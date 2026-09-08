@@ -1,3 +1,186 @@
+          ];
+          memUserStep = 0;
+          memCanInput = false;
+          document.getElementById('memStatus').textContent = '光る順番をよく見て覚えてください...';
+          document.getElementById('memProgress').textContent = '系列長: 4ステップ (再生中)';
+
+          let stepIdx = 0;
+          const playSeq = () => {
+            if (stepIdx >= memSequence.length) {
+              memCanInput = true;
+              document.getElementById('memStatus').textContent = '【入力受付】覚えた順にタップ！';
+              document.getElementById('memProgress').textContent = '入力待ち: 0 / 4';
+              return;
+            }
+            flashMemoryBtn(memSequence[stepIdx]);
+            stepIdx++;
+            testTimer = setTimeout(playSeq, 650);
+          };
+          testTimer = setTimeout(playSeq, 500);
+        }
+      }
+
+      function handleReactionTap() {
+        if (testType !== 'reaction') return;
+        if (!testWaitingGreen) {
+          clearTimeout(testTimer);
+          toast('お手付きです！緑色に変わる前にタップされました');
+          cleanupTests();
+          return;
+        }
+        const reactMs = Date.now() - testStartTime;
+        cleanupTests();
+        showResultDisplay(
+          '① 反応速度テスト',
+          `${reactMs} ms`,
+          reactMs < 270 ? '良好：ベースライン同等の素早い覚醒度' : '通常よりやや遅延（無理せず休息を）',
+          reactMs < 270 ? '#065f46' : 'var(--warn)'
+        );
+      }
+
+      function nextAttentionTrial() {
+        if (attRemaining <= 0) {
+          finishAttention();
+          return;
+        }
+        document.getElementById('attCount').textContent = `残り: ${attRemaining}回`;
+        attRemaining--;
+
+        const btn = document.getElementById('attCircleBtn');
+        btn.style.background = '#cbd5e1';
+        btn.textContent = '...';
+        btn.style.pointerEvents = 'none';
+        attIsTarget = false;
+
+        testTimer = setTimeout(() => {
+          attIsTarget = Math.random() < 0.6;
+          btn.style.pointerEvents = 'auto';
+          if (attIsTarget) {
+            btn.style.background = '#ef4444';
+            btn.textContent = '赤 (押す!)';
+            attTargetStartTime = Date.now();
+          } else {
+            const colors = ['#3b82f6', '#10b981', '#f59e0b'];
+            btn.style.background = colors[Math.floor(Math.random() * colors.length)];
+            btn.textContent = '見送り';
+          }
+
+          attInterval = setTimeout(() => {
+            if (attIsTarget) attScore.miss++;
+            nextAttentionTrial();
+          }, 1200);
+        }, 500);
+      }
+
+      function handleAttentionTap() {
+        clearTimeout(attInterval);
+        const btn = document.getElementById('attCircleBtn');
+        btn.style.pointerEvents = 'none';
+
+        if (attIsTarget) {
+          attScore.correct++;
+          attScore.times.push(Date.now() - attTargetStartTime);
+        } else {
+          attScore.falseAlarm++;
+        }
+        testTimer = setTimeout(nextAttentionTrial, 300);
+      }
+
+      function finishAttention() {
+        cleanupTests();
+        const avg = attScore.times.length ? Math.round(attScore.times.reduce((a,b)=>a+b,0)/attScore.times.length) : 0;
+        const success = attScore.falseAlarm === 0 && attScore.correct >= 2;
+        showResultDisplay(
+          '② 注意テスト (赤色選択)',
+          `正答 ${attScore.correct}回 / 誤答 ${attScore.falseAlarm}回 (${avg}ms)`,
+          success ? '良好：注意維持力・抑制機能は正常' : 'やや散漫：見落とし・誤反応あり',
+          success ? '#065f46' : 'var(--warn)'
+        );
+      }
+
+      function flashMemoryBtn(idx) {
+        const btn = document.getElementById(`memBtn-${idx}`);
+        if (!btn) return;
+        btn.style.opacity = '1';
+        btn.style.transform = 'scale(1.08)';
+        setTimeout(() => {
+          btn.style.opacity = '0.6';
+          btn.style.transform = 'scale(1)';
+        }, 300);
+      }
+
+      function handleMemoryTap(idx) {
+        if (!memCanInput) return;
+        flashMemoryBtn(idx);
+
+        if (idx !== memSequence[memUserStep]) {
+          memCanInput = false;
+          toast(`順番が違いました（正解は ${memUserStep + 1}番目が別の色でした）`);
+          cleanupTests();
+          showResultDisplay(
+            '③ 記憶系列テスト',
+            `再現成功: ${memUserStep} / 4ステップ`,
+            '通常ベースラインより低下（疲労の可能性あり）',
+            'var(--warn)'
+          );
+          return;
+        }
+
+        memUserStep++;
+        document.getElementById('memProgress').textContent = `入力中: ${memUserStep} / 4`;
+
+        if (memUserStep >= memSequence.length) {
+          memCanInput = false;
+          cleanupTests();
+          showResultDisplay(
+            '③ 記憶系列テスト',
+            '完全再現 (4/4 成功)',
+            '短期記憶力・集中力はベースライン同等',
+            '#065f46'
+          );
+        }
+      }
+
+      function showResultDisplay(title, score, comp, compColor) {
+        const box = document.getElementById('testResultBox');
+        box.classList.remove('hidden');
+        document.getElementById('resTestTitle').textContent = title;
+        document.getElementById('resScoreVal').textContent = score;
+        const compEl = document.getElementById('resCompVal');
+        compEl.textContent = comp;
+        compEl.style.color = compColor;
+        toast(`${title} 完了`);
+      }
+
+      function init(){
+        initBars();
+        document.getElementById('btnStart').addEventListener('click', async (e)=>{
+          e.preventDefault();
+          await startMeasurement();
+        }, { passive:false });
+
+        checkMotionPermissionUI();
+        loadPeakEventsFromStorage();
+        loadHistory();
+        document.getElementById('baselineLabel').textContent=`● ベースライン: ${baselineDb.toFixed(1)} dB`;
+        runPreflight();
+        updateRuleText();
+        setInterval(updateDebug, 500);
+      }
+
+      return {
+        init, switchRole, switchTab, requestSensorPermission, runPreflight,
+        calibrateBaseline, startMeasurement, stopMeasurement, toggleBlackout,
+        onDoctorSessionChange, onShareSessionChange, exportSessionLog, playPeakAudio, playPeakByIndex, clearPeakEvents, clearAllLogs,
+        // ミニゲーム用公開関数
+        setTestType, startCurrentTest, handleReactionTap, handleAttentionTap, handleMemoryTap
+      };
+    })();
+
+    window.addEventListener('DOMContentLoaded', ()=>App.init());
+  </script>
+</body>
+</html>
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -43,10 +226,13 @@
     .logline{padding:4px 0;border-bottom:1px dashed #e2e8f0;font-size:12px;color:#334155}
     .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
     .dbg{background:#0b1220;color:#dbeafe;border:1px solid #22314f;border-radius:10px;padding:10px;font-size:12px;line-height:1.45;white-space:pre-wrap}
+
+    /* 昼間ミニテスト専用スタイル */
+    .test-box { height: 260px; border-radius: 14px; border: 2px dashed #cbd5e1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f8fafc; user-select: none; position: relative; }
   </style>
 </head>
 <body>
-  <div id=\"toast\"></div>
+  <div id="toast"></div>
 
   <div id="blackout" onclick="App.toggleBlackout(false)">
     <div id="blackoutClock">00:00</div>
@@ -153,7 +339,65 @@
         </div>
       </div>
 
-      <div id="panel-day" class="hidden"><div class="card">昼間テスト（プレースホルダ）</div></div>
+      <!-- 昼間テスト（ミニゲーム復活） -->
+      <div id="panel-day" class="hidden col">
+        <div class="card col">
+          <div>
+            <strong>起床後ミニテスト</strong>
+            <div class="muted">起床直後の覚醒度・注意力を測定します。</div>
+          </div>
+
+          <div class="row" style="gap:4px;border-bottom:1px solid var(--line);padding-bottom:8px">
+            <button onclick="App.setTestType('reaction')" id="btnTest-reaction" class="btn btn-primary" style="flex:1;font-size:11px;padding:6px 4px">① 反応速度</button>
+            <button onclick="App.setTestType('attention')" id="btnTest-attention" class="btn btn-soft" style="flex:1;font-size:11px;padding:6px 4px">② 注意力</button>
+            <button onclick="App.setTestType('memory')" id="btnTest-memory" class="btn btn-soft" style="flex:1;font-size:11px;padding:6px 4px">③ 記憶力</button>
+          </div>
+
+          <div id="testArea" class="test-box">
+            <div id="testGuide" style="display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:12px">
+              <strong id="testGuideTitle" style="font-size:14px">画面が「緑」に変わったら即タップ！</strong>
+              <p id="testGuideSub" style="font-size:11px;color:var(--muted)">「開始」を押すと待機画面（赤）になります</p>
+              <button onclick="App.startCurrentTest()" class="btn btn-primary" style="margin-top:6px;padding:8px 20px">テスト開始</button>
+            </div>
+
+            <div id="panelReaction" onclick="App.handleReactionTap()" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer">
+              <strong id="reactPrompt" style="font-size:22px">待機中...</strong>
+              <span id="reactSubPrompt" style="font-size:11px;margin-top:4px">緑色に変わるまでタップ禁止</span>
+            </div>
+
+            <div id="panelAttention" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:12px">
+              <div style="width:100%;display:flex;justify-content:space-between;font-size:11px;font-weight:bold">
+                <span>「赤色の円」だけタップ！</span>
+                <span id="attCount">残り: 5回</span>
+              </div>
+              <button id="attCircleBtn" onclick="App.handleAttentionTap()" style="width:90px;height:90px;border-radius:9999px;border:0;color:#fff;font-weight:bold;font-size:13px;cursor:pointer"></button>
+              <span style="font-size:10px;color:var(--muted)">青・緑は見送ってください</span>
+            </div>
+
+            <div id="panelMemory" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:12px">
+              <div id="memStatus" style="font-size:11px;font-weight:bold">光る順番を覚えてください...</div>
+              <div style="display:grid;grid-template-columns:repeat(2, 65px);gap:10px;margin:auto">
+                <button id="memBtn-0" onclick="App.handleMemoryTap(0)" style="height:65px;border-radius:8px;border:0;background:#ef4444;opacity:0.6;cursor:pointer"></button>
+                <button id="memBtn-1" onclick="App.handleMemoryTap(1)" style="height:65px;border-radius:8px;border:0;background:#3b82f6;opacity:0.6;cursor:pointer"></button>
+                <button id="memBtn-2" onclick="App.handleMemoryTap(2)" style="height:65px;border-radius:8px;border:0;background:#f59e0b;opacity:0.6;cursor:pointer"></button>
+                <button id="memBtn-3" onclick="App.handleMemoryTap(3)" style="height:65px;border-radius:8px;border:0;background:#10b981;opacity:0.6;cursor:pointer"></button>
+              </div>
+              <div id="memProgress" style="font-size:10px;color:var(--muted)">系列長: 4ステップ</div>
+            </div>
+          </div>
+
+          <div id="testResultBox" class="hidden" style="background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:10px">
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted)">
+              <span id="resTestTitle">結果</span>
+              <span>個人ベースライン照合</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:8px;margin-top:2px">
+              <strong id="resScoreVal" style="font-size:18px">--</strong>
+              <span id="resCompVal" style="font-size:10px;font-weight:bold;color:var(--warn)">判定中</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- 共有タブ -->
       <div id="panel-share" class="hidden col">
@@ -203,7 +447,7 @@
         <div id="docStats">最大体動: -- G / いびき疑い: --分</div>
         <div id="docNote" class="muted">--</div>
         <audio id="docAudio" controls style="width:100%;display:none"></audio>
-        <button class="btn btn-primary" onclick="App.playPeakAudio()\">録音再生</button>
+        <button class="btn btn-primary" onclick="App.playPeakAudio()">録音再生</button>
       </div>
     </section>
   </main>
@@ -229,6 +473,20 @@
       let peakEvents=[];
 
       let lastDecision='待機', lastTrigger='なし', preflight={};
+
+      // ===== 起床後ミニテスト用ステート =====
+      let testType = 'reaction';
+      let testTimer = null;
+      let testStartTime = 0;
+      let testWaitingGreen = false;
+      let attInterval = null;
+      let attRemaining = 5;
+      let attScore = { correct: 0, miss: 0, falseAlarm: 0, times: [] };
+      let attIsTarget = false;
+      let attTargetStartTime = 0;
+      let memSequence = [];
+      let memUserStep = 0;
+      let memCanInput = false;
 
       const CFG = {
         sampleMs:120,
@@ -738,6 +996,7 @@ lastTrigger=${lastTrigger}`;
 
       function switchRole(next){
         role=next;
+        cleanupTests();
         const pv=document.getElementById('patientView'), dv=document.getElementById('doctorView');
         const rp=document.getElementById('rolePatient'), rd=document.getElementById('roleDoctor');
         if(next==='patient'){ pv.classList.remove('hidden'); dv.classList.add('hidden'); rp.style.background='#fff'; rd.style.background='transparent'; }
@@ -746,6 +1005,7 @@ lastTrigger=${lastTrigger}`;
 
       function switchTab(next){
         tab=next;
+        cleanupTests();
         ['record','history','day','share'].forEach(t=>{
           document.getElementById('tab-'+t).classList.toggle('active', t===next);
           document.getElementById('panel-'+t).classList.toggle('hidden', t!==next);
@@ -768,7 +1028,6 @@ lastTrigger=${lastTrigger}`;
           return null;
         }
 
-        // セッションオブジェクトの複製（元データを壊さない）
         let sessionObj = JSON.parse(JSON.stringify(targetSession));
         let exportPeakEvents = JSON.parse(JSON.stringify(peakEvents));
 
@@ -781,8 +1040,8 @@ lastTrigger=${lastTrigger}`;
           });
         }
 
-        // 現在の日本時間ISO形式文字列
         const now = new Date();
+        const exportDateStr = new Date(now.getTime
         const exportDateStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString();
 
         return {
@@ -853,17 +1112,254 @@ lastTrigger=${lastTrigger}`;
                   toast('共有失敗のためダウンロードしました');
                   return;
                 }
-                return; // ユーザーキャンセル時は何もしない
+                return;
               }
             }
           }
-          // Web Share非対応環境へのフォールバック
           downloadBlob(blob, fileName);
           toast('共有非対応のためダウンロードしました');
         }else{
           downloadBlob(blob, fileName);
           toast('JSONログを書き出しました');
         }
+      }
+
+      // ===== 起床後ミニテスト（復活ロジック） =====
+      function setTestType(type) {
+        testType = type;
+        cleanupTests();
+
+        ['reaction', 'attention', 'memory'].forEach(t => {
+          const btn = document.getElementById(`btnTest-${t}`);
+          if (btn) btn.className = (t === type) ? 'btn btn-primary' : 'btn btn-soft';
+        });
+
+        const guideTitle = document.getElementById('testGuideTitle');
+        const guideSub = document.getElementById('testGuideSub');
+
+        if (type === 'reaction') {
+          guideTitle.textContent = '画面が「緑」に変わったら即タップ！';
+          guideSub.textContent = '「開始」を押すと待機画面（赤）になります';
+        } else if (type === 'attention') {
+          guideTitle.textContent = '「赤色の円」が現れた時だけタップ！';
+          guideSub.textContent = '青や緑は見送ってください（全5回）';
+        } else {
+          guideTitle.textContent = '光る色の順番を記憶して再現！';
+          guideSub.textContent = '4つの色が光ります。同じ順序でタップしてください';
+        }
+      }
+
+      function cleanupTests() {
+        clearTimeout(testTimer);
+        clearTimeout(attInterval);
+        testWaitingGreen = false;
+        memCanInput = false;
+
+        const guide = document.getElementById('testGuide');
+        if (guide) guide.classList.remove('hidden');
+        ['panelReaction', 'panelAttention', 'panelMemory', 'testResultBox'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.classList.add('hidden');
+        });
+        const area = document.getElementById('testArea');
+        if (area) {
+          area.style.background = '#f8fafc';
+          area.style.borderColor = '#cbd5e1';
+        }
+      }
+
+      function startCurrentTest() {
+        document.getElementById('testGuide').classList.add('hidden');
+        document.getElementById('testResultBox').classList.add('hidden');
+
+        if (testType === 'reaction') {
+          const p = document.getElementById('panelReaction');
+          p.classList.remove('hidden');
+          const area = document.getElementById('testArea');
+          area.style.background = '#ef4444';
+          area.style.borderColor = '#dc2626';
+          document.getElementById('reactPrompt').textContent = '待機中...';
+          document.getElementById('reactPrompt').style.color = '#fff';
+          document.getElementById('reactSubPrompt').textContent = '緑色に変わるまでタップ禁止';
+          document.getElementById('reactSubPrompt').style.color = '#fee2e2';
+
+          testWaitingGreen = false;
+          const delay = 1500 + Math.random() * 2000;
+          clearTimeout(testTimer);
+          testTimer = setTimeout(() => {
+            testWaitingGreen = true;
+            area.style.background = '#10b981';
+            area.style.borderColor = '#059669';
+            document.getElementById('reactPrompt').textContent = '今すぐタップ！';
+            document.getElementById('reactSubPrompt').textContent = '画面内をどこでもタップ';
+            testStartTime = Date.now();
+          }, delay);
+        } else if (testType === 'attention') {
+          const p = document.getElementById('panelAttention');
+          p.classList.remove('hidden');
+          attRemaining = 5;
+          attScore = { correct: 0, miss: 0, falseAlarm: 0, times: [] };
+          nextAttentionTrial();
+        } else if (testType === 'memory') {
+          const p = document.getElementById('panelMemory');
+          p.classList.remove('hidden');
+          memSequence = [
+            Math.floor(Math.random() * 4),
+            Math.floor(Math.random() * 4),
+            Math.floor(Math.random() * 4),
+            Math.floor(Math.random() * 4)
+          ];
+          memUserStep = 0;
+          memCanInput = false;
+          document.getElementById('memStatus').textContent = '光る順番をよく見て覚えてください...';
+          document.getElementById('memProgress').textContent = '系列長: 4ステップ (再生中)';
+
+          let stepIdx = 0;
+          const playSeq = () => {
+            if (stepIdx >= memSequence.length) {
+              memCanInput = true;
+              document.getElementById('memStatus').textContent = '【入力受付】覚えた順にタップ！';
+              document.getElementById('memProgress').textContent = '入力待ち: 0 / 4';
+              return;
+            }
+            flashMemoryBtn(memSequence[stepIdx]);
+            stepIdx++;
+            testTimer = setTimeout(playSeq, 650);
+          };
+          testTimer = setTimeout(playSeq, 500);
+        }
+      }
+
+      function handleReactionTap() {
+        if (testType !== 'reaction') return;
+        if (!testWaitingGreen) {
+          clearTimeout(testTimer);
+          toast('お手付きです！緑色に変わる前にタップされました');
+          cleanupTests();
+          return;
+        }
+        const reactMs = Date.now() - testStartTime;
+        cleanupTests();
+        showResultDisplay(
+          '① 反応速度テスト',
+          `${reactMs} ms`,
+          reactMs < 270 ? '良好：ベースライン同等の素早い覚醒度' : '通常よりやや遅延（無理せず休息を）',
+          reactMs < 270 ? '#065f46' : 'var(--warn)'
+        );
+      }
+
+      function nextAttentionTrial() {
+        if (attRemaining <= 0) {
+          finishAttention();
+          return;
+        }
+        document.getElementById('attCount').textContent = `残り: ${attRemaining}回`;
+        attRemaining--;
+
+        const btn = document.getElementById('attCircleBtn');
+        btn.style.background = '#cbd5e1';
+        btn.textContent = '...';
+        btn.style.pointerEvents = 'none';
+        attIsTarget = false;
+
+        testTimer = setTimeout(() => {
+          attIsTarget = Math.random() < 0.6;
+          btn.style.pointerEvents = 'auto';
+          if (attIsTarget) {
+            btn.style.background = '#ef4444';
+            btn.textContent = '赤 (押す!)';
+            attTargetStartTime = Date.now();
+          } else {
+            const colors = ['#3b82f6', '#10b981', '#f59e0b'];
+            btn.style.background = colors[Math.floor(Math.random() * colors.length)];
+            btn.textContent = '見送り';
+          }
+
+          attInterval = setTimeout(() => {
+            if (attIsTarget) attScore.miss++;
+            nextAttentionTrial();
+          }, 1200);
+        }, 500);
+      }
+
+      function handleAttentionTap() {
+        clearTimeout(attInterval);
+        const btn = document.getElementById('attCircleBtn');
+        btn.style.pointerEvents = 'none';
+
+        if (attIsTarget) {
+          attScore.correct++;
+          attScore.times.push(Date.now() - attTargetStartTime);
+        } else {
+          attScore.falseAlarm++;
+        }
+        testTimer = setTimeout(nextAttentionTrial, 300);
+      }
+
+      function finishAttention() {
+        cleanupTests();
+        const avg = attScore.times.length ? Math.round(attScore.times.reduce((a,b)=>a+b,0)/attScore.times.length) : 0;
+        const success = attScore.falseAlarm === 0 && attScore.correct >= 2;
+        showResultDisplay(
+          '② 注意テスト (赤色選択)',
+          `正答 ${attScore.correct}回 / 誤答 ${attScore.falseAlarm}回 (${avg}ms)`,
+          success ? '良好：注意維持力・抑制機能は正常' : 'やや散漫：見落とし・誤反応あり',
+          success ? '#065f46' : 'var(--warn)'
+        );
+      }
+
+      function flashMemoryBtn(idx) {
+        const btn = document.getElementById(`memBtn-${idx}`);
+        if (!btn) return;
+        btn.style.opacity = '1';
+        btn.style.transform = 'scale(1.08)';
+        setTimeout(() => {
+          btn.style.opacity = '0.6';
+          btn.style.transform = 'scale(1)';
+        }, 300);
+      }
+
+      function handleMemoryTap(idx) {
+        if (!memCanInput) return;
+        flashMemoryBtn(idx);
+
+        if (idx !== memSequence[memUserStep]) {
+          memCanInput = false;
+          toast(`順番が違いました（正解は ${memUserStep + 1}番目が別の色でした）`);
+          cleanupTests();
+          showResultDisplay(
+            '③ 記憶系列テスト',
+            `再現成功: ${memUserStep} / 4ステップ`,
+            '通常ベースラインより低下（疲労の可能性あり）',
+            'var(--warn)'
+          );
+          return;
+        }
+
+        memUserStep++;
+        document.getElementById('memProgress').textContent = `入力中: ${memUserStep} / 4`;
+
+        if (memUserStep >= memSequence.length) {
+          memCanInput = false;
+          cleanupTests();
+          showResultDisplay(
+            '③ 記憶系列テスト',
+            '完全再現 (4/4 成功)',
+            '短期記憶力・集中力はベースライン同等',
+            '#065f46'
+          );
+        }
+      }
+
+      function showResultDisplay(title, score, comp, compColor) {
+        const box = document.getElementById('testResultBox');
+        box.classList.remove('hidden');
+        document.getElementById('resTestTitle').textContent = title;
+        document.getElementById('resScoreVal').textContent = score;
+        const compEl = document.getElementById('resCompVal');
+        compEl.textContent = comp;
+        compEl.style.color = compColor;
+        toast(`${title} 完了`);
       }
 
       function init(){
@@ -885,7 +1381,8 @@ lastTrigger=${lastTrigger}`;
       return {
         init, switchRole, switchTab, requestSensorPermission, runPreflight,
         calibrateBaseline, startMeasurement, stopMeasurement, toggleBlackout,
-        onDoctorSessionChange, onShareSessionChange, exportSessionLog, playPeakAudio, playPeakByIndex, clearPeakEvents, clearAllLogs
+        onDoctorSessionChange, onShareSessionChange, exportSessionLog, playPeakAudio, playPeakByIndex, clearPeakEvents, clearAllLogs,
+        setTestType, startCurrentTest, handleReactionTap, handleAttentionTap, handleMemoryTap
       };
     })();
 
