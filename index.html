@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>SleepTracker 完全版（患者/医師・実測連動）</title>
+  <title>SleepTracker 完全版（患者/医師・実測連動・コンディションcheck統合）</title>
   <style>
     :root{
       --bg:#f1f5f9;
@@ -280,7 +280,7 @@
       color:var(--text);
     }
     .test-box{
-      height:280px;
+      height:300px;
       border:2px dashed #cbd5e1;
       border-radius:14px;
       background:#f8fafc;
@@ -333,6 +333,48 @@
     }
     .sum .k{font-size:10px;color:#64748b;}
     .sum .v{font-weight:900;font-size:16px;}
+    .progress-pill{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:999px;
+      padding:4px 10px;
+      background:#e0e7ff;
+      color:#3730a3;
+      font-weight:800;
+      font-size:12px;
+    }
+    .modal-backdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(2,6,23,.55);
+      z-index:120;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:16px;
+    }
+    .modal-backdrop.active{display:flex;}
+    .modal{
+      width:min(94vw,480px);
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:14px;
+      box-shadow:0 10px 30px rgba(2,6,23,.25);
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .modal h3{
+      font-size:18px;
+      line-height:1.2;
+    }
+    .modal p{
+      font-size:13px;
+      color:#334155;
+      line-height:1.6;
+    }
     @media (max-width:740px){
       .event-row{
         grid-template-columns:1fr;
@@ -352,13 +394,24 @@
     <div class="muted" style="margin-top:8px;color:#475569;">🌙 就寝モード（タップで復帰）</div>
   </div>
 
+  <div id="wakeCheckModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="wakeCheckTitle">
+    <div class="modal">
+      <h3 id="wakeCheckTitle">☀️ 起床後チェック</h3>
+      <p>おはようございます！脳の目覚め度（反射神経・判断力・短期記憶）をサクッと測定しませんか？</p>
+      <div class="row" style="justify-content:flex-end;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="App.goConditionNow()">今すぐチェックする</button>
+        <button class="btn btn-soft" onclick="App.skipConditionNow()">スキップする / あとで</button>
+      </div>
+    </div>
+  </div>
+
   <header class="top">
     <div class="top-inner">
       <div class="brand">
         <div class="logo">🌙</div>
         <div>
           <div class="ttl">SleepTracker</div>
-          <div class="sub">単一ファイル完全版（患者/医師・実測連動）</div>
+          <div class="sub">患者/医師・実測連動（コンディションcheck統合）</div>
         </div>
       </div>
       <div class="mode-switch">
@@ -373,7 +426,7 @@
       <div class="tabs">
         <button id="tab-measure" class="tab active" onclick="App.switchPatientTab('measure')">測定</button>
         <button id="tab-history" class="tab" onclick="App.switchPatientTab('history')">履歴</button>
-        <button id="tab-daytest" class="tab" onclick="App.switchPatientTab('daytest')">昼間テスト</button>
+        <button id="tab-condition" class="tab" onclick="App.switchPatientTab('condition')">コンディションcheck</button>
         <button id="tab-share" class="tab" onclick="App.switchPatientTab('share')">共有</button>
       </div>
 
@@ -448,61 +501,58 @@
         </div>
       </div>
 
-      <div id="panel-daytest" class="hidden col">
+      <div id="panel-condition" class="hidden col">
         <div class="card col">
-          <div>
-            <strong>起床後ミニテスト</strong>
-            <div class="muted">①反応速度 / ②注意力 / ③記憶力</div>
+          <div class="row" style="justify-content:space-between;align-items:flex-start;">
+            <div>
+              <strong>コンディションcheck</strong>
+              <div class="muted">起床後の反射神経・判断力・短期記憶を3連続で測定</div>
+            </div>
+            <span id="condProgressPill" class="progress-pill">待機中</span>
           </div>
 
-          <div class="row" style="border-bottom:1px solid var(--line);padding-bottom:8px;">
-            <button id="btnTest-reaction" class="btn btn-primary" style="flex:1;padding:8px 6px;" onclick="App.setDayTest('reaction')">①反応速度</button>
-            <button id="btnTest-attention" class="btn btn-soft" style="flex:1;padding:8px 6px;" onclick="App.setDayTest('attention')">②注意力</button>
-            <button id="btnTest-memory" class="btn btn-soft" style="flex:1;padding:8px 6px;" onclick="App.setDayTest('memory')">③記憶力</button>
+          <div id="condGuide" class="col" style="background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:10px;">
+            <div style="font-size:13px;font-weight:800;">ワンストップ測定</div>
+            <div id="condGuideText" class="muted">「チェック開始」で 1/3→2/3→3/3 を自動実行します。</div>
+            <button id="btnConditionStart" class="btn btn-primary" onclick="App.startConditionFlow()">チェック開始</button>
           </div>
 
-          <div id="testBox" class="test-box">
-            <div id="testGuide" class="col" style="align-items:center;text-align:center;padding:12px;">
-              <strong id="testGuideTitle">画面が緑に変わった瞬間をタップ</strong>
-              <div id="testGuideSub" class="muted">開始後、赤画面で待機します</div>
-              <button class="btn btn-primary" onclick="App.startCurrentDayTest()">テスト開始</button>
+          <div id="condTestBox" class="test-box">
+            <div id="condIdlePanel" class="col" style="align-items:center;text-align:center;padding:12px;">
+              <strong>準備OK</strong>
+              <div class="muted">チェック開始を押すとすぐ開始します</div>
             </div>
 
-            <div id="panelReaction" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;" onclick="App.onReactionTap()">
-              <div id="reactionMain" style="font-size:24px;font-weight:900;color:#fff;">待機中...</div>
-              <div id="reactionSub" style="font-size:11px;color:#fee2e2;">緑になるまでタップ禁止</div>
+            <div id="condReactionPanel" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;" onclick="App.onConditionReactionTap()">
+              <div id="condReactionMain" style="font-size:24px;font-weight:900;color:#fff;">待機中...</div>
+              <div id="condReactionSub" style="font-size:11px;color:#fee2e2;">画面が緑になるまでタップしないでください</div>
             </div>
 
-            <div id="panelAttention" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:12px;">
+            <div id="condAttentionPanel" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:12px;">
               <div class="row" style="justify-content:space-between;width:100%;">
-                <strong style="font-size:12px;">赤だけタップ（Go/No-Go）</strong>
-                <span id="attRemain" style="font-size:12px;">残り: 5回</span>
+                <strong style="font-size:12px;">赤色の円が出た時だけタップ！（全5回）</strong>
+                <span id="condAttRemain" style="font-size:12px;">残り: 5回</span>
               </div>
-              <button id="attCircle" class="circle-btn" onclick="App.onAttentionTap()">...</button>
-              <div class="muted">青・緑は見送る</div>
+              <button id="condAttCircle" class="circle-btn" onclick="App.onConditionAttentionTap()">...</button>
+              <div class="muted">青・緑は見送り</div>
             </div>
 
-            <div id="panelMemory" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:12px;">
-              <div id="memStatus" style="font-size:12px;font-weight:800;">光る順を覚えてください...</div>
+            <div id="condMemoryPanel" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:12px;">
+              <div id="condMemStatus" style="font-size:12px;font-weight:800;">4色の順番を覚えてください...</div>
               <div class="mem-grid">
-                <button id="mem-0" class="mem-cell" style="background:#ef4444;" onclick="App.onMemoryTap(0)"></button>
-                <button id="mem-1" class="mem-cell" style="background:#3b82f6;" onclick="App.onMemoryTap(1)"></button>
-                <button id="mem-2" class="mem-cell" style="background:#f59e0b;" onclick="App.onMemoryTap(2)"></button>
-                <button id="mem-3" class="mem-cell" style="background:#10b981;" onclick="App.onMemoryTap(3)"></button>
+                <button id="condMem-0" class="mem-cell" style="background:#ef4444;" onclick="App.onConditionMemoryTap(0)"></button>
+                <button id="condMem-1" class="mem-cell" style="background:#3b82f6;" onclick="App.onConditionMemoryTap(1)"></button>
+                <button id="condMem-2" class="mem-cell" style="background:#f59e0b;" onclick="App.onConditionMemoryTap(2)"></button>
+                <button id="condMem-3" class="mem-cell" style="background:#10b981;" onclick="App.onConditionMemoryTap(3)"></button>
               </div>
-              <div id="memProg" class="muted">系列長: 4</div>
+              <div id="condMemProg" class="muted">系列長: 4</div>
             </div>
           </div>
 
-          <div id="dayResult" class="hidden" style="background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:10px;">
-            <div class="row" style="justify-content:space-between;">
-              <span id="dayResultTitle" style="font-size:12px;color:#64748b;">結果</span>
-              <span style="font-size:11px;color:#64748b;">判定</span>
-            </div>
-            <div class="row" style="align-items:baseline;gap:8px;">
-              <strong id="dayResultScore" style="font-size:20px;">--</strong>
-              <span id="dayResultJudge" style="font-size:12px;font-weight:800;color:#065f46;">--</span>
-            </div>
+          <div id="condResultBox" class="hidden" style="background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:12px;">
+            <div style="font-size:12px;color:#64748b;">トータル判定</div>
+            <div id="condResultText" style="font-size:22px;font-weight:900;margin-top:4px;">測定完了！OK☕</div>
+            <div class="muted">この結果は履歴保存され、医師モードと共有JSONに連携されます。</div>
           </div>
         </div>
       </div>
@@ -510,7 +560,7 @@
       <div id="panel-share" class="hidden col">
         <div class="card col">
           <strong>完全実測ログ出力 / 共有</strong>
-          <div class="muted">セッションを選択してJSONを生成し、ダウンロードまたは共有します。</div>
+          <div class="muted">セッションを選択してJSONを生成し、ダウンロードまたは共有します（コンディションcheck履歴含む）。</div>
 
           <select id="shareSessionSelect"></select>
 
@@ -551,6 +601,11 @@
           <strong style="font-size:12px;">ピーク録音（セッション内）</strong>
           <div id="docPeakList" class="list"></div>
         </div>
+
+        <div class="card col" style="background:#f8fafc;">
+          <strong style="font-size:13px;">起床後コンディション推移</strong>
+          <div id="docConditionPanel" class="muted">紐付くコンディションcheck結果がありません。</div>
+        </div>
       </div>
     </section>
   </main>
@@ -559,6 +614,7 @@
     const App = (() => {
       const STORAGE_SESSIONS = "sleep_sessions_v6";
       const STORAGE_PEAKS = "sleep_peak_events_v6";
+      const STORAGE_CONDITION = "condition_checks_v1";
 
       let mode = "patient";
       let patientTab = "measure";
@@ -603,20 +659,8 @@
       let lastDecision = "待機";
       let lastTrigger = "なし";
 
-      let dayTestType = "reaction";
-      let testTimer = null;
-      let reactionWaiting = false;
-      let reactionStartTs = 0;
-
-      let attentionRemain = 5;
-      let attentionState = { correct:0, miss:0, falseAlarm:0, times:[] };
-      let attentionTarget = false;
-      let attentionTargetStart = 0;
-      let attentionAutoTimeout = null;
-
-      let memorySeq = [];
-      let memoryStep = 0;
-      let memoryCanInput = false;
+      let currentSessionIdForRecording = "";
+      let lastSavedSessionId = "";
 
       const CFG = {
         sampleMs: 120,
@@ -633,6 +677,28 @@
         cooldownMs: 4500,
         peakRecSec: 3
       };
+
+      let condFlowRunning = false;
+      let condPhase = 0;
+      let condTimer = null;
+
+      const condRaw = {
+        reactionMs: null,
+        attention: { total:5, correct:0, miss:0, falseAlarm:0, times:[] },
+        memory: { total:4, success:0, full:false }
+      };
+
+      let condReactionWaiting = false;
+      let condReactionStartTs = 0;
+
+      let condAttRemain = 5;
+      let condAttTarget = false;
+      let condAttTargetStart = 0;
+      let condAttTimeout = null;
+
+      let condMemSeq = [];
+      let condMemStep = 0;
+      let condMemCanInput = false;
 
       function toast(msg){
         const wrap = document.getElementById("toastWrap");
@@ -662,6 +728,16 @@
         const h = String(Math.floor(sec/3600)).padStart(2,"0");
         const m = String(Math.floor((sec%3600)/60)).padStart(2,"0");
         return `${h}:${m}`;
+      }
+
+      function nowJaYmdHm(){
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth()+1).padStart(2,"0");
+        const day = String(d.getDate()).padStart(2,"0");
+        const hh = String(d.getHours()).padStart(2,"0");
+        const mm = String(d.getMinutes()).padStart(2,"0");
+        return `${y}/${m}/${day} ${hh}:${mm}`;
       }
 
       function median(arr){
@@ -945,6 +1021,17 @@
         }
       }
 
+      function saveConditionChecks(arr){
+        localStorage.setItem(STORAGE_CONDITION, JSON.stringify(arr.slice(0,120)));
+      }
+
+      function loadConditionChecks(){
+        try{
+          return JSON.parse(localStorage.getItem(STORAGE_CONDITION) || "[]");
+        }catch{
+          return [];
+        }
+      }
       async function recordPeakIfNeeded(db){
         const now = Date.now();
         const gTh = dynGPeakThreshold();
@@ -1039,12 +1126,9 @@
         }
       }
 
-      let currentSessionIdForRecording = "";
-
       async function startMeasurement(){
         if(isRecording) return;
 
-        // 要件: ボタン直後に最優先で getUserMedia 呼び出し
         try{
           mediaStream = await navigator.mediaDevices.getUserMedia({ audio:true });
         }catch(e){
@@ -1160,6 +1244,27 @@
         toast("測定開始");
       }
 
+      function openWakeCheckModal(){
+        const m = document.getElementById("wakeCheckModal");
+        m.classList.add("active");
+      }
+
+      function closeWakeCheckModal(){
+        const m = document.getElementById("wakeCheckModal");
+        m.classList.remove("active");
+      }
+
+      function goConditionNow(){
+        closeWakeCheckModal();
+        switchPatientTab("condition");
+        prepareConditionIdle();
+      }
+
+      function skipConditionNow(){
+        closeWakeCheckModal();
+        switchPatientTab("history");
+      }
+
       function stopMeasurement(){
         if(!isRecording) return;
         isRecording = false;
@@ -1202,6 +1307,7 @@
         const sessions = loadSessions();
         sessions.unshift(session);
         saveSessions(sessions);
+        lastSavedSessionId = id;
 
         document.getElementById("sessionBadge").textContent = "測定完了";
         document.getElementById("sessionBadge").className = "badge b-gray";
@@ -1218,7 +1324,9 @@
         loadHistoryUI();
         loadShareSelect();
         loadDoctorSelect();
-        switchPatientTab("history");
+        prepareConditionIdle();
+
+        openWakeCheckModal();
         toast("保存完了");
       }
 
@@ -1298,18 +1406,21 @@
         if(!confirm("ピーク録音履歴を削除しますか？")) return;
         localStorage.removeItem(STORAGE_PEAKS);
         renderPeakEvents();
-        loadDoctorPeaksForSelected();
+        loadDoctorPeaksForSelected(document.getElementById("doctorSessionSelect").value);
         toast("ピーク履歴を削除しました");
       }
 
       function clearAllData(){
-        if(!confirm("測定履歴とピーク履歴を全削除しますか？")) return;
+        if(!confirm("測定履歴・ピーク履歴・コンディションcheck履歴を全削除しますか？")) return;
         localStorage.removeItem(STORAGE_SESSIONS);
         localStorage.removeItem(STORAGE_PEAKS);
+        localStorage.removeItem(STORAGE_CONDITION);
         loadHistoryUI();
         loadShareSelect();
         loadDoctorSelect();
         clearDoctorSummary();
+        prepareConditionIdle();
+        closeWakeCheckModal();
         toast("全履歴削除完了");
       }
 
@@ -1336,17 +1447,19 @@
 
       function switchPatientTab(next){
         patientTab = next;
-        ["measure","history","daytest","share"].forEach(t => {
+        ["measure","history","condition","share"].forEach(t => {
           document.getElementById(`tab-${t}`).classList.toggle("active", t===next);
           document.getElementById(`panel-${t}`).classList.toggle("hidden", t!==next);
         });
-        cleanupDayTests();
         if(next === "share"){
           loadShareSelect();
           updateSharePreview();
         }
         if(next === "history"){
           loadHistoryUI();
+        }
+        if(next === "condition"){
+          prepareConditionIdle();
         }
       }
 
@@ -1356,176 +1469,204 @@
         else b.classList.remove("active");
       }
 
-      function setDayTest(type){
-        dayTestType = type;
-        ["reaction","attention","memory"].forEach(t => {
-          const btn = document.getElementById(`btnTest-${t}`);
-          btn.className = t===type ? "btn btn-primary" : "btn btn-soft";
-        });
-        cleanupDayTests();
-        const title = document.getElementById("testGuideTitle");
-        const sub = document.getElementById("testGuideSub");
-        if(type === "reaction"){
-          title.textContent = "画面が緑に変わった瞬間をタップ";
-          sub.textContent = "開始後、赤画面で待機します";
-        }else if(type === "attention"){
-          title.textContent = "赤い円だけタップ（Go/No-Go）";
-          sub.textContent = "全5試行。青/緑は見送ります";
-        }else{
-          title.textContent = "光る順（4ステップ）を再現";
-          sub.textContent = "4色の順序記憶テスト";
-        }
+      function resetConditionRaw(){
+        condRaw.reactionMs = null;
+        condRaw.attention = { total:5, correct:0, miss:0, falseAlarm:0, times:[] };
+        condRaw.memory = { total:4, success:0, full:false };
       }
 
-      function cleanupDayTests(){
-        clearTimeout(testTimer);
-        clearTimeout(attentionAutoTimeout);
-        reactionWaiting = false;
-        memoryCanInput = false;
+      function prepareConditionIdle(){
+        clearTimeout(condTimer);
+        clearTimeout(condAttTimeout);
+        condFlowRunning = false;
+        condPhase = 0;
+        condReactionWaiting = false;
+        condMemCanInput = false;
+        resetConditionRaw();
 
-        document.getElementById("testGuide").classList.remove("hidden");
-        document.getElementById("panelReaction").classList.add("hidden");
-        document.getElementById("panelAttention").classList.add("hidden");
-        document.getElementById("panelMemory").classList.add("hidden");
-        document.getElementById("dayResult").classList.add("hidden");
-
-        const box = document.getElementById("testBox");
+        const box = document.getElementById("condTestBox");
         box.style.background = "#f8fafc";
         box.style.borderColor = "#cbd5e1";
+
+        document.getElementById("condProgressPill").textContent = "待機中";
+        document.getElementById("condGuideText").textContent = "「チェック開始」で 1/3→2/3→3/3 を自動実行します。";
+        document.getElementById("btnConditionStart").disabled = false;
+
+        document.getElementById("condIdlePanel").classList.remove("hidden");
+        document.getElementById("condReactionPanel").classList.add("hidden");
+        document.getElementById("condAttentionPanel").classList.add("hidden");
+        document.getElementById("condMemoryPanel").classList.add("hidden");
+        document.getElementById("condResultBox").classList.add("hidden");
       }
 
-      function startCurrentDayTest(){
-        document.getElementById("testGuide").classList.add("hidden");
-        document.getElementById("dayResult").classList.add("hidden");
-
-        if(dayTestType === "reaction"){
-          const p = document.getElementById("panelReaction");
-          p.classList.remove("hidden");
-          const box = document.getElementById("testBox");
-          box.style.background = "#ef4444";
-          box.style.borderColor = "#dc2626";
-          document.getElementById("reactionMain").textContent = "待機中...";
-          document.getElementById("reactionSub").textContent = "緑になるまでタップ禁止";
-          reactionWaiting = false;
-          const delay = 1500 + Math.random()*2000;
-          testTimer = setTimeout(() => {
-            reactionWaiting = true;
-            box.style.background = "#10b981";
-            box.style.borderColor = "#059669";
-            document.getElementById("reactionMain").textContent = "今すぐタップ！";
-            document.getElementById("reactionSub").textContent = "どこでもタップ";
-            reactionStartTs = Date.now();
-          }, delay);
-        }
-
-        if(dayTestType === "attention"){
-          const p = document.getElementById("panelAttention");
-          p.classList.remove("hidden");
-          attentionRemain = 5;
-          attentionState = { correct:0, miss:0, falseAlarm:0, times:[] };
-          nextAttentionTrial();
-        }
-
-        if(dayTestType === "memory"){
-          const p = document.getElementById("panelMemory");
-          p.classList.remove("hidden");
-          memorySeq = [Math.floor(Math.random()*4),Math.floor(Math.random()*4),Math.floor(Math.random()*4),Math.floor(Math.random()*4)];
-          memoryStep = 0;
-          memoryCanInput = false;
-          document.getElementById("memStatus").textContent = "光る順を記憶してください...";
-          document.getElementById("memProg").textContent = "系列長: 4（再生中）";
-
-          let idx = 0;
-          const play = () => {
-            if(idx >= memorySeq.length){
-              memoryCanInput = true;
-              document.getElementById("memStatus").textContent = "入力受付: 順番通りにタップ";
-              document.getElementById("memProg").textContent = "入力 0 / 4";
-              return;
-            }
-            flashMem(memorySeq[idx]);
-            idx++;
-            testTimer = setTimeout(play, 650);
-          };
-          testTimer = setTimeout(play, 500);
-        }
+      function showConditionPhase(phase){
+        condPhase = phase;
+        const pill = document.getElementById("condProgressPill");
+        if(phase === 1) pill.textContent = "1/3 反射神経";
+        if(phase === 2) pill.textContent = "2/3 判断力";
+        if(phase === 3) pill.textContent = "3/3 短期記憶";
       }
 
-      function onReactionTap(){
-        if(dayTestType !== "reaction") return;
-        if(!reactionWaiting){
-          clearTimeout(testTimer);
-          toast("お手付き：緑になる前にタップ");
-          cleanupDayTests();
+      function startConditionFlow(){
+        if(condFlowRunning) return;
+        prepareConditionIdle();
+        condFlowRunning = true;
+        document.getElementById("btnConditionStart").disabled = true;
+        document.getElementById("condResultBox").classList.add("hidden");
+        runConditionReaction();
+      }
+
+      function runConditionReaction(){
+        showConditionPhase(1);
+        const box = document.getElementById("condTestBox");
+        document.getElementById("condGuideText").textContent = "画面が緑に変わった瞬間を素早くタップ！";
+
+        document.getElementById("condIdlePanel").classList.add("hidden");
+        document.getElementById("condReactionPanel").classList.remove("hidden");
+        document.getElementById("condAttentionPanel").classList.add("hidden");
+        document.getElementById("condMemoryPanel").classList.add("hidden");
+
+        box.style.background = "#ef4444";
+        box.style.borderColor = "#dc2626";
+        document.getElementById("condReactionMain").textContent = "待機中...";
+        document.getElementById("condReactionSub").textContent = "画面が緑になるまでタップしないでください";
+
+        condReactionWaiting = false;
+        const delay = 1500 + Math.random()*2000;
+        condTimer = setTimeout(() => {
+          condReactionWaiting = true;
+          box.style.background = "#10b981";
+          box.style.borderColor = "#059669";
+          document.getElementById("condReactionMain").textContent = "今すぐタップ！";
+          document.getElementById("condReactionSub").textContent = "どこでもタップ";
+          condReactionStartTs = Date.now();
+        }, delay);
+      }
+
+      function onConditionReactionTap(){
+        if(!condFlowRunning || condPhase !== 1) return;
+        if(!condReactionWaiting){
           return;
         }
-        const ms = Date.now() - reactionStartTs;
-        cleanupDayTests();
-        showDayResult("①反応速度", `${ms} ms`, ms < 270 ? "ベースライン同等" : "疲労注意", ms < 270 ? "#065f46" : "#b45309");
+        condRaw.reactionMs = Date.now() - condReactionStartTs;
+        condReactionWaiting = false;
+
+        document.getElementById("condGuideText").textContent = "次は判断力チェックに進みます…";
+        condTimer = setTimeout(() => {
+          runConditionAttention();
+        }, 1000);
       }
 
-      function nextAttentionTrial(){
-        if(attentionRemain <= 0){
-          finishAttention();
+      function runConditionAttention(){
+        showConditionPhase(2);
+        document.getElementById("condGuideText").textContent = "赤色の円が出た時だけタップ！（全5回）";
+
+        const box = document.getElementById("condTestBox");
+        box.style.background = "#f8fafc";
+        box.style.borderColor = "#cbd5e1";
+        document.getElementById("condReactionPanel").classList.add("hidden");
+        document.getElementById("condAttentionPanel").classList.remove("hidden");
+        document.getElementById("condMemoryPanel").classList.add("hidden");
+        document.getElementById("condIdlePanel").classList.add("hidden");
+
+        condAttRemain = 5;
+        condRaw.attention = { total:5, correct:0, miss:0, falseAlarm:0, times:[] };
+        nextConditionAttentionTrial();
+      }
+
+      function nextConditionAttentionTrial(){
+        if(condAttRemain <= 0){
+          document.getElementById("condGuideText").textContent = "次は短期記憶チェックに進みます…";
+          condTimer = setTimeout(() => {
+            runConditionMemory();
+          }, 1000);
           return;
         }
-        document.getElementById("attRemain").textContent = `残り: ${attentionRemain}回`;
-        attentionRemain--;
 
-        const btn = document.getElementById("attCircle");
+        document.getElementById("condAttRemain").textContent = `残り: ${condAttRemain}回`;
+        condAttRemain--;
+
+        const btn = document.getElementById("condAttCircle");
         btn.style.background = "#cbd5e1";
         btn.textContent = "...";
         btn.style.pointerEvents = "none";
-        attentionTarget = false;
+        condAttTarget = false;
 
-        testTimer = setTimeout(() => {
-          attentionTarget = Math.random() < 0.6;
+        condTimer = setTimeout(() => {
+          condAttTarget = Math.random() < 0.6;
           btn.style.pointerEvents = "auto";
-          if(attentionTarget){
+          if(condAttTarget){
             btn.style.background = "#ef4444";
-            btn.textContent = "赤（押す）";
-            attentionTargetStart = Date.now();
+            btn.textContent = "赤";
+            condAttTargetStart = Date.now();
           }else{
             const cs = ["#3b82f6","#10b981","#f59e0b"];
             btn.style.background = cs[Math.floor(Math.random()*cs.length)];
             btn.textContent = "見送り";
           }
 
-          attentionAutoTimeout = setTimeout(() => {
-            if(attentionTarget) attentionState.miss++;
-            nextAttentionTrial();
+          condAttTimeout = setTimeout(() => {
+            if(condAttTarget) condRaw.attention.miss++;
+            nextConditionAttentionTrial();
           }, 1200);
         }, 500);
       }
 
-      function onAttentionTap(){
-        clearTimeout(attentionAutoTimeout);
-        const btn = document.getElementById("attCircle");
+      function onConditionAttentionTap(){
+        if(!condFlowRunning || condPhase !== 2) return;
+        clearTimeout(condAttTimeout);
+
+        const btn = document.getElementById("condAttCircle");
         btn.style.pointerEvents = "none";
 
-        if(attentionTarget){
-          attentionState.correct++;
-          attentionState.times.push(Date.now() - attentionTargetStart);
+        if(condAttTarget){
+          condRaw.attention.correct++;
+          condRaw.attention.times.push(Date.now() - condAttTargetStart);
         }else{
-          attentionState.falseAlarm++;
+          condRaw.attention.falseAlarm++;
         }
-        testTimer = setTimeout(nextAttentionTrial, 300);
+
+        condTimer = setTimeout(nextConditionAttentionTrial, 300);
       }
 
-      function finishAttention(){
-        cleanupDayTests();
-        const avg = attentionState.times.length ? Math.round(attentionState.times.reduce((a,b)=>a+b,0)/attentionState.times.length) : 0;
-        const good = attentionState.falseAlarm===0 && attentionState.correct>=2;
-        showDayResult(
-          "②注意力",
-          `正答${attentionState.correct} / 誤答${attentionState.falseAlarm} / 平均${avg}ms`,
-          good ? "ベースライン同等" : "疲労注意",
-          good ? "#065f46" : "#b45309"
-        );
+      function runConditionMemory(){
+        showConditionPhase(3);
+        document.getElementById("condGuideText").textContent = "4色の光る順番を覚えて、同じ順にタップ！";
+
+        const box = document.getElementById("condTestBox");
+        box.style.background = "#f8fafc";
+        box.style.borderColor = "#cbd5e1";
+
+        document.getElementById("condReactionPanel").classList.add("hidden");
+        document.getElementById("condAttentionPanel").classList.add("hidden");
+        document.getElementById("condMemoryPanel").classList.remove("hidden");
+        document.getElementById("condIdlePanel").classList.add("hidden");
+
+        condMemSeq = [Math.floor(Math.random()*4),Math.floor(Math.random()*4),Math.floor(Math.random()*4),Math.floor(Math.random()*4)];
+        condMemStep = 0;
+        condMemCanInput = false;
+        condRaw.memory = { total:4, success:0, full:false };
+
+        document.getElementById("condMemStatus").textContent = "光る順番を覚えてください...";
+        document.getElementById("condMemProg").textContent = "系列長: 4（再生中）";
+
+        let idx = 0;
+        const play = () => {
+          if(idx >= condMemSeq.length){
+            condMemCanInput = true;
+            document.getElementById("condMemStatus").textContent = "入力受付: 同じ順番でタップ";
+            document.getElementById("condMemProg").textContent = "入力 0 / 4";
+            return;
+          }
+          flashCondMem(condMemSeq[idx]);
+          idx++;
+          condTimer = setTimeout(play, 650);
+        };
+        condTimer = setTimeout(play, 500);
       }
 
-      function flashMem(idx){
-        const b = document.getElementById(`mem-${idx}`);
+      function flashCondMem(idx){
+        const b = document.getElementById(`condMem-${idx}`);
         b.style.opacity = "1";
         b.style.transform = "scale(1.08)";
         setTimeout(() => {
@@ -1534,50 +1675,119 @@
         }, 280);
       }
 
-      function onMemoryTap(idx){
-        if(!memoryCanInput) return;
-        flashMem(idx);
+      function onConditionMemoryTap(idx){
+        if(!condFlowRunning || condPhase !== 3) return;
+        if(!condMemCanInput) return;
 
-        if(idx !== memorySeq[memoryStep]){
-          memoryCanInput = false;
-          cleanupDayTests();
-          showDayResult("③記憶力", `再現成功 ${memoryStep} / 4`, "疲労注意", "#b45309");
+        flashCondMem(idx);
+
+        if(idx !== condMemSeq[condMemStep]){
+          condRaw.memory.success = condMemStep;
+          condRaw.memory.full = false;
+          condMemCanInput = false;
+          finishConditionFlow();
           return;
         }
 
-        memoryStep++;
-        document.getElementById("memProg").textContent = `入力 ${memoryStep} / 4`;
-        if(memoryStep >= memorySeq.length){
-          memoryCanInput = false;
-          cleanupDayTests();
-          showDayResult("③記憶力", "完全再現 4 / 4", "ベースライン同等", "#065f46");
+        condMemStep++;
+        document.getElementById("condMemProg").textContent = `入力 ${condMemStep} / 4`;
+
+        if(condMemStep >= condMemSeq.length){
+          condRaw.memory.success = 4;
+          condRaw.memory.full = true;
+          condMemCanInput = false;
+          finishConditionFlow();
         }
       }
 
-      function showDayResult(title, score, judge, color){
-        const box = document.getElementById("dayResult");
-        box.classList.remove("hidden");
-        document.getElementById("dayResultTitle").textContent = title;
-        document.getElementById("dayResultScore").textContent = score;
-        const j = document.getElementById("dayResultJudge");
-        j.textContent = judge;
-        j.style.color = color;
-        toast(`${title} 完了`);
+      function evaluateConditionComment(raw){
+        const reaction = raw.reactionMs == null ? 9999 : raw.reactionMs;
+        const attScore = (raw.attention.correct / raw.attention.total) * 100;
+        const memScore = (raw.memory.success / raw.memory.total) * 100;
+
+        let level = 2;
+        if(reaction <= 230 && attScore >= 100 && memScore >= 100) level = 4;
+        else if(reaction <= 300 && attScore >= 80 && memScore >= 75) level = 3;
+        else if(reaction <= 420 && attScore >= 60 && memScore >= 50) level = 2;
+        else level = 1;
+
+        if(level === 4) return "測定完了！Good！🌟";
+        if(level === 3) return "測定完了！Good✨";
+        if(level === 2) return "測定完了！OK☕";
+        return "測定完了！少しぼんやり気味かもしれません🍃";
+      }
+
+      function finishConditionFlow(){
+        clearTimeout(condTimer);
+        clearTimeout(condAttTimeout);
+        condFlowRunning = false;
+        document.getElementById("btnConditionStart").disabled = false;
+        document.getElementById("condProgressPill").textContent = "完了";
+
+        const comment = evaluateConditionComment(condRaw);
+
+        const box = document.getElementById("condTestBox");
+        box.style.background = "#f8fafc";
+        box.style.borderColor = "#cbd5e1";
+        document.getElementById("condReactionPanel").classList.add("hidden");
+        document.getElementById("condAttentionPanel").classList.add("hidden");
+        document.getElementById("condMemoryPanel").classList.add("hidden");
+        document.getElementById("condIdlePanel").classList.remove("hidden");
+
+        document.getElementById("condResultText").textContent = comment;
+        document.getElementById("condResultBox").classList.remove("hidden");
+        document.getElementById("condGuideText").textContent = "チェック完了。次回も起床後に続けて記録できます。";
+
+        const checks = loadConditionChecks();
+        const linkedSessionId = lastSavedSessionId || (loadSessions()[0] ? loadSessions()[0].id : "");
+        checks.unshift({
+          id: `${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+          dateTime: nowJaYmdHm(),
+          linkedSessionId: String(linkedSessionId || ""),
+          raw: {
+            reactionMs: condRaw.reactionMs,
+            attention: {
+              total: condRaw.attention.total,
+              correct: condRaw.attention.correct,
+              miss: condRaw.attention.miss,
+              falseAlarm: condRaw.attention.falseAlarm,
+              accuracy: condRaw.attention.total ? Number((condRaw.attention.correct / condRaw.attention.total * 100).toFixed(1)) : 0
+            },
+            memory: {
+              total: condRaw.memory.total,
+              success: condRaw.memory.success,
+              successRate: condRaw.memory.total ? Number((condRaw.memory.success / condRaw.memory.total * 100).toFixed(1)) : 0,
+              full: condRaw.memory.full
+            }
+          },
+          comment
+        });
+        saveConditionChecks(checks);
+
+        loadDoctorConditionPanelBySession(linkedSessionId);
+        loadShareSelect();
+        updateSharePreview();
+
+        toast("コンディションcheckを保存しました");
       }
 
       function buildFullLog(session){
         const peaks = loadPeakStore().filter(p => String(p.sessionId) === String(session.id));
+        const checksAll = loadConditionChecks();
+        const linkedChecks = checksAll.filter(c => String(c.linkedSessionId) === String(session.id));
+
         return {
           meta: {
             app: "SleepTracker",
-            version: "single-file-complete",
+            version: "single-file-complete-condition-v1",
             exportedAt: new Date().toISOString(),
             locale: "ja-JP"
           },
           session: {
             ...session
           },
-          peaks: peaks
+          peaks: peaks,
+          conditionChecks: linkedChecks
         };
       }
 
@@ -1596,10 +1806,21 @@
             durationSec: p.durationSec
           }));
 
+        const checksAll = loadConditionChecks();
+        const linkedChecks = checksAll
+          .filter(c => String(c.linkedSessionId) === String(session.id))
+          .map(c => ({
+            id: c.id,
+            dateTime: c.dateTime,
+            linkedSessionId: c.linkedSessionId,
+            raw: c.raw,
+            comment: c.comment
+          }));
+
         return {
           meta: {
             app: "SleepTracker",
-            version: "single-file-complete",
+            version: "single-file-complete-condition-v1",
             exportedAt: new Date().toISOString(),
             locale: "ja-JP",
             lightweight: true
@@ -1618,7 +1839,8 @@
             accelSamples: session.accelSamples,
             eventLogs: session.eventLogs
           },
-          peaks
+          peaks,
+          conditionChecks: linkedChecks
         };
       }
 
@@ -1699,7 +1921,7 @@
           return;
         }
         const full = buildFullLog(s);
-        ta.value = JSON.stringify(full, null, 2).slice(0, 4000);
+        ta.value = JSON.stringify(full, null, 2).slice(0, 7000);
       }
 
       function exportFullLog(){
@@ -1767,6 +1989,7 @@
         document.getElementById("docMaxG").textContent = "-- G";
         document.getElementById("docNote").textContent = "セッションを選択してください。";
         document.getElementById("docPeakList").innerHTML = "";
+        document.getElementById("docConditionPanel").innerHTML = "紐付くコンディションcheck結果がありません。";
       }
 
       function loadDoctorPeaksForSelected(sessionId){
@@ -1776,7 +1999,7 @@
           list.innerHTML = '<div class="muted">このセッションのピーク録音はありません。</div>';
           return;
         }
-        list.innerHTML = peaks.map((p, i) => `
+        list.innerHTML = peaks.map((p) => `
           <div class="card" style="padding:8px;">
             <div class="row" style="justify-content:space-between;">
               <strong>${esc(p.time)} / ${esc(p.type)}</strong>
@@ -1786,12 +2009,12 @@
             <audio controls preload="metadata" style="width:100%;margin-top:6px;">
               <source src="${esc(p.audioBase64)}" type="audio/webm">
             </audio>
-            <button class="btn btn-soft" style="margin-top:6px;" onclick="App.playDoctorPeakByIndex('${esc(p.id)}')">再生</button>
+            <button class="btn btn-soft" style="margin-top:6px;" onclick="App.playDoctorPeakById('${esc(p.id)}')">再生</button>
           </div>
         `).join("");
       }
 
-      function playDoctorPeakByIndex(peakId){
+      function playDoctorPeakById(peakId){
         const p = loadPeakStore().find(x => String(x.id) === String(peakId));
         if(!p || !p.audioBase64){
           toast("録音データがありません");
@@ -1799,6 +2022,32 @@
         }
         const a = new Audio(p.audioBase64);
         a.play().catch(() => toast("再生失敗"));
+      }
+
+      function loadDoctorConditionPanelBySession(sessionId){
+        const panel = document.getElementById("docConditionPanel");
+        const checks = loadConditionChecks().filter(c => String(c.linkedSessionId) === String(sessionId));
+
+        if(!checks.length){
+          panel.innerHTML = "紐付くコンディションcheck結果がありません。";
+          return;
+        }
+
+        panel.innerHTML = checks.slice(0, 10).map(c => {
+          const r = c.raw || {};
+          const reaction = r.reactionMs != null ? `${r.reactionMs}ms` : "--";
+          const attC = r.attention ? `${r.attention.correct}/${r.attention.total}正答` : "--";
+          const mem = r.memory ? `${r.memory.success}/${r.memory.total}${r.memory.full ? "（完全再現）" : ""}` : "--";
+          return `
+            <div class="card" style="padding:8px;">
+              <div class="row" style="justify-content:space-between;">
+                <strong>${esc(c.dateTime)}</strong>
+                <span class="badge b-green">${esc(c.comment)}</span>
+              </div>
+              <div class="muted">反応 ${reaction} / 判断 ${attC} / 記憶 ${mem}</div>
+            </div>
+          `;
+        }).join("");
       }
 
       function onDoctorSessionChange(sessionId){
@@ -1828,6 +2077,7 @@
         }
 
         loadDoctorPeaksForSelected(s.id);
+        loadDoctorConditionPanelBySession(s.id);
       }
 
       function bindStartButton(){
@@ -1849,6 +2099,7 @@
         updateRuleText();
         document.getElementById("baselineLabel").textContent = `● ベースライン: ${baselineDb.toFixed(1)} dB`;
         updateDebug();
+        prepareConditionIdle();
       }
 
       return {
@@ -1864,17 +2115,18 @@
         clearAllData,
         clearPeakEvents,
         playPeakByIndex,
-        setDayTest,
-        startCurrentDayTest,
-        onReactionTap,
-        onAttentionTap,
-        onMemoryTap,
         exportFullLog,
         shareFullLog,
         exportLiteLog,
         shareLiteLog,
         onDoctorSessionChange,
-        playDoctorPeakByIndex
+        playDoctorPeakById,
+        goConditionNow,
+        skipConditionNow,
+        startConditionFlow,
+        onConditionReactionTap,
+        onConditionAttentionTap,
+        onConditionMemoryTap
       };
     })();
 
