@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+  <title>SleepTracker V5 Stable（マイク取得順序固定・相対閾値・常時デバッグ）</title>
+  <style>
+    :root{
+      --primary:#4f46e5; --bg:#f1f5f9; --card:#ffffff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
+      --ok:#10b981; --warn:#f59e0b; --danger:#ef4444;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+    body{background:var(--bg);color:var(--text)}
+    .app{max-width:980px;margin:0 auto;padding:10px 12px 80px}
+    .top{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);z-index:10}
+    .top-in{max-width:980px;margin:0 auto;height:56px;padding:0 12px;display:flex;align-items:center;justify-content:space-between}
+    .role{display:flex;background:#eef2ff;border-radius:10px;padding:3px;gap:4px}
+    .btn{border:1px solid transparent;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer}
+    .btn:disabled{opacity:.45;cursor:not-allowed}
+    .btn-primary{background:var(--primary);color:#fff}
+    .btn-danger{background:var(--danger);color:#fff}
+    .btn-soft{background:#f8fafc;border-color:#cbd5e1;color:#334155}
+    .tabbar{display:flex;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:auto}
+    .tab{flex:1;min-width:88px;padding:10px;border:none;background:transparent;font-weight:700;color:#475569;border-bottom:2px solid transparent}
+    .tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+    .row{display:flex;gap:8px;align-items:center}
+    .col{display:flex;flex-direction:column;gap:10px}
+    .hidden{display:none!important}
+    .badge{display:inline-flex;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700}
+    .b-gray{background:#e2e8f0;color:#475569}.b-green{background:#d1fae5;color:#065f46}
+    .kv{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .tile{background:#1e293b;border-radius:8px;padding:8px}
+    .tile .k{font-size:10px;color:#94a3b8}.tile .v{font-size:17px;font-weight:800}
+    #realBars{height:54px;background:#020617;border-radius:8px;display:flex;align-items:flex-end;gap:2px;padding:4px}
+    #toast{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:99;display:flex;flex-direction:column;gap:8px;width:min(92vw,420px)}
+    .toast{background:rgba(2,6,23,.92);color:#fff;padding:10px;border-radius:10px;text-align:center;font-size:12px}
+    #blackout{position:fixed;inset:0;background:#000;display:none;z-index:90;align-items:center;justify-content:center;flex-direction:column}
+    #blackout.active{display:flex}
+    #blackoutClock{font-family:monospace;font-size:38px;color:#334155;font-weight:800}
+    .muted{color:var(--muted);font-size:12px}
+    select{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff}
+    .logline{padding:4px 0;border-bottom:1px dashed #e2e8f0;font-size:12px;color:#334155}
+    .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+    .dbg{background:#0b1220;color:#dbeafe;border:1px solid #22314f;border-radius:10px;padding:10px;font-size:12px;line-height:1.45;white-space:pre-wrap}
+  </style>
+</head>
+<body>
+  <div id="toast"></div>
+
+  <div id="blackout" onclick="App.toggleBlackout(false)">
+    <div id="blackoutClock">00:00</div>
+    <div class="muted" style="margin-top:10px">🌙 就寝モード（タップで戻る）</div>
+  </div>
+
+  <header class="top">
+    <div class="top-in">
+      <div class="row">
+        <div style="background:var(--primary);color:#fff;border-radius:8px;padding:6px 8px">🌙</div>
+        <div><strong>SleepTracker</strong><div class="muted">V5 Stable（マイク優先起動）</div></div>
+      </div>
+      <div class="role">
+        <button id="rolePatient" class="btn btn-soft" style="background:#fff" onclick="App.switchRole('patient')">患者</button>
+        <button id="roleDoctor" class="btn btn-soft" onclick="App.switchRole('doctor')">医師</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app">
+    <section id="patientView" class="col">
+      <div class="tabbar">
+        <button id="tab-record" class="tab active" onclick="App.switchTab('record')">測定</button>
+        <button id="tab-history" class="tab" onclick="App.switchTab('history')">履歴</button>
+        <button id="tab-day" class="tab" onclick="App.switchTab('day')">昼間テスト</button>
+        <button id="tab-share" class="tab" onclick="App.switchTab('share')">共有</button>
+      </div>
+
+      <div id="panel-record" class="col">
+        <div class="card col">
+          <div class="row" style="justify-content:space-between">
+            <div><strong>就寝測定セッション</strong><div class="muted">相対閾値 / ピーク3秒録音 / 常時デバッグ</div></div>
+            <span id="sessionBadge" class="badge b-gray">未測定</span>
+          </div>
+
+          <div class="row">
+            <button class="btn btn-soft" onclick="App.calibrateBaseline()">ベースライン再計測</button>
+            <button class="btn btn-soft" onclick="App.requestSensorPermission()">モーション許可</button>
+            <button class="btn btn-soft" onclick="App.runPreflight()">接続チェック</button>
+          </div>
+
+          <div id="sensorBox" class="row" style="justify-content:space-between;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px;display:none">
+            <span style="font-size:12px">⚠️ モーションセンサー許可が必要</span>
+            <button class="btn btn-primary" style="padding:6px 10px" onclick="App.requestSensorPermission()">許可</button>
+          </div>
+
+          <div class="row" style="justify-content:space-between;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:8px">
+            <span id="baselineLabel" style="font-size:12px;font-weight:700;color:#065f46">● ベースライン: -- dB</span>
+            <span id="deltaLabel" class="mono" style="font-size:12px;color:#1e3a8a">ΔdB: --</span>
+          </div>
+
+          <div class="card" style="padding:8px;background:#f8fafc">
+            <div class="muted">判定ルール（相対閾値）</div>
+            <div id="ruleText" class="mono" style="font-size:12px;line-height:1.5;color:#334155"></div>
+          </div>
+
+          <div style="background:#0f172a;border-radius:10px;padding:10px" class="col">
+            <div class="row" style="justify-content:space-between">
+              <span id="recState" style="font-size:12px;color:#cbd5e1">● 待機中</span>
+              <span id="recTime" style="font-family:monospace;font-size:18px;color:#fff">00:00:00</span>
+            </div>
+            <div id="realBars"></div>
+            <div class="kv">
+              <div class="tile"><div class="k">実測マイク音圧</div><div id="valDb" class="v" style="color:#6ee7b7">-- dB</div></div>
+              <div class="tile"><div class="k">実測加速度・体動</div><div id="valG" class="v" style="color:#93c5fd">0.00 G</div></div>
+            </div>
+          </div>
+
+          <div class="row">
+            <button id="btnStart" class="btn btn-primary" style="flex:1">睡眠測定を開始</button>
+            <button id="btnStop" class="btn btn-soft" style="flex:1" onclick="App.stopMeasurement()" disabled>測定終了</button>
+          </div>
+          <button id="btnBlack" class="btn btn-soft" onclick="App.toggleBlackout(true)" disabled>🌙 就寝画面</button>
+
+          <div class="dbg" id="debugPanel">debug booting...</div>
+        </div>
+      </div>
+
+      <div id="panel-history" class="hidden col">
+        <div class="card">
+          <div class="row" style="justify-content:space-between;align-items:center">
+            <strong>測定履歴</strong>
+            <button class="btn btn-soft" style="padding:6px 10px" onclick="App.clearAllLogs()">全履歴削除</button>
+          </div>
+          <div id="historyList" style="margin-top:8px"></div>
+        </div>
+
+        <div class="card" id="peakPanel" style="margin-top:10px;background:linear-gradient(180deg,#0f213a,#0b1b31);border:1px solid #243b5a;color:#e5eefc">
+          <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">
+            <strong style="font-size:18px">🔊 ピーク検出イベント一覧（自動録音）</strong>
+            <button class="btn btn-soft" style="background:#102846;color:#dbeafe;border-color:#284a74" onclick="App.clearPeakEvents()">履歴消去</button>
+          </div>
+          <div style="font-size:12px;color:#a8c1df;margin-bottom:10px">
+            録音トリガー: <span class="mono">dB ≥ baseline + 10</span> または <span class="mono">G ≥ 動的閾値</span>
+          </div>
+          <div class="row" style="font-weight:700;color:#9ec5ff;border-bottom:1px solid #29486e;padding-bottom:6px">
+            <div style="width:110px">発生時刻</div>
+            <div style="width:190px">タイプ</div>
+            <div style="width:110px">音圧</div>
+            <div style="width:110px">体動</div>
+            <div style="flex:1">再生</div>
+          </div>
+          <div id="peakEventList" style="margin-top:6px"></div>
+        </div>
+      </div>
+
+      <div id="panel-day" class="hidden"><div class="card">昼間テスト（プレースホルダ）</div></div>
+      <div id="panel-share" class="hidden"><div class="card">共有（プレースホルダ）</div></div>
+    </section>
+
+    <section id="doctorView" class="hidden col">
+      <div class="card col">
+        <strong>医師モード</strong>
+        <select id="docSelect" onchange="App.onDoctorSessionChange(this.value)"></select>
+      </div>
+      <div class="card col">
+        <div id="docTime">--:-- 〜 --:--</div>
+        <div id="docBase">Baseline: -- dB</div>
+        <div id="docBrux">歯ぎしり疑い: --件</div>
+        <div id="docStats">最大体動: -- G / いびき疑い: --分</div>
+        <div id="docNote" class="muted">--</div>
+        <audio id="docAudio" controls style="width:100%;display:none"></audio>
+        <button class="btn btn-primary" onclick="App.playPeakAudio()">録音再生</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const App = (() => {
+      let role='patient', tab='record';
+      let isRecording=false, recTimer=null, sampleTimer=null, recStart=null, recSec=0;
+      let wakeLock=null;
+
+      let audioContext=null, mediaStream=null, analyser=null, tdBuf=null;
+      let motionSensorActive=false, gotMotion=false, lastAccel={x:0,y:0,z:0}, currentG=0, maxG=0;
+
+      let baselineDb=32.0, currentDb=32.0;
+      let dbWin=[], gWin=[];
+      const DB_WIN_MAX=120, G_WIN_MAX=120;
+
+      let audioSamples=[], accelSamples=[], bruxCount=0, snoreMin=0;
+      let mediaRecorder=null, peakChunks=[], peakRecording=false, peakCooldown=0;
+
+      let selectedSession=null, eventLogs=[], currentPeakBase64='';
+      let lastEventAt={ snore:0, bruxism:0, sleep_talk:0 };
+      let peakEvents=[];
+
+      let lastDecision='待機', lastTrigger='なし', preflight={};
+
+      const CFG = {
+        sampleMs:120,
+        peakDbDelta:10,
+        snoreDbDeltaMin:6,
+        snoreDbDeltaMax:16,
+        bruxDbDelta:14,
+        talkDbDeltaMin:9,
+        talkDbDeltaMax:20,
+        gOffsetPeak:0.08,
+        gOffsetMove:0.05,
+        gFloorPeak:0.12,
+        gCeilPeak:0.28,
+        cooldownMs:4500
+      };
+
+      function toast(msg){
+        const box=document.getElementById('toast');
+        const t=document.createElement('div'); t.className='toast'; t.textContent=msg; box.appendChild(t);
+        setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity .25s'; setTimeout(()=>t.remove(),250); },1800);
+      }
+
+      function esc(s){ return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+      function formatHMS(sec){ const h=String(Math.floor(sec/3600)).padStart(2,'0'); const m=String(Math.floor((sec%3600)/60)).padStart(2,'0'); const s=String(sec%60).padStart(2,'0'); return `${h}:${m}:${s}`; }
+      function formatHM(sec){ const h=String(Math.floor(sec/3600)).padStart(2,'0'); const m=String(Math.floor((sec%3600)/60)).padStart(2,'0'); return `${h}:${m}`; }
+      function typeJa(t){ return t==='snore'?'いびき':t==='bruxism'?'歯ぎしり':t==='sleep_talk'?'寝言':t; }
+
+      function pushWin(arr,v,max){ arr.push(v); if(arr.length>max) arr.shift(); }
+      function median(arr){ if(!arr.length) return 0; const a=[...arr].sort((x,y)=>x-y); const m=Math.floor(a.length/2); return a.length%2?a[m]:(a[m-1]+a[m])/2; }
+      function dynGPeakThreshold(){ return Math.min(CFG.gCeilPeak, Math.max(CFG.gFloorPeak, median(gWin)+CFG.gOffsetPeak)); }
+      function dynGMoveThreshold(){ return Math.max(0.06, median(gWin)+CFG.gOffsetMove); }
+
+      function initBars(){
+        const c=document.getElementById('realBars'); c.innerHTML='';
+        for(let i=0;i<28;i++){
+          const b=document.createElement('div');
+          b.style.cssText='flex:1;min-height:4px;height:8px;background:#10b981;border-radius:2px;transition:height .08s linear';
+          b.id='bar'+i; c.appendChild(b);
+        }
+      }
+      function drawBars(db){
+        for(let i=0;i<28;i++){
+          const b=document.getElementById('bar'+i);
+          const h=Math.min(50,Math.max(4,(db-22)*1.2+Math.random()*5));
+          b.style.height=h+'px';
+          b.style.background=(db>=baselineDb+CFG.peakDbDelta)?'#f59e0b':'#10b981';
+        }
+      }
+
+      function updateRuleText(){
+        document.getElementById('ruleText').textContent=[
+          `peak: dB>=baseline+${CFG.peakDbDelta} OR G>=dyn(${dynGPeakThreshold().toFixed(2)})`,
+          `snore: +${CFG.snoreDbDeltaMin}..+${CFG.snoreDbDeltaMax} & G<move(${dynGMoveThreshold().toFixed(2)})`,
+          `brux: +${CFG.bruxDbDelta}以上 & 低体動`,
+          `talk: +${CFG.talkDbDeltaMin}..+${CFG.talkDbDeltaMax} & 低体動`,
+          `cooldown:${Math.round(CFG.cooldownMs/1000)}s sample:${CFG.sampleMs}ms`
+        ].join('\n');
+      }
+
+      function updateDebug(){
+        const dDb=(currentDb-baselineDb).toFixed(1);
+        document.getElementById('deltaLabel').textContent=`ΔdB: ${dDb}`;
+        document.getElementById('debugPanel').textContent =
+`[Preflight]
+secure=${window.isSecureContext} getUserMedia=${!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)} motionAPI=${'DeviceMotionEvent' in window}
+micPermission=${preflight.micPermissionState||'unknown'}
+
+[Runtime]
+recording=${isRecording} motionActive=${motionSensorActive} gotMotion=${gotMotion} wakeLock=${!!wakeLock}
+db=${currentDb.toFixed(1)} baseline=${baselineDb.toFixed(1)} dDb=+${dDb}
+g=${currentG.toFixed(2)} gPeakTh=${dynGPeakThreshold().toFixed(2)} gMoveTh=${dynGMoveThreshold().toFixed(2)}
+cooldownRemainMs=${Math.max(0, peakCooldown-Date.now())}
+
+[Decision]
+lastDecision=${lastDecision}
+lastTrigger=${lastTrigger}`;
+      }
+
+      async function runPreflight(){
+        const out={};
+        out.isSecureContext=window.isSecureContext;
+        out.hasMediaDevices=!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia);
+        out.hasDeviceMotion=('DeviceMotionEvent' in window);
+        try{
+          if(navigator.permissions&&navigator.permissions.query){
+            const mic=await navigator.permissions.query({name:'microphone'});
+            out.micPermissionState=mic.state;
+          }
+        }catch{ out.micPermissionState='unknown'; }
+        preflight=out; updateDebug();
+      }
+
+      async function requestWakeLock(){ try{ if('wakeLock' in navigator){ wakeLock=await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release',()=>wakeLock=null); } }catch{} }
+      function releaseWakeLock(){ if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; } }
+
+      function bindMotionRobust(){
+        if(bindMotionRobust._bound) return;
+        bindMotionRobust._bound=true;
+        window.addEventListener('devicemotion',(ev)=>{
+          const a=ev.accelerationIncludingGravity||ev.acceleration;
+          if(!a||a.x==null) return;
+          gotMotion=true; motionSensorActive=true;
+          const dx=Math.abs((a.x||0)-lastAccel.x), dy=Math.abs((a.y||0)-lastAccel.y), dz=Math.abs((a.z||0)-lastAccel.z);
+          lastAccel={x:a.x||0,y:a.y||0,z:a.z||0};
+          const dg=Math.sqrt(dx*dx+dy*dy+dz*dz)/9.8;
+          currentG=Math.max(0,dg-0.03);
+          if(isRecording&&currentG>maxG) maxG=currentG;
+          document.getElementById('valG').textContent=currentG.toFixed(2)+' G';
+        },{passive:true});
+      }
+
+      function checkMotionPermissionUI(){
+        const box=document.getElementById('sensorBox');
+        if(typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function') box.style.display='flex';
+        else { box.style.display='none'; bindMotionRobust(); }
+      }
+
+      async function requestSensorPermission(){
+        try{
+          if(typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function'){
+            const r=await DeviceMotionEvent.requestPermission();
+            if(r!=='granted'){ toast('モーション許可が拒否されました'); return; }
+          }
+          bindMotionRobust();
+          document.getElementById('sensorBox').style.display='none';
+          toast('モーション許可OK');
+        }catch{
+          toast('モーション許可エラー');
+        }
+      }
+
+      function calcDb(){
+        if(!analyser||!tdBuf) return 30+Math.random()*2;
+        analyser.getFloatTimeDomainData(tdBuf);
+        let s=0; for(let i=0;i<tdBuf.length;i++){ const x=tdBuf[i]; s+=x*x; }
+        const rms=Math.sqrt(s/tdBuf.length);
+        if(rms<=1e-8) return 24;
+        return Math.min(95,Math.max(24,20*Math.log10(rms)+71));
+      }
+
+      async function calibrateBaseline(){
+        let own=false;
+        if(!mediaStream){
+          try{ mediaStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false}); own=true; }
+          catch(e){ alert('マイクが開けません: '+(e.message||e.name)); return; }
+          const AC=window.AudioContext||window.webkitAudioContext;
+          audioContext=new AC();
+          if(audioContext.state==='suspended'){ try{ await audioContext.resume(); }catch{} }
+          const src=audioContext.createMediaStreamSource(mediaStream);
+          analyser=audioContext.createAnalyser(); analyser.fftSize=1024; src.connect(analyser);
+          tdBuf=new Float32Array(analyser.fftSize);
+        }
+
+        toast('ベースライン計測中(3秒)');
+        const arr=[]; const t=setInterval(()=>{ arr.push(calcDb()); if(arr.length>100) arr.shift(); },30);
+        setTimeout(()=>{
+          clearInterval(t);
+          if(arr.length){ baselineDb=median(arr); document.getElementById('baselineLabel').textContent=`● ベースライン: ${baselineDb.toFixed(1)} dB`; }
+          updateRuleText(); updateDebug(); toast('ベースライン更新');
+          if(own&&!isRecording){ try{ mediaStream.getTracks().forEach(tr=>tr.stop()); audioContext.close(); }catch{} mediaStream=null; audioContext=null; analyser=null; tdBuf=null; }
+        },3000);
+      }
+
+      async function blobToDataURL(blob){
+        return await new Promise((resolve,reject)=>{ const fr=new FileReader(); fr.onload=()=>resolve(fr.result); fr.onerror=reject; fr.readAsDataURL(blob); });
+      }
+
+      function savePeakEventsToStorage(){ localStorage.setItem('peak_events', JSON.stringify(peakEvents.slice(0,180))); }
+      function loadPeakEventsFromStorage(){ peakEvents=JSON.parse(localStorage.getItem('peak_events')||'[]'); }
+
+      function classifyPeakType(db,g){
+        const d=db-baselineDb;
+        if(g>=dynGPeakThreshold()) return '急な体動/音響';
+        if(d>=16) return '大きないびき/音響';
+        if(d>=CFG.peakDbDelta) return '通常いびき';
+        return 'イベント';
+      }
+
+      function pushEventLog(type,db,g){
+        const now=Date.now(), cool={snore:10000,bruxism:8000,sleep_talk:12000};
+        if(now-lastEventAt[type]<cool[type]) return;
+        lastEventAt[type]=now;
+        eventLogs.push({type,t:formatHMS(recSec),hhmm:formatHM(recSec),db:+db.toFixed(1),g:+g.toFixed(2),base:+baselineDb.toFixed(1),dDb:+(db-baselineDb).toFixed(1)});
+      }
+
+      function recordPeakIfNeeded(db){
+        const now=Date.now(), gTh=dynGPeakThreshold();
+        const overDb=db>=(baselineDb+CFG.peakDbDelta), overG=currentG>=gTh;
+
+        if(!(overDb||overG)){ lastDecision=`NO_TRIGGER: 閾値未満 dDb=${(db-baselineDb).toFixed(1)} g=${currentG.toFixed(2)}`; return; }
+        if(now<peakCooldown){ lastDecision=`NO_TRIGGER: cooldown ${peakCooldown-now}ms`; return; }
+        if(peakRecording){ lastDecision='NO_TRIGGER: 録音中'; return; }
+        if(!mediaStream){ lastDecision='NO_TRIGGER: mediaStreamなし'; return; }
+        if(typeof MediaRecorder==='undefined'){ lastDecision='NO_TRIGGER: MediaRecorder非対応'; return; }
+
+        const snapDb=db, snapG=currentG, snapTime=formatHMS(recSec), snapBase=baselineDb;
+        peakRecording=true; peakChunks=[];
+        lastTrigger=`TRIGGER:${overDb?'dB':'G'} db=${snapDb.toFixed(1)} g=${snapG.toFixed(2)} base=${snapBase.toFixed(1)}`;
+
+        let opt={}; try{
+          if(MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) opt={mimeType:'audio/webm;codecs=opus'};
+          else if(MediaRecorder.isTypeSupported('audio/webm')) opt={mimeType:'audio/webm'};
+        }catch{}
+
+        try{
+          mediaRecorder=new MediaRecorder(mediaStream,opt);
+          mediaRecorder.ondataavailable=(e)=>{ if(e.data&&e.data.size>0) peakChunks.push(e.data); };
+          mediaRecorder.onstop=async ()=>{
+            try{
+              const blob=new Blob(peakChunks,{type:mediaRecorder.mimeType||'audio/webm'});
+              if(blob.size>700){
+                const b64=await blobToDataURL(blob); currentPeakBase64=b64;
+                peakEvents.unshift({time:snapTime,type:classifyPeakType(snapDb,snapG),db:+snapDb.toFixed(1),g:+snapG.toFixed(2),base:+snapBase.toFixed(1),dDb:+(snapDb-snapBase).toFixed(1),audioBase64:b64,durationSec:3});
+                savePeakEventsToStorage(); renderPeakEvents();
+                lastDecision='TRIGGER_OK: 保存完了';
+              }else lastDecision='TRIGGER_FAIL: size不足';
+            }catch(e){ lastDecision='TRIGGER_FAIL: '+(e.message||e.name); }
+            peakRecording=false; peakCooldown=Date.now()+CFG.cooldownMs; updateDebug();
+          };
+          mediaRecorder.start();
+          setTimeout(()=>{ try{ if(mediaRecorder&&mediaRecorder.state==='recording') mediaRecorder.stop(); }catch{} },3000);
+        }catch(e){
+          peakRecording=false; peakCooldown=Date.now()+2000; lastDecision='TRIGGER_FAIL: recorder開始失敗';
+        }
+      }
+
+      async function startMeasurement(){
+        if(isRecording) return;
+
+        // ===== 最重要: ユーザータップ直後に最優先でマイク取得（V5安定順序） =====
+        try{
+          mediaStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:false });
+        }catch(e){
+          alert('マイク権限エラー: '+(e.message||e.name));
+          lastDecision='mic failed: '+(e.message||e.name);
+          updateDebug();
+          return;
+        }
+
+        // AudioContext 構築
+        try{
+          const AC=window.AudioContext||window.webkitAudioContext;
+          audioContext=new AC();
+          if(audioContext.state==='suspended'){ try{ await audioContext.resume(); }catch{} }
+          const src=audioContext.createMediaStreamSource(mediaStream);
+          analyser=audioContext.createAnalyser(); analyser.fftSize=1024; src.connect(analyser);
+          tdBuf=new Float32Array(analyser.fftSize);
+        }catch(e){
+          alert('音声解析初期化エラー: '+(e.message||e.name));
+          try{ mediaStream.getTracks().forEach(t=>t.stop()); }catch{}
+          mediaStream=null; audioContext=null; analyser=null; tdBuf=null;
+          return;
+        }
+
+        // ここから後段（失敗しても測定継続）
+        runPreflight();
+        try{
+          if(typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function'){
+            const r=await DeviceMotionEvent.requestPermission();
+            if(r!=='granted') console.warn('motion denied');
+          }
+        }catch{}
+        bindMotionRobust();
+        requestWakeLock();
+
+        // ===== セッション開始 =====
+        isRecording=true; recStart=new Date(); recSec=0;
+        audioSamples=[]; accelSamples=[]; bruxCount=0; snoreMin=0; maxG=0;
+        peakCooldown=0; currentPeakBase64=''; eventLogs=[]; lastEventAt={snore:0,bruxism:0,sleep_talk:0};
+        dbWin=[]; gWin=[]; gotMotion=false; lastDecision='測定開始'; lastTrigger='なし';
+
+        document.getElementById('sessionBadge').textContent='測定中';
+        document.getElementById('sessionBadge').className='badge b-green';
+        document.getElementById('recState').textContent='● センサー取得中';
+        document.getElementById('recState').style.color='#ef4444';
+        document.getElementById('btnStart').disabled=true;
+        document.getElementById('btnStop').disabled=false;
+        document.getElementById('btnStop').className='btn btn-danger';
+        document.getElementById('btnBlack').disabled=false;
+
+        clearInterval(recTimer);
+        recTimer=setInterval(()=>{
+          recSec++;
+          const h=String(Math.floor(recSec/3600)).padStart(2,'0');
+          const m=String(Math.floor((recSec%3600)/60)).padStart(2,'0');
+          const s=String(recSec%60).padStart(2,'0');
+          document.getElementById('recTime').textContent=`${h}:${m}:${s}`;
+          document.getElementById('blackoutClock').textContent=`${h}:${m}`;
+        },1000);
+
+        clearInterval(sampleTimer);
+        sampleTimer=setInterval(()=>{
+          if(!isRecording) return;
+          currentDb=calcDb();
+
+          if(!motionSensorActive){
+            const d=Math.max(0,currentDb-baselineDb);
+            currentG=Math.min(0.9,d*0.015);
+            document.getElementById('valG').textContent=currentG.toFixed(2)+' G (推定)';
+          }
+
+          pushWin(dbWin,currentDb,DB_WIN_MAX); pushWin(gWin,currentG,G_WIN_MAX);
+          const dDb=currentDb-baselineDb, gMove=dynGMoveThreshold();
+
+          if(dDb>=CFG.snoreDbDeltaMin && dDb<=CFG.snoreDbDeltaMax && currentG<gMove){ snoreMin += (CFG.sampleMs/1000/60); pushEventLog('snore',currentDb,currentG); }
+          if(dDb>=CFG.bruxDbDelta && currentG<gMove*0.9){ bruxCount++; pushEventLog('bruxism',currentDb,currentG); }
+          if(dDb>=CFG.talkDbDeltaMin && dDb<=CFG.talkDbDeltaMax && currentG<gMove*0.8){ pushEventLog('sleep_talk',currentDb,currentG); }
+
+          recordPeakIfNeeded(currentDb);
+
+          if(audioSamples.length<900){ audioSamples.push(+currentDb.toFixed(1)); accelSamples.push(+currentG.toFixed(2)); }
+          if(currentG>maxG) maxG=currentG;
+
+          document.getElementById('valDb').textContent=currentDb.toFixed(1)+' dB';
+          drawBars(currentDb); updateRuleText(); updateDebug();
+        },CFG.sampleMs);
+
+        toast('測定開始');
+      }
+
+      function stopMeasurement(){
+        if(!isRecording) return;
+        isRecording=false; clearInterval(recTimer); clearInterval(sampleTimer);
+        try{ if(mediaStream) mediaStream.getTracks().forEach(t=>t.stop()); if(audioContext) audioContext.close().catch(()=>{}); }catch{}
+        mediaStream=null; audioContext=null; analyser=null; tdBuf=null;
+        releaseWakeLock(); toggleBlackout(false);
+
+        const end=new Date();
+        const payload={
+          id:Date.now(),
+          startTime:recStart.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),
+          endTime:end.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),
+          dateStr:recStart.toLocaleDateString('ja-JP'),
+          durationSec:recSec,
+          baselineDb:+baselineDb.toFixed(1),
+          bruxismEvents:Math.round(bruxCount/5),
+          snoreMin:Math.round(snoreMin),
+          maxMotionG:+maxG.toFixed(2),
+          audioSamples, accelSamples, eventLogs,
+          peakAudioBase64:currentPeakBase64||''
+        };
+        const arr=JSON.parse(localStorage.getItem('sleep_sessions')||'[]'); arr.unshift(payload);
+        localStorage.setItem('sleep_sessions', JSON.stringify(arr.slice(0,30)));
+
+        document.getElementById('sessionBadge').textContent='測定完了';
+        document.getElementById('sessionBadge').className='badge b-gray';
+        document.getElementById('recState').textContent='● 待機中';
+        document.getElementById('recState').style.color='#cbd5e1';
+        document.getElementById('btnStart').disabled=false;
+        document.getElementById('btnStop').disabled=true;
+        document.getElementById('btnStop').className='btn btn-soft';
+        document.getElementById('btnBlack').disabled=true;
+
+        lastDecision='測定終了・保存'; updateDebug();
+        loadHistory(); switchTab('history'); toast('保存完了');
+      }
+
+      function renderEventSummaryHTML(logs){
+        if(!logs||!logs.length) return '<div class="muted">イベント記録なし</div>';
+        return '<div style="margin-top:6px;">'+logs.map(ev=>`<div class="logline">${ev.hhmm} <strong>${typeJa(ev.type)}</strong> (${ev.db}dB / +${ev.dDb})</div>`).join('')+'</div>';
+      }
+
+      function renderPeakEvents(){
+        const list=document.getElementById('peakEventList'); if(!list) return;
+        if(!peakEvents.length){ list.innerHTML='<div style="padding:10px 0;color:#9bb3ce;font-size:12px">まだピーク録音イベントはありません。</div>'; return; }
+        list.innerHTML=peakEvents.map((e,idx)=>`
+          <div class="row" style="padding:10px 0;border-bottom:1px solid #213b5d;align-items:center">
+            <div style="width:110px;font-weight:800;color:#fff">${esc(e.time)}</div>
+            <div style="width:190px;color:#ffb020;font-weight:800">${esc(e.type)}</div>
+            <div style="width:110px;color:#ff4d4f;font-weight:800">${Number(e.db).toFixed(1)} dB</div>
+            <div style="width:110px;color:#fff;font-weight:800">${Number(e.g).toFixed(2)} G</div>
+            <div style="flex:1;display:flex;gap:8px;align-items:center">
+              <audio controls preload="metadata" style="width:100%;max-width:340px"><source src="${esc(e.audioBase64)}" type="audio/webm"></audio>
+              <button class="btn btn-soft" style="padding:6px 10px;background:#102846;color:#dbeafe;border-color:#2d4b72" onclick="App.playPeakByIndex(${idx})">再生</button>
+            </div>
+          </div>`).join('');
+      }
+
+      function loadHistory(){
+        const arr=JSON.parse(localStorage.getItem('sleep_sessions')||'[]');
+        const list=document.getElementById('historyList');
+        const sel=document.getElementById('docSelect');
+        list.innerHTML=''; sel.innerHTML='';
+        if(!arr.length){
+          list.innerHTML='<div class="muted">まだ測定履歴がありません。</div>';
+          sel.innerHTML='<option value="">保存済みセッションなし</option>';
+          renderPeakEvents(); return;
+        }
+
+        arr.forEach((s,i)=>{
+          const hasAudio=!!(s.peakAudioBase64&&s.peakAudioBase64.length>100);
+          const card=document.createElement('div'); card.className='card'; card.style.marginTop='8px';
+          card.innerHTML=`<div><strong>${s.dateStr}</strong> ${s.startTime}〜${s.endTime}</div>
+            <div class="muted">baseline ${Number(s.baselineDb||baselineDb).toFixed(1)} dB / 睡眠 ${Math.round(s.durationSec/60)}分 / いびき ${s.snoreMin}分 / 歯ぎしり疑い ${s.bruxismEvents}件 / 録音:${hasAudio?'あり':'なし'}</div>
+            ${renderEventSummaryHTML(s.eventLogs||[])}`;
+          list.appendChild(card);
+
+          const o=document.createElement('option');
+          o.value=s.id;
+          o.textContent=`${s.dateStr} (${s.startTime}〜${s.endTime}) baseline:${Number(s.baselineDb||baselineDb).toFixed(1)}dB`;
+          sel.appendChild(o);
+          if(i===0) selectedSession=s;
+        });
+
+        if(arr[0]) onDoctorSessionChange(arr[0].id);
+        renderPeakEvents();
+      }
+
+      function onDoctorSessionChange(id){
+        const arr=JSON.parse(localStorage.getItem('sleep_sessions')||'[]');
+        const s=arr.find(x=>String(x.id)===String(id))||arr[0];
+        if(!s) return;
+        selectedSession=s;
+
+        const b=Number(s.baselineDb||baselineDb).toFixed(1);
+        document.getElementById('docTime').textContent=`${s.startTime} 〜 ${s.endTime}`;
+        document.getElementById('docBase').textContent=`Baseline: ${b} dB`;
+        document.getElementById('docBrux').textContent=`歯ぎしり疑い: ${s.bruxismEvents}件`;
+        document.getElementById('docStats').textContent=`最大体動: ${s.maxMotionG} G / いびき疑い: ${s.snoreMin}分`;
+
+        const logs=s.eventLogs||[];
+        const hasAudio=!!(s.peakAudioBase64&&s.peakAudioBase64.length>100);
+        if(logs.length){
+          const txt=logs.slice(-12).map(ev=>`${ev.hhmm} ${typeJa(ev.type)}(+${ev.dDb}dB)`).join(' / ');
+          document.getElementById('docNote').innerHTML=`睡眠実測時間: <strong>${Math.round(s.durationSec/60)}分</strong><br>イベント時刻: ${logs.length}件<br>録音: ${hasAudio?'あり':'なし'}<br><span style="font-size:12px;color:#475569;">${txt}</span>`;
+        }else{
+          document.getElementById('docNote').innerHTML=`睡眠実測時間: <strong>${Math.round(s.durationSec/60)}分</strong><br>イベント時刻記録: なし<br>録音: ${hasAudio?'あり':'なし'}`;
+        }
+
+        const audio=document.getElementById('docAudio');
+        if(hasAudio){ audio.src=s.peakAudioBase64; audio.style.display='block'; }
+        else { audio.removeAttribute('src'); audio.style.display='none'; }
+      }
+
+      function playPeakAudio(){
+        if(!selectedSession||!selectedSession.peakAudioBase64){ toast('録音データがありません'); return; }
+        const a=document.getElementById('docAudio');
+        a.src=selectedSession.peakAudioBase64; a.style.display='block';
+        a.play().catch(()=>toast('再生失敗'));
+      }
+      function playPeakByIndex(i){
+        const e=peakEvents[i]; if(!e||!e.audioBase64){ toast('録音データがありません'); return; }
+        const a=new Audio(e.audioBase64); a.play().catch(()=>toast('再生失敗'));
+      }
+
+      function clearPeakEvents(){
+        if(!confirm('ピーク録音履歴を削除しますか？')) return;
+        peakEvents=[]; savePeakEventsToStorage(); renderPeakEvents(); toast('ピーク履歴削除');
+      }
+
+      function clearAllLogs(){
+        if(!confirm('測定履歴・ピーク録音履歴をすべて削除しますか？')) return;
+        localStorage.removeItem('sleep_sessions'); localStorage.removeItem('peak_events');
+        selectedSession=null; peakEvents=[]; currentPeakBase64=''; eventLogs=[];
+        loadHistory(); renderPeakEvents();
+        const audio=document.getElementById('docAudio');
+        if(audio){ audio.pause(); audio.removeAttribute('src'); audio.style.display='none'; }
+        document.getElementById('docTime').textContent='--:-- 〜 --:--';
+        document.getElementById('docBase').textContent='Baseline: -- dB';
+        document.getElementById('docBrux').textContent='歯ぎしり疑い: --件';
+        document.getElementById('docStats').textContent='最大体動: -- G / いびき疑い: --分';
+        document.getElementById('docNote').textContent='--';
+        toast('全履歴削除完了');
+      }
+
+      function switchRole(next){
+        role=next;
+        const pv=document.getElementById('patientView'), dv=document.getElementById('doctorView');
+        const rp=document.getElementById('rolePatient'), rd=document.getElementById('roleDoctor');
+        if(next==='patient'){ pv.classList.remove('hidden'); dv.classList.add('hidden'); rp.style.background='#fff'; rd.style.background='transparent'; }
+        else { pv.classList.add('hidden'); dv.classList.remove('hidden'); rd.style.background='#fff'; rp.style.background='transparent'; }
+      }
+
+      function switchTab(next){
+        tab=next;
+        ['record','history','day','share'].forEach(t=>{
+          document.getElementById('tab-'+t).classList.toggle('active', t===next);
+          document.getElementById('panel-'+t).classList.toggle('hidden', t!==next);
+        });
+      }
+
+      function toggleBlackout(on){
+        const b=document.getElementById('blackout');
+        if(on) b.classList.add('active'); else b.classList.remove('active');
+      }
+
+      function init(){
+        initBars();
+        document.getElementById('btnStart').addEventListener('click', async (e)=>{
+          e.preventDefault();
+          await startMeasurement();
+        }, { passive:false });
+
+        checkMotionPermissionUI();
+        loadPeakEventsFromStorage();
+        loadHistory();
+        document.getElementById('baselineLabel').textContent=`● ベースライン: ${baselineDb.toFixed(1)} dB`;
+        runPreflight();
+        updateRuleText();
+        setInterval(updateDebug, 500);
+      }
+
+      return {
+        init, switchRole, switchTab, requestSensorPermission, runPreflight,
+        calibrateBaseline, startMeasurement, stopMeasurement, toggleBlackout,
+        onDoctorSessionChange, playPeakAudio, playPeakByIndex, clearPeakEvents, clearAllLogs
+      };
+    })();
+
+    window.addEventListener('DOMContentLoaded', ()=>App.init());
+  </script>
+</body>
+</html>
