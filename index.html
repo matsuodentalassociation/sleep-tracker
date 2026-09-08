@@ -1,186 +1,3 @@
-          ];
-          memUserStep = 0;
-          memCanInput = false;
-          document.getElementById('memStatus').textContent = '光る順番をよく見て覚えてください...';
-          document.getElementById('memProgress').textContent = '系列長: 4ステップ (再生中)';
-
-          let stepIdx = 0;
-          const playSeq = () => {
-            if (stepIdx >= memSequence.length) {
-              memCanInput = true;
-              document.getElementById('memStatus').textContent = '【入力受付】覚えた順にタップ！';
-              document.getElementById('memProgress').textContent = '入力待ち: 0 / 4';
-              return;
-            }
-            flashMemoryBtn(memSequence[stepIdx]);
-            stepIdx++;
-            testTimer = setTimeout(playSeq, 650);
-          };
-          testTimer = setTimeout(playSeq, 500);
-        }
-      }
-
-      function handleReactionTap() {
-        if (testType !== 'reaction') return;
-        if (!testWaitingGreen) {
-          clearTimeout(testTimer);
-          toast('お手付きです！緑色に変わる前にタップされました');
-          cleanupTests();
-          return;
-        }
-        const reactMs = Date.now() - testStartTime;
-        cleanupTests();
-        showResultDisplay(
-          '① 反応速度テスト',
-          `${reactMs} ms`,
-          reactMs < 270 ? '良好：ベースライン同等の素早い覚醒度' : '通常よりやや遅延（無理せず休息を）',
-          reactMs < 270 ? '#065f46' : 'var(--warn)'
-        );
-      }
-
-      function nextAttentionTrial() {
-        if (attRemaining <= 0) {
-          finishAttention();
-          return;
-        }
-        document.getElementById('attCount').textContent = `残り: ${attRemaining}回`;
-        attRemaining--;
-
-        const btn = document.getElementById('attCircleBtn');
-        btn.style.background = '#cbd5e1';
-        btn.textContent = '...';
-        btn.style.pointerEvents = 'none';
-        attIsTarget = false;
-
-        testTimer = setTimeout(() => {
-          attIsTarget = Math.random() < 0.6;
-          btn.style.pointerEvents = 'auto';
-          if (attIsTarget) {
-            btn.style.background = '#ef4444';
-            btn.textContent = '赤 (押す!)';
-            attTargetStartTime = Date.now();
-          } else {
-            const colors = ['#3b82f6', '#10b981', '#f59e0b'];
-            btn.style.background = colors[Math.floor(Math.random() * colors.length)];
-            btn.textContent = '見送り';
-          }
-
-          attInterval = setTimeout(() => {
-            if (attIsTarget) attScore.miss++;
-            nextAttentionTrial();
-          }, 1200);
-        }, 500);
-      }
-
-      function handleAttentionTap() {
-        clearTimeout(attInterval);
-        const btn = document.getElementById('attCircleBtn');
-        btn.style.pointerEvents = 'none';
-
-        if (attIsTarget) {
-          attScore.correct++;
-          attScore.times.push(Date.now() - attTargetStartTime);
-        } else {
-          attScore.falseAlarm++;
-        }
-        testTimer = setTimeout(nextAttentionTrial, 300);
-      }
-
-      function finishAttention() {
-        cleanupTests();
-        const avg = attScore.times.length ? Math.round(attScore.times.reduce((a,b)=>a+b,0)/attScore.times.length) : 0;
-        const success = attScore.falseAlarm === 0 && attScore.correct >= 2;
-        showResultDisplay(
-          '② 注意テスト (赤色選択)',
-          `正答 ${attScore.correct}回 / 誤答 ${attScore.falseAlarm}回 (${avg}ms)`,
-          success ? '良好：注意維持力・抑制機能は正常' : 'やや散漫：見落とし・誤反応あり',
-          success ? '#065f46' : 'var(--warn)'
-        );
-      }
-
-      function flashMemoryBtn(idx) {
-        const btn = document.getElementById(`memBtn-${idx}`);
-        if (!btn) return;
-        btn.style.opacity = '1';
-        btn.style.transform = 'scale(1.08)';
-        setTimeout(() => {
-          btn.style.opacity = '0.6';
-          btn.style.transform = 'scale(1)';
-        }, 300);
-      }
-
-      function handleMemoryTap(idx) {
-        if (!memCanInput) return;
-        flashMemoryBtn(idx);
-
-        if (idx !== memSequence[memUserStep]) {
-          memCanInput = false;
-          toast(`順番が違いました（正解は ${memUserStep + 1}番目が別の色でした）`);
-          cleanupTests();
-          showResultDisplay(
-            '③ 記憶系列テスト',
-            `再現成功: ${memUserStep} / 4ステップ`,
-            '通常ベースラインより低下（疲労の可能性あり）',
-            'var(--warn)'
-          );
-          return;
-        }
-
-        memUserStep++;
-        document.getElementById('memProgress').textContent = `入力中: ${memUserStep} / 4`;
-
-        if (memUserStep >= memSequence.length) {
-          memCanInput = false;
-          cleanupTests();
-          showResultDisplay(
-            '③ 記憶系列テスト',
-            '完全再現 (4/4 成功)',
-            '短期記憶力・集中力はベースライン同等',
-            '#065f46'
-          );
-        }
-      }
-
-      function showResultDisplay(title, score, comp, compColor) {
-        const box = document.getElementById('testResultBox');
-        box.classList.remove('hidden');
-        document.getElementById('resTestTitle').textContent = title;
-        document.getElementById('resScoreVal').textContent = score;
-        const compEl = document.getElementById('resCompVal');
-        compEl.textContent = comp;
-        compEl.style.color = compColor;
-        toast(`${title} 完了`);
-      }
-
-      function init(){
-        initBars();
-        document.getElementById('btnStart').addEventListener('click', async (e)=>{
-          e.preventDefault();
-          await startMeasurement();
-        }, { passive:false });
-
-        checkMotionPermissionUI();
-        loadPeakEventsFromStorage();
-        loadHistory();
-        document.getElementById('baselineLabel').textContent=`● ベースライン: ${baselineDb.toFixed(1)} dB`;
-        runPreflight();
-        updateRuleText();
-        setInterval(updateDebug, 500);
-      }
-
-      return {
-        init, switchRole, switchTab, requestSensorPermission, runPreflight,
-        calibrateBaseline, startMeasurement, stopMeasurement, toggleBlackout,
-        onDoctorSessionChange, onShareSessionChange, exportSessionLog, playPeakAudio, playPeakByIndex, clearPeakEvents, clearAllLogs,
-        // ミニゲーム用公開関数
-        setTestType, startCurrentTest, handleReactionTap, handleAttentionTap, handleMemoryTap
-      };
-    })();
-
-    window.addEventListener('DOMContentLoaded', ()=>App.init());
-  </script>
-</body>
-</html>
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -227,7 +44,7 @@
     .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
     .dbg{background:#0b1220;color:#dbeafe;border:1px solid #22314f;border-radius:10px;padding:10px;font-size:12px;line-height:1.45;white-space:pre-wrap}
 
-    /* 昼間ミニテスト専用スタイル */
+    /* 昼間ミニテスト専用スタイル（過去コードから移植・既存UIを破壊しないスコープ定義） */
     .test-box { height: 260px; border-radius: 14px; border: 2px dashed #cbd5e1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f8fafc; user-select: none; position: relative; }
   </style>
 </head>
@@ -606,8 +423,7 @@ lastTrigger=${lastTrigger}`;
 
       async function requestSensorPermission(){
         try{
-          if(typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function'){
-            const r=await DeviceMotionEvent.requestPermission();
+          if(typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function'){\r\n            const r=await DeviceMotionEvent.requestPermission();
             if(r!=='granted'){ toast('モーション許可が拒否されました'); return; }
           }
           bindMotionRobust();
@@ -1041,7 +857,356 @@ lastTrigger=${lastTrigger}`;
         }
 
         const now = new Date();
-        const exportDateStr = new Date(now.getTime
+        const exportDateStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString();
+
+        return {
+          exportInfo: {
+            appName: 'SleepTracker',
+            exportDate: exportDateStr,
+            formatVersion: '1.0',
+            includeAudio: includeAudio
+          },
+          session: sessionObj,
+          allPeakEvents: exportPeakEvents
+        };
+      }
+
+      function generateFileName(sessionObj, includeAudio){
+        let datePart = 'unknown';
+        if(sessionObj && sessionObj.id){
+          const d = new Date(sessionObj.id);
+          const y = d.getFullYear();
+          const m = String(d.getMonth()+1).padStart(2,'0');
+          const day = String(d.getDate()).padStart(2,'0');
+          const hh = String(d.getHours()).padStart(2,'0');
+          const mm = String(d.getMinutes()).padStart(2,'0');
+          datePart = `${y}${m}${day}_${hh}${mm}`;
+        }
+        const suffix = includeAudio ? 'full' : 'light';
+        return `SleepTracker_${datePart}_${suffix}.json`;
+      }
+
+      function downloadBlob(blob, fileName){
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      async function exportSessionLog(includeAudio, tryShare){
+        const exportData = buildExportData(includeAudio);
+        if(!exportData){
+          toast('書き出す測定データがありません');
+          return;
+        }
+
+        const fileName = generateFileName(exportData.session, includeAudio);
+        const jsonStr = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+
+        if(tryShare){
+          if(navigator.share && navigator.canShare){
+            const file = new File([blob], fileName, { type: 'application/json' });
+            if(navigator.canShare({ files: [file] })){
+              try{
+                await navigator.share({
+                  files: [file],
+                  title: fileName,
+                  text: `SleepTracker 睡眠測定ログ: ${exportData.session.dateStr} (${exportData.session.startTime}〜${exportData.session.endTime})`
+                });
+                toast('共有を完了しました');
+                return;
+              }catch(e){
+                if(e.name !== 'AbortError'){
+                  console.warn('Share error, fallback to download:', e);
+                  downloadBlob(blob, fileName);
+                  toast('共有失敗のためダウンロードしました');
+                  return;
+                }
+                return;
+              }
+            }
+          }
+          downloadBlob(blob, fileName);
+          toast('共有非対応のためダウンロードしました');
+        }else{
+          downloadBlob(blob, fileName);
+          toast('JSONログを書き出しました');
+        }
+      }
+
+      // ===== 起床後ミニテスト（復活ロジック） =====
+      function setTestType(type) {
+        testType = type;
+        cleanupTests();
+
+        ['reaction', 'attention', 'memory'].forEach(t => {
+          const btn = document.getElementById(`btnTest-${t}`);
+          if (btn) btn.className = (t === type) ? 'btn btn-primary' : 'btn btn-soft';
+        });
+
+        const guideTitle = document.getElementById('testGuideTitle');
+        const guideSub = document.getElementById('testGuideSub');
+
+        if (type === 'reaction') {
+          guideTitle.textContent = '画面が「緑」に変わったら即タップ！';
+          guideSub.textContent = '「開始」を押すと待機画面（赤）になります';
+        } else if (type === 'attention') {
+          guideTitle.textContent = '「赤色の円」が現れた時だけタップ！';
+          guideSub.textContent = '青や緑は見送ってください（全5回）';
+        } else {
+          guideTitle.textContent = '光る色の順番を記憶して再現！';
+          guideSub.textContent = '4つの色が光ります。同じ順序でタップしてください';
+        }
+      }
+
+      function cleanupTests() {
+        clearTimeout(testTimer);
+        clearTimeout(attInterval);
+        testWaitingGreen = false;
+        memCanInput = false;
+
+        const guide = document.getElementById('testGuide');
+        if (guide) guide.classList.remove('hidden');
+        ['panelReaction', 'panelAttention', 'panelMemory', 'testResultBox'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.classList.add('hidden');
+        });
+        const area = document.getElementById('testArea');
+        if (area) {
+          area.style.background = '#f8fafc';
+          area.style.borderColor = '#cbd5e1';
+        }
+      }
+
+      function startCurrentTest() {
+        document.getElementById('testGuide').classList.add('hidden');
+        document.getElementById('testResultBox').classList.add('hidden');
+
+        if (testType === 'reaction') {
+          const p = document.getElementById('panelReaction');
+          p.classList.remove('hidden');
+          const area = document.getElementById('testArea');
+          area.style.background = '#ef4444';
+          area.style.borderColor = '#dc2626';
+          document.getElementById('reactPrompt').textContent = '待機中...';
+          document.getElementById('reactPrompt').style.color = '#fff';
+          document.getElementById('reactSubPrompt').textContent = '緑色に変わるまでタップ禁止';
+          document.getElementById('reactSubPrompt').style.color = '#fee2e2';
+
+          testWaitingGreen = false;
+          const delay = 1500 + Math.random() * 2000;
+          clearTimeout(testTimer);
+          testTimer = setTimeout(() => {
+            testWaitingGreen = true;
+            area.style.background = '#10b981';
+            area.style.borderColor = '#059669';
+            document.getElementById('reactPrompt').textContent = '今すぐタップ！';
+            document.getElementById('reactSubPrompt').textContent = '画面内をどこでもタップ';
+            testStartTime = Date.now();
+          }, delay);
+        } else if (testType === 'attention') {
+          const p = document.getElementById('panelAttention');
+          p.classList.remove('hidden');
+          attRemaining = 5;
+          attScore = { correct: 0, miss: 0, falseAlarm: 0, times: [] };
+          nextAttentionTrial();
+        } else if (testType === 'memory') {
+          const p = document.getElementById('panelMemory');
+          p.classList.remove('hidden');
+          memSequence = [
+            Math.floor(Math.random() * 4),
+            Math.floor(Math.random() * 4),
+            Math.floor(Math.random() * 4),
+            Math.floor(Math.random() * 4)
+          
+          ];
+          memUserStep = 0;
+          memCanInput = false;
+          document.getElementById('memStatus').textContent = '光る順番をよく見て覚えてください...';
+          document.getElementById('memProgress').textContent = '系列長: 4ステップ (再生中)';
+
+          let stepIdx = 0;
+          const playSeq = () => {
+            if (stepIdx >= memSequence.length) {
+              memCanInput = true;
+              document.getElementById('memStatus').textContent = '【入力受付】覚えた順にタップ！';
+              document.getElementById('memProgress').textContent = '入力待ち: 0 / 4';
+              return;
+            }
+            flashMemoryBtn(memSequence[stepIdx]);
+            stepIdx++;
+            testTimer = setTimeout(playSeq, 650);
+          };
+          testTimer = setTimeout(playSeq, 500);
+        }
+      }
+
+      function handleReactionTap() {
+        if (testType !== 'reaction') return;
+        if (!testWaitingGreen) {
+          clearTimeout(testTimer);
+          toast('お手付きです！緑色に変わる前にタップされました');
+          cleanupTests();
+          return;
+        }
+        const reactMs = Date.now() - testStartTime;
+        cleanupTests();
+        showResultDisplay(
+          '① 反応速度テスト',
+          `${reactMs} ms`,
+          reactMs < 270 ? '良好：ベースライン同等の素早い覚醒度' : '通常よりやや遅延（無理せず休息を）',
+          reactMs < 270 ? '#065f46' : 'var(--warn)'
+        );
+      }
+
+      function nextAttentionTrial() {
+        if (attRemaining <= 0) {
+          finishAttention();
+          return;
+        }
+        document.getElementById('attCount').textContent = `残り: ${attRemaining}回`;
+        attRemaining--;
+
+        const btn = document.getElementById('attCircleBtn');
+        btn.style.background = '#cbd5e1';
+        btn.textContent = '...';
+        btn.style.pointerEvents = 'none';
+        attIsTarget = false;
+
+        testTimer = setTimeout(() => {
+          attIsTarget = Math.random() < 0.6;
+          btn.style.pointerEvents = 'auto';
+          if (attIsTarget) {
+            btn.style.background = '#ef4444';
+            btn.textContent = '赤 (押す!)';
+            attTargetStartTime = Date.now();
+          } else {
+            const colors = ['#3b82f6', '#10b981', '#f59e0b'];
+            btn.style.background = colors[Math.floor(Math.random() * colors.length)];
+            btn.textContent = '見送り';
+          }
+
+          attInterval = setTimeout(() => {
+            if (attIsTarget) attScore.miss++;
+            nextAttentionTrial();
+          }, 1200);
+        }, 500);
+      }
+
+      function handleAttentionTap() {
+        clearTimeout(attInterval);
+        const btn = document.getElementById('attCircleBtn');
+        btn.style.pointerEvents = 'none';
+
+        if (attIsTarget) {
+          attScore.correct++;
+          attScore.times.push(Date.now() - attTargetStartTime);
+        } else {
+          attScore.falseAlarm++;
+        }
+        testTimer = setTimeout(nextAttentionTrial, 300);
+      }
+
+      function finishAttention() {
+        cleanupTests();
+        const avg = attScore.times.length ? Math.round(attScore.times.reduce((a,b)=>a+b,0)/attScore.times.length) : 0;
+        const success = attScore.falseAlarm === 0 && attScore.correct >= 2;
+        showResultDisplay(
+          '② 注意テスト (赤色選択)',
+          `正答 ${attScore.correct}回 / 誤答 ${attScore.falseAlarm}回 (${avg}ms)`,
+          success ? '良好：注意維持力・抑制機能は正常' : 'やや散漫：見落とし・誤反応あり',
+          success ? '#065f46' : 'var(--warn)'
+        );
+      }
+
+      function flashMemoryBtn(idx) {
+        const btn = document.getElementById(`memBtn-${idx}`);
+        if (!btn) return;
+        btn.style.opacity = '1';
+        btn.style.transform = 'scale(1.08)';
+        setTimeout(() => {
+          btn.style.opacity = '0.6';
+          btn.style.transform = 'scale(1)';
+        }, 300);
+      }
+
+      function handleMemoryTap(idx) {
+        if (!memCanInput) return;
+        flashMemoryBtn(idx);
+
+        if (idx !== memSequence[memUserStep]) {
+          memCanInput = false;
+          toast(`順番が違いました（正解は ${memUserStep + 1}番目が別の色でした）`);
+          cleanupTests();
+          showResultDisplay(
+            '③ 記憶系列テスト',
+            `再現成功: ${memUserStep} / 4ステップ`,
+            '通常ベースラインより低下（疲労の可能性あり）',
+            'var(--warn)'
+          );
+          return;
+        }
+
+        memUserStep++;
+        document.getElementById('memProgress').textContent = `入力中: ${memUserStep} / 4`;
+
+        if (memUserStep >= memSequence.length) {
+          memCanInput = false;
+          cleanupTests();
+          showResultDisplay(
+            '③ 記憶系列テスト',
+            '完全再現 (4/4 成功)',
+            '短期記憶力・集中力はベースライン同等',
+            '#065f46'
+          );
+        }
+      }
+
+      function showResultDisplay(title, score, comp, compColor) {
+        const box = document.getElementById('testResultBox');
+        box.classList.remove('hidden');
+        document.getElementById('resTestTitle').textContent = title;
+        document.getElementById('resScoreVal').textContent = score;
+        const compEl = document.getElementById('resCompVal');
+        compEl.textContent = comp;
+        compEl.style.color = compColor;
+        toast(`${title} 完了`);
+      }
+
+      function init(){
+        initBars();
+        document.getElementById('btnStart').addEventListener('click', async (e)=>{
+          e.preventDefault();
+          await startMeasurement();
+        }, { passive:false });
+
+        checkMotionPermissionUI();
+        loadPeakEventsFromStorage();
+        loadHistory();
+        document.getElementById('baselineLabel').textContent=`● ベースライン: ${baselineDb.toFixed(1)} dB`;
+        runPreflight();
+        updateRuleText();
+        setInterval(updateDebug, 500);
+      }
+
+      return {
+        init, switchRole, switchTab, requestSensorPermission, runPreflight,
+        calibrateBaseline, startMeasurement, stopMeasurement, toggleBlackout,
+        onDoctorSessionChange, onShareSessionChange, exportSessionLog, playPeakAudio, playPeakByIndex, clearPeakEvents, clearAllLogs,
+        // ミニゲーム用公開関数
+        setTestType, startCurrentTest, handleReactionTap, handleAttentionTap, handleMemoryTap
+      };
+    })();
+
+    window.addEventListener('DOMContentLoaded', ()=>App.init());
+  </script>
+</body>
+</html>
         const exportDateStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString();
 
         return {
