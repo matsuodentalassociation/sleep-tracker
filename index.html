@@ -2,1556 +2,1885 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
-  <title>SleepTracker V5 Stable（マイク取得順序固定・相対閾値・常時デバッグ）</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>SleepTracker 完全版（患者/医師・実測連動）</title>
   <style>
     :root{
-      --primary:#4f46e5; --bg:#f1f5f9; --card:#ffffff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
-      --ok:#10b981; --warn:#f59e0b; --danger:#ef4444;
+      --bg:#f1f5f9;
+      --card:#ffffff;
+      --line:#e2e8f0;
+      --text:#0f172a;
+      --muted:#64748b;
+      --primary:#4f46e5;
+      --primary-hover:#4338ca;
+      --ok:#10b981;
+      --warn:#f59e0b;
+      --danger:#ef4444;
+      --ink:#020617;
+      --ink2:#0f172a;
+      --blue:#3b82f6;
+      --amber:#f59e0b;
+      --green:#10b981;
+      --rose:#ef4444;
     }
-    *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-    body{background:var(--bg);color:var(--text)}
-    .app{max-width:980px;margin:0 auto;padding:10px 12px 80px}
-    .top{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);z-index:10}
-    .top-in{max-width:980px;margin:0 auto;height:56px;padding:0 12px;display:flex;align-items:center;justify-content:space-between}
-    .role{display:flex;background:#eef2ff;border-radius:10px;padding:3px;gap:4px}
-    .btn{border:1px solid transparent;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer}
-    .btn:disabled{opacity:.45;cursor:not-allowed}
-    .btn-primary{background:var(--primary);color:#fff}
-    .btn-danger{background:var(--danger);color:#fff}
-    .btn-soft{background:#f8fafc;border-color:#cbd5e1;color:#334155}
-    .tabbar{display:flex;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:auto}
-    .tab{flex:1;min-width:88px;padding:10px;border:none;background:transparent;font-weight:700;color:#475569;border-bottom:2px solid transparent}
-    .tab.active{color:var(--primary);border-bottom-color:var(--primary)}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
-    .row{display:flex;gap:8px;align-items:center}
-    .col{display:flex;flex-direction:column;gap:10px}
-    .hidden{display:none!important}
-    .badge{display:inline-flex;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700}
-    .b-gray{background:#e2e8f0;color:#475569}.b-green{background:#d1fae5;color:#065f46}
-    .kv{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-    .tile{background:#1e293b;border-radius:8px;padding:8px}
-    .tile .k{font-size:10px;color:#94a3b8}.tile .v{font-size:17px;font-weight:800}
-    #realBars{height:54px;background:#020617;border-radius:8px;display:flex;align-items:flex-end;gap:2px;padding:4px}
-    #toast{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:99;display:flex;flex-direction:column;gap:8px;width:min(92vw,420px)}
-    .toast{background:rgba(2,6,23,.92);color:#fff;padding:10px;border-radius:10px;text-align:center;font-size:12px}
-    #blackout{position:fixed;inset:0;background:#000;display:none;z-index:90;align-items:center;justify-content:center;flex-direction:column}
-    #blackout.active{display:flex}
-    #blackoutClock{font-family:monospace;font-size:38px;color:#334155;font-weight:800}
-    .muted{color:var(--muted);font-size:12px}
-    select{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff}
-    .logline{padding:4px 0;border-bottom:1px dashed #e2e8f0;font-size:12px;color:#334155}
-    .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
-    .dbg{background:#0b1220;color:#dbeafe;border:1px solid #22314f;border-radius:10px;padding:10px;font-size:12px;line-height:1.45;white-space:pre-wrap}
-
-    /* 昼間ミニテスト専用スタイル（過去コードから移植・既存UIを破壊しないスコープ定義） */
-    .test-box { height: 260px; border-radius: 14px; border: 2px dashed #cbd5e1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f8fafc; user-select: none; position: relative; }
+    *{
+      box-sizing:border-box;
+      margin:0;
+      padding:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      -webkit-tap-highlight-color:transparent;
+    }
+    body{
+      background:var(--bg);
+      color:var(--text);
+      line-height:1.4;
+      padding-bottom:80px;
+    }
+    .top{
+      position:sticky;
+      top:0;
+      z-index:40;
+      background:#fff;
+      border-bottom:1px solid var(--line);
+    }
+    .top-inner{
+      max-width:1100px;
+      height:58px;
+      margin:0 auto;
+      padding:0 12px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .brand .logo{
+      width:30px;
+      height:30px;
+      border-radius:9px;
+      background:var(--primary);
+      color:#fff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:16px;
+      font-weight:800;
+    }
+    .brand .ttl{
+      font-weight:800;
+      font-size:14px;
+      line-height:1.1;
+    }
+    .brand .sub{
+      font-size:10px;
+      color:var(--muted);
+    }
+    .mode-switch{
+      background:#eef2ff;
+      padding:3px;
+      border-radius:10px;
+      display:flex;
+      gap:4px;
+    }
+    .container{
+      max-width:1100px;
+      margin:12px auto 0;
+      padding:0 12px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:12px;
+      box-shadow:0 1px 3px rgba(15,23,42,.05);
+    }
+    .hidden{display:none !important;}
+    .row{display:flex;align-items:center;gap:8px;}
+    .col{display:flex;flex-direction:column;gap:10px;}
+    .btn{
+      border:1px solid transparent;
+      border-radius:10px;
+      padding:10px 12px;
+      font-size:13px;
+      font-weight:800;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      transition:.15s all;
+    }
+    .btn:active{transform:scale(.98);}
+    .btn:disabled{opacity:.45;cursor:not-allowed;}
+    .btn-primary{background:var(--primary);color:#fff;}
+    .btn-primary:hover{background:var(--primary-hover);}
+    .btn-soft{background:#f8fafc;border-color:#cbd5e1;color:#334155;}
+    .btn-danger{background:var(--danger);color:#fff;}
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      border-radius:999px;
+      padding:2px 8px;
+      font-size:11px;
+      font-weight:800;
+    }
+    .b-gray{background:#e2e8f0;color:#475569;}
+    .b-green{background:#d1fae5;color:#065f46;}
+    .b-amber{background:#fef3c7;color:#92400e;}
+    .tabs{
+      display:flex;
+      overflow:auto;
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:#fff;
+      scrollbar-width:none;
+    }
+    .tab{
+      border:none;
+      background:transparent;
+      min-width:90px;
+      padding:10px 10px;
+      color:#475569;
+      font-size:12px;
+      font-weight:800;
+      border-bottom:2px solid transparent;
+      cursor:pointer;
+      flex:1;
+    }
+    .tab.active{color:var(--primary);border-bottom-color:var(--primary);}
+    .muted{font-size:12px;color:var(--muted);}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+    #toastWrap{
+      position:fixed;
+      top:12px;
+      left:50%;
+      transform:translateX(-50%);
+      z-index:100;
+      width:min(92vw,420px);
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      pointer-events:none;
+    }
+    .toast{
+      background:rgba(2,6,23,.92);
+      color:#fff;
+      border-radius:10px;
+      padding:10px;
+      font-size:12px;
+      text-align:center;
+    }
+    #blackout{
+      position:fixed;
+      inset:0;
+      z-index:90;
+      background:#000;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      flex-direction:column;
+    }
+    #blackout.active{display:flex;}
+    #blackoutClock{
+      font-size:38px;
+      color:#334155;
+      font-weight:900;
+      font-family:ui-monospace,Menlo,Consolas,monospace;
+    }
+    #realBars{
+      height:56px;
+      background:#020617;
+      border-radius:8px;
+      display:flex;
+      align-items:flex-end;
+      gap:2px;
+      padding:4px;
+      overflow:hidden;
+    }
+    .kv{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+    }
+    .tile{
+      background:#1e293b;
+      border-radius:8px;
+      padding:8px;
+    }
+    .tile .k{font-size:10px;color:#94a3b8;}
+    .tile .v{font-size:17px;font-weight:900;}
+    .rule{
+      background:#eef2ff;
+      border:1px solid #c7d2fe;
+      border-radius:10px;
+      padding:8px;
+      font-size:12px;
+      color:#1e3a8a;
+      white-space:pre-wrap;
+    }
+    .dbg{
+      background:#0b1220;
+      color:#dbeafe;
+      border:1px solid #22314f;
+      border-radius:10px;
+      padding:10px;
+      font-size:12px;
+      line-height:1.45;
+      white-space:pre-wrap;
+      min-height:142px;
+    }
+    .list{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .session-item{
+      border:1px solid var(--line);
+      border-radius:10px;
+      background:#fff;
+      padding:10px;
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      align-items:center;
+      cursor:pointer;
+    }
+    .session-item:hover{background:#f8fafc;}
+    .event-row{
+      display:grid;
+      grid-template-columns:110px 170px 80px 80px 1fr;
+      gap:8px;
+      align-items:center;
+      padding:8px 0;
+      border-bottom:1px dashed #2c4463;
+      font-size:12px;
+      color:#dbeafe;
+    }
+    .peak-panel{
+      background:linear-gradient(180deg,#0f213a,#0b1b31);
+      border:1px solid #243b5a;
+      color:#e5eefc;
+      border-radius:12px;
+      padding:10px;
+    }
+    select,textarea,input[type="text"]{
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:10px;
+      padding:10px;
+      font-size:13px;
+      background:#fff;
+      color:var(--text);
+    }
+    .test-box{
+      height:280px;
+      border:2px dashed #cbd5e1;
+      border-radius:14px;
+      background:#f8fafc;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      flex-direction:column;
+      user-select:none;
+      position:relative;
+      overflow:hidden;
+    }
+    .circle-btn{
+      width:92px;
+      height:92px;
+      border-radius:999px;
+      border:0;
+      color:#fff;
+      font-size:13px;
+      font-weight:800;
+      cursor:pointer;
+    }
+    .mem-grid{
+      display:grid;
+      grid-template-columns:repeat(2,70px);
+      gap:10px;
+    }
+    .mem-cell{
+      height:70px;
+      border:0;
+      border-radius:10px;
+      opacity:.6;
+      transition:transform .15s, opacity .15s;
+      cursor:pointer;
+    }
+    .share-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+    }
+    .summary-grid{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:8px;
+    }
+    .sum{
+      border:1px solid var(--line);
+      background:#f8fafc;
+      border-radius:8px;
+      padding:8px;
+    }
+    .sum .k{font-size:10px;color:#64748b;}
+    .sum .v{font-weight:900;font-size:16px;}
+    @media (max-width:740px){
+      .event-row{
+        grid-template-columns:1fr;
+        gap:5px;
+        border-bottom:1px dashed #2c4463;
+        padding:10px 0;
+      }
+      .share-grid,.summary-grid,.kv{grid-template-columns:1fr;}
+    }
   </style>
 </head>
 <body>
-  <div id="toast"></div>
+  <div id="toastWrap"></div>
 
   <div id="blackout" onclick="App.toggleBlackout(false)">
     <div id="blackoutClock">00:00</div>
-    <div class="muted" style="margin-top:10px">🌙 就寝モード（タップで戻る）</div>
+    <div class="muted" style="margin-top:8px;color:#475569;">🌙 就寝モード（タップで復帰）</div>
   </div>
 
   <header class="top">
-    <div class="top-in">
-      <div class="row">
-        <div style="background:var(--primary);color:#fff;border-radius:8px;padding:6px 8px">🌙</div>
-        <div><strong>SleepTracker</strong><div class="muted">V5 Stable（マイク優先起動）</div></div>
+    <div class="top-inner">
+      <div class="brand">
+        <div class="logo">🌙</div>
+        <div>
+          <div class="ttl">SleepTracker</div>
+          <div class="sub">単一ファイル完全版（患者/医師・実測連動）</div>
+        </div>
       </div>
-      <div class="role">
-        <button id="rolePatient" class="btn btn-soft" style="background:#fff" onclick="App.switchRole('patient')">患者</button>
-        <button id="roleDoctor" class="btn btn-soft" onclick="App.switchRole('doctor')">医師</button>
+      <div class="mode-switch">
+        <button id="btnModePatient" class="btn btn-soft" style="background:#fff;" onclick="App.switchMode('patient')">患者モード</button>
+        <button id="btnModeDoctor" class="btn btn-soft" onclick="App.switchMode('doctor')">医師モード</button>
       </div>
     </div>
   </header>
 
-  <main class="app">
+  <main class="container">
     <section id="patientView" class="col">
-      <div class="tabbar">
-        <button id="tab-record" class="tab active" onclick="App.switchTab('record')">測定</button>
-        <button id="tab-history" class="tab" onclick="App.switchTab('history')">履歴</button>
-        <button id="tab-day" class="tab" onclick="App.switchTab('day')">昼間テスト</button>
-        <button id="tab-share" class="tab" onclick="App.switchTab('share')">共有</button>
+      <div class="tabs">
+        <button id="tab-measure" class="tab active" onclick="App.switchPatientTab('measure')">測定</button>
+        <button id="tab-history" class="tab" onclick="App.switchPatientTab('history')">履歴</button>
+        <button id="tab-daytest" class="tab" onclick="App.switchPatientTab('daytest')">昼間テスト</button>
+        <button id="tab-share" class="tab" onclick="App.switchPatientTab('share')">共有</button>
       </div>
 
-      <div id="panel-record" class="col">
+      <div id="panel-measure" class="col">
         <div class="card col">
-          <div class="row" style="justify-content:space-between">
-            <div><strong>就寝測定セッション</strong><div class="muted">相対閾値 / ピーク3秒録音 / 常時デバッグ</div></div>
+          <div class="row" style="justify-content:space-between;">
+            <div>
+              <strong>就寝測定セッション</strong>
+              <div class="muted">マイクdB + 体動G + 相対閾値イベント録音（3秒）</div>
+            </div>
             <span id="sessionBadge" class="badge b-gray">未測定</span>
           </div>
 
+          <div id="motionPermBox" class="row hidden" style="justify-content:space-between;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px;">
+            <span style="font-size:12px;">⚠️ iOSはモーション許可が必要です</span>
+            <button class="btn btn-primary" style="padding:6px 10px;" onclick="App.requestMotionPermission()">許可</button>
+          </div>
+
           <div class="row">
-            <button class="btn btn-soft" onclick="App.calibrateBaseline()">ベースライン再計測</button>
-            <button class="btn btn-soft" onclick="App.requestSensorPermission()">モーション許可</button>
+            <button class="btn btn-soft" onclick="App.calibrateBaseline()">ベースライン再計測（3秒）</button>
+            <button class="btn btn-soft" onclick="App.requestMotionPermission()">モーション許可</button>
             <button class="btn btn-soft" onclick="App.runPreflight()">接続チェック</button>
           </div>
 
-          <div id="sensorBox" class="row" style="justify-content:space-between;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px;display:none">
-            <span style="font-size:12px">⚠️ モーションセンサー許可が必要</span>
-            <button class="btn btn-primary" style="padding:6px 10px" onclick="App.requestSensorPermission()">許可</button>
+          <div class="row" style="justify-content:space-between;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:8px;">
+            <span id="baselineLabel" style="font-size:12px;font-weight:800;color:#065f46;">● ベースライン: -- dB</span>
+            <span id="deltaLabel" class="mono" style="font-size:12px;color:#1e3a8a;">ΔdB: --</span>
           </div>
 
-          <div class="row" style="justify-content:space-between;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:8px">
-            <span id="baselineLabel" style="font-size:12px;font-weight:700;color:#065f46">● ベースライン: -- dB</span>
-            <span id="deltaLabel" class="mono" style="font-size:12px;color:#1e3a8a">ΔdB: --</span>
-          </div>
+          <div id="ruleText" class="rule"></div>
 
-          <div class="card" style="padding:8px;background:#f8fafc">
-            <div class="muted">判定ルール（相対閾値）</div>
-            <div id="ruleText" class="mono" style="font-size:12px;line-height:1.5;color:#334155"></div>
-          </div>
-
-          <div style="background:#0f172a;border-radius:10px;padding:10px" class="col">
-            <div class="row" style="justify-content:space-between">
-              <span id="recState" style="font-size:12px;color:#cbd5e1">● 待機中</span>
-              <span id="recTime" style="font-family:monospace;font-size:18px;color:#fff">00:00:00</span>
+          <div class="col" style="background:var(--ink2);border-radius:10px;padding:10px;">
+            <div class="row" style="justify-content:space-between;">
+              <span id="recState" style="font-size:12px;color:#cbd5e1;">● 待機中</span>
+              <span id="recTime" class="mono" style="font-size:18px;color:#fff;font-weight:900;">00:00:00</span>
             </div>
             <div id="realBars"></div>
             <div class="kv">
-              <div class="tile"><div class="k">実測マイク音圧</div><div id="valDb" class="v" style="color:#6ee7b7">-- dB</div></div>
-              <div class="tile"><div class="k">実測加速度・体動</div><div id="valG" class="v" style="color:#93c5fd">0.00 G</div></div>
+              <div class="tile"><div class="k">実測マイク音圧</div><div id="valDb" class="v" style="color:#6ee7b7;">-- dB</div></div>
+              <div class="tile"><div class="k">実測加速度・体動</div><div id="valG" class="v" style="color:#93c5fd;">0.00 G</div></div>
             </div>
           </div>
 
           <div class="row">
-            <button id="btnStart" class="btn btn-primary" style="flex:1">睡眠測定を開始</button>
-            <button id="btnStop" class="btn btn-soft" style="flex:1" onclick="App.stopMeasurement()" disabled>測定終了</button>
+            <button id="btnStart" class="btn btn-primary" style="flex:1;">睡眠測定を開始</button>
+            <button id="btnStop" class="btn btn-soft" style="flex:1;" onclick="App.stopMeasurement()" disabled>測定を終了</button>
           </div>
-          <button id="btnBlack" class="btn btn-soft" onclick="App.toggleBlackout(true)" disabled>🌙 就寝画面</button>
+          <button id="btnBlackout" class="btn btn-soft" onclick="App.toggleBlackout(true)" disabled>🌙 画面暗転（就寝モード）</button>
 
-          <div class="dbg" id="debugPanel">debug booting...</div>
+          <div id="debugPanel" class="dbg">debug booting...</div>
         </div>
       </div>
 
       <div id="panel-history" class="hidden col">
-        <div class="card">
-          <div class="row" style="justify-content:space-between;align-items:center">
-            <strong>測定履歴</strong>
-            <button class="btn btn-soft" style="padding:6px 10px" onclick="App.clearAllLogs()">全履歴削除</button>
+        <div class="card col">
+          <div class="row" style="justify-content:space-between;">
+            <strong>保存済み測定セッション</strong>
+            <button class="btn btn-soft" style="padding:6px 10px;" onclick="App.clearAllData()">全履歴消去</button>
           </div>
-          <div id="historyList" style="margin-top:8px"></div>
+          <div id="historyList" class="list"></div>
         </div>
 
-        <div class="card" id="peakPanel" style="margin-top:10px;background:linear-gradient(180deg,#0f213a,#0b1b31);border:1px solid #243b5a;color:#e5eefc">
-          <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">
-            <strong style="font-size:18px">🔊 ピーク検出イベント一覧（自動録音）</strong>
-            <button class="btn btn-soft" style="background:#102846;color:#dbeafe;border-color:#284a74" onclick="App.clearPeakEvents()">履歴消去</button>
+        <div class="peak-panel">
+          <div class="row" style="justify-content:space-between;">
+            <strong>🔊 ピーク録音イベント一覧</strong>
+            <button class="btn btn-soft" style="padding:6px 10px;background:#102846;color:#dbeafe;border-color:#2d4b72;" onclick="App.clearPeakEvents()">ピーク履歴消去</button>
           </div>
-          <div style="font-size:12px;color:#a8c1df;margin-bottom:10px">
-            録音トリガー: <span class="mono">dB ≥ baseline + 10</span> または <span class="mono">G ≥ 動的閾値</span>
+          <div class="muted" style="color:#a8c1df;margin:6px 0 10px 0;">
+            録音トリガー: dB ≥ baseline + 10 または G ≥ 動的閾値（3秒録音）
           </div>
-          <div class="row" style="font-weight:700;color:#9ec5ff;border-bottom:1px solid #29486e;padding-bottom:6px">
-            <div style="width:110px">発生時刻</div>
-            <div style="width:190px">タイプ</div>
-            <div style="width:110px">音圧</div>
-            <div style="width:110px">体動</div>
-            <div style="flex:1">再生</div>
-          </div>
-          <div id="peakEventList" style="margin-top:6px"></div>
+          <div id="peakEventList"></div>
         </div>
       </div>
 
-      <!-- 昼間テスト（ミニゲーム復活） -->
-      <div id="panel-day" class="hidden col">
+      <div id="panel-daytest" class="hidden col">
         <div class="card col">
           <div>
             <strong>起床後ミニテスト</strong>
-            <div class="muted">起床直後の覚醒度・注意力を測定します。</div>
+            <div class="muted">①反応速度 / ②注意力 / ③記憶力</div>
           </div>
 
-          <div class="row" style="gap:4px;border-bottom:1px solid var(--line);padding-bottom:8px">
-            <button onclick="App.setTestType('reaction')" id="btnTest-reaction" class="btn btn-primary" style="flex:1;font-size:11px;padding:6px 4px">① 反応速度</button>
-            <button onclick="App.setTestType('attention')" id="btnTest-attention" class="btn btn-soft" style="flex:1;font-size:11px;padding:6px 4px">② 注意力</button>
-            <button onclick="App.setTestType('memory')" id="btnTest-memory" class="btn btn-soft" style="flex:1;font-size:11px;padding:6px 4px">③ 記憶力</button>
+          <div class="row" style="border-bottom:1px solid var(--line);padding-bottom:8px;">
+            <button id="btnTest-reaction" class="btn btn-primary" style="flex:1;padding:8px 6px;" onclick="App.setDayTest('reaction')">①反応速度</button>
+            <button id="btnTest-attention" class="btn btn-soft" style="flex:1;padding:8px 6px;" onclick="App.setDayTest('attention')">②注意力</button>
+            <button id="btnTest-memory" class="btn btn-soft" style="flex:1;padding:8px 6px;" onclick="App.setDayTest('memory')">③記憶力</button>
           </div>
 
-          <div id="testArea" class="test-box">
-            <div id="testGuide" style="display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:12px">
-              <strong id="testGuideTitle" style="font-size:14px">画面が「緑」に変わったら即タップ！</strong>
-              <p id="testGuideSub" style="font-size:11px;color:var(--muted)">「開始」を押すと待機画面（赤）になります</p>
-              <button onclick="App.startCurrentTest()" class="btn btn-primary" style="margin-top:6px;padding:8px 20px">テスト開始</button>
+          <div id="testBox" class="test-box">
+            <div id="testGuide" class="col" style="align-items:center;text-align:center;padding:12px;">
+              <strong id="testGuideTitle">画面が緑に変わった瞬間をタップ</strong>
+              <div id="testGuideSub" class="muted">開始後、赤画面で待機します</div>
+              <button class="btn btn-primary" onclick="App.startCurrentDayTest()">テスト開始</button>
             </div>
 
-            <div id="panelReaction" onclick="App.handleReactionTap()" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer">
-              <strong id="reactPrompt" style="font-size:22px">待機中...</strong>
-              <span id="reactSubPrompt" style="font-size:11px;margin-top:4px">緑色に変わるまでタップ禁止</span>
+            <div id="panelReaction" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;" onclick="App.onReactionTap()">
+              <div id="reactionMain" style="font-size:24px;font-weight:900;color:#fff;">待機中...</div>
+              <div id="reactionSub" style="font-size:11px;color:#fee2e2;">緑になるまでタップ禁止</div>
             </div>
 
-            <div id="panelAttention" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:12px">
-              <div style="width:100%;display:flex;justify-content:space-between;font-size:11px;font-weight:bold">
-                <span>「赤色の円」だけタップ！</span>
-                <span id="attCount">残り: 5回</span>
+            <div id="panelAttention" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:12px;">
+              <div class="row" style="justify-content:space-between;width:100%;">
+                <strong style="font-size:12px;">赤だけタップ（Go/No-Go）</strong>
+                <span id="attRemain" style="font-size:12px;">残り: 5回</span>
               </div>
-              <button id="attCircleBtn" onclick="App.handleAttentionTap()" style="width:90px;height:90px;border-radius:9999px;border:0;color:#fff;font-weight:bold;font-size:13px;cursor:pointer"></button>
-              <span style="font-size:10px;color:var(--muted)">青・緑は見送ってください</span>
+              <button id="attCircle" class="circle-btn" onclick="App.onAttentionTap()">...</button>
+              <div class="muted">青・緑は見送る</div>
             </div>
 
-            <div id="panelMemory" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:12px">
-              <div id="memStatus" style="font-size:11px;font-weight:bold">光る順番を覚えてください...</div>
-              <div style="display:grid;grid-template-columns:repeat(2, 65px);gap:10px;margin:auto">
-                <button id="memBtn-0" onclick="App.handleMemoryTap(0)" style="height:65px;border-radius:8px;border:0;background:#ef4444;opacity:0.6;cursor:pointer"></button>
-                <button id="memBtn-1" onclick="App.handleMemoryTap(1)" style="height:65px;border-radius:8px;border:0;background:#3b82f6;opacity:0.6;cursor:pointer"></button>
-                <button id="memBtn-2" onclick="App.handleMemoryTap(2)" style="height:65px;border-radius:8px;border:0;background:#f59e0b;opacity:0.6;cursor:pointer"></button>
-                <button id="memBtn-3" onclick="App.handleMemoryTap(3)" style="height:65px;border-radius:8px;border:0;background:#10b981;opacity:0.6;cursor:pointer"></button>
+            <div id="panelMemory" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:12px;">
+              <div id="memStatus" style="font-size:12px;font-weight:800;">光る順を覚えてください...</div>
+              <div class="mem-grid">
+                <button id="mem-0" class="mem-cell" style="background:#ef4444;" onclick="App.onMemoryTap(0)"></button>
+                <button id="mem-1" class="mem-cell" style="background:#3b82f6;" onclick="App.onMemoryTap(1)"></button>
+                <button id="mem-2" class="mem-cell" style="background:#f59e0b;" onclick="App.onMemoryTap(2)"></button>
+                <button id="mem-3" class="mem-cell" style="background:#10b981;" onclick="App.onMemoryTap(3)"></button>
               </div>
-              <div id="memProgress" style="font-size:10px;color:var(--muted)">系列長: 4ステップ</div>
+              <div id="memProg" class="muted">系列長: 4</div>
             </div>
           </div>
 
-          <div id="testResultBox" class="hidden" style="background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:10px">
-            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted)">
-              <span id="resTestTitle">結果</span>
-              <span>個人ベースライン照合</span>
+          <div id="dayResult" class="hidden" style="background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:10px;">
+            <div class="row" style="justify-content:space-between;">
+              <span id="dayResultTitle" style="font-size:12px;color:#64748b;">結果</span>
+              <span style="font-size:11px;color:#64748b;">判定</span>
             </div>
-            <div style="display:flex;align-items:baseline;gap:8px;margin-top:2px">
-              <strong id="resScoreVal" style="font-size:18px">--</strong>
-              <span id="resCompVal" style="font-size:10px;font-weight:bold;color:var(--warn)">判定中</span>
+            <div class="row" style="align-items:baseline;gap:8px;">
+              <strong id="dayResultScore" style="font-size:20px;">--</strong>
+              <span id="dayResultJudge" style="font-size:12px;font-weight:800;color:#065f46;">--</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 共有タブ -->
       <div id="panel-share" class="hidden col">
         <div class="card col">
-          <div>
-            <strong>測定ログの書き出し・共有</strong>
-            <div class="muted">保存された実測データをJSON形式で書き出し、調査・分析に活用できます。</div>
+          <strong>完全実測ログ出力 / 共有</strong>
+          <div class="muted">セッションを選択してJSONを生成し、ダウンロードまたは共有します。</div>
+
+          <select id="shareSessionSelect"></select>
+
+          <div class="share-grid">
+            <button class="btn btn-primary" onclick="App.exportFullLog()">完全ログ書き出し (.json)</button>
+            <button class="btn btn-soft" onclick="App.shareFullLog()">完全ログ共有（navigator.share）</button>
+            <button class="btn btn-primary" onclick="App.exportLiteLog()">解析用軽量ログ書き出し (.json)</button>
+            <button class="btn btn-soft" onclick="App.shareLiteLog()">解析用軽量ログ共有</button>
           </div>
 
-          <div class="col" style="gap:4px">
-            <label for="shareSelect" style="font-size:12px;font-weight:700;color:#334155">対象測定セッション</label>
-            <select id="shareSelect" onchange="App.onShareSessionChange(this.value)"></select>
-          </div>
-
-          <div id="shareSummary" class="card" style="background:#f8fafc;padding:10px;font-size:13px;line-height:1.6">
-            対象の測定データがありません。
-          </div>
-
-          <div class="col" style="gap:8px">
-            <div class="row">
-              <button id="btnDownloadFull" class="btn btn-primary" style="flex:1" onclick="App.exportSessionLog(true, false)">完全ログを書き出す (.json)</button>
-              <button id="btnShareFull" class="btn btn-soft" style="flex:1" onclick="App.exportSessionLog(true, true)">共有 (完全版)</button>
-            </div>
-            <div class="row">
-              <button id="btnDownloadLight" class="btn btn-soft" style="flex:1" onclick="App.exportSessionLog(false, false)">解析用ログ (録音除外・軽量)</button>
-              <button id="btnShareLight" class="btn btn-soft" style="flex:1" onclick="App.exportSessionLog(false, true)">共有 (軽量版)</button>
-            </div>
-          </div>
-
-          <div class="muted" style="line-height:1.4">
-            ※「完全ログ」には端末に記録された3秒ピーク音声（Base64）を含みます。<br>
-            ※「共有」ボタンは対応端末（Android Chrome等）でGoogle Driveやメール等へ直接渡せます。未対応時は自動でダウンロードされます。
-          </div>
+          <textarea id="sharePreview" rows="11" readonly></textarea>
         </div>
       </div>
     </section>
 
     <section id="doctorView" class="hidden col">
       <div class="card col">
-        <strong>医師モード</strong>
-        <select id="docSelect" onchange="App.onDoctorSessionChange(this.value)"></select>
+        <div class="row" style="justify-content:space-between;">
+          <strong>医師モード（保存済みセッション閲覧）</strong>
+          <span class="badge b-green">実測ログ</span>
+        </div>
+        <select id="doctorSessionSelect" onchange="App.onDoctorSessionChange(this.value)"></select>
       </div>
+
       <div class="card col">
-        <div id="docTime">--:-- 〜 --:--</div>
-        <div id="docBase">Baseline: -- dB</div>
-        <div id="docBrux">歯ぎしり疑い: --件</div>
-        <div id="docStats">最大体動: -- G / いびき疑い: --分</div>
-        <div id="docNote" class="muted">--</div>
-        <audio id="docAudio" controls style="width:100%;display:none"></audio>
-        <button class="btn btn-primary" onclick="App.playPeakAudio()">録音再生</button>
+        <div class="summary-grid">
+          <div class="sum"><div class="k">就寝時間帯</div><div id="docTime" class="v">--:--〜--:--</div></div>
+          <div class="sum"><div class="k">実測時間</div><div id="docDur" class="v">--分</div></div>
+          <div class="sum"><div class="k">ベースライン</div><div id="docBase" class="v">-- dB</div></div>
+          <div class="sum"><div class="k">歯ぎしり疑い</div><div id="docBrux" class="v">--件</div></div>
+          <div class="sum"><div class="k">いびき疑い</div><div id="docSnore" class="v">--分</div></div>
+          <div class="sum"><div class="k">最大体動</div><div id="docMaxG" class="v">-- G</div></div>
+        </div>
+
+        <div id="docNote" class="muted">セッションを選択してください。</div>
+
+        <div class="col">
+          <strong style="font-size:12px;">ピーク録音（セッション内）</strong>
+          <div id="docPeakList" class="list"></div>
+        </div>
       </div>
     </section>
   </main>
 
   <script>
     const App = (() => {
-      let role='patient', tab='record';
-      let isRecording=false, recTimer=null, sampleTimer=null, recStart=null, recSec=0;
-      let wakeLock=null;
+      const STORAGE_SESSIONS = "sleep_sessions_v6";
+      const STORAGE_PEAKS = "sleep_peak_events_v6";
 
-      let audioContext=null, mediaStream=null, analyser=null, tdBuf=null;
-      let motionSensorActive=false, gotMotion=false, lastAccel={x:0,y:0,z:0}, currentG=0, maxG=0;
+      let mode = "patient";
+      let patientTab = "measure";
 
-      let baselineDb=32.0, currentDb=32.0;
-      let dbWin=[], gWin=[];
-      const DB_WIN_MAX=120, G_WIN_MAX=120;
+      let isRecording = false;
+      let recStart = null;
+      let recSec = 0;
+      let recTimer = null;
+      let sampleTimer = null;
+      let wakeLock = null;
 
-      let audioSamples=[], accelSamples=[], bruxCount=0, snoreMin=0;
-      let mediaRecorder=null, peakChunks=[], peakRecording=false, peakCooldown=0;
+      let audioContext = null;
+      let mediaStream = null;
+      let analyser = null;
+      let timeBuf = null;
 
-      let selectedSession=null, eventLogs=[], currentPeakBase64='';
-      let lastEventAt={ snore:0, bruxism:0, sleep_talk:0 };
-      let peakEvents=[];
+      let mediaRecorder = null;
+      let peakChunks = [];
+      let peakRecording = false;
+      let peakCooldownUntil = 0;
 
-      let lastDecision='待機', lastTrigger='なし', preflight={};
+      let motionBound = false;
+      let motionActive = false;
+      let gotMotion = false;
+      let lastAccel = { x:0, y:0, z:0 };
+      let currentG = 0;
+      let maxG = 0;
 
-      // ===== 起床後ミニテスト用ステート =====
-      let testType = 'reaction';
+      let currentDb = 32.0;
+      let baselineDb = 32.0;
+      let dbWindow = [];
+      let gWindow = [];
+
+      let audioSamples = [];
+      let accelSamples = [];
+      let bruxCounter = 0;
+      let snoreMinutes = 0;
+      let eventLogs = [];
+      let sessionPeakEvents = [];
+
+      let preflight = {};
+      let lastDecision = "待機";
+      let lastTrigger = "なし";
+
+      let dayTestType = "reaction";
       let testTimer = null;
-      let testStartTime = 0;
-      let testWaitingGreen = false;
-      let attInterval = null;
-      let attRemaining = 5;
-      let attScore = { correct: 0, miss: 0, falseAlarm: 0, times: [] };
-      let attIsTarget = false;
-      let attTargetStartTime = 0;
-      let memSequence = [];
-      let memUserStep = 0;
-      let memCanInput = false;
+      let reactionWaiting = false;
+      let reactionStartTs = 0;
+
+      let attentionRemain = 5;
+      let attentionState = { correct:0, miss:0, falseAlarm:0, times:[] };
+      let attentionTarget = false;
+      let attentionTargetStart = 0;
+      let attentionAutoTimeout = null;
+
+      let memorySeq = [];
+      let memoryStep = 0;
+      let memoryCanInput = false;
 
       const CFG = {
-        sampleMs:120,
-        peakDbDelta:10,
-        snoreDbDeltaMin:6,
-        snoreDbDeltaMax:16,
-        bruxDbDelta:14,
-        talkDbDeltaMin:9,
-        talkDbDeltaMax:20,
-        gOffsetPeak:0.08,
-        gOffsetMove:0.05,
-        gFloorPeak:0.12,
-        gCeilPeak:0.28,
-        cooldownMs:4500
+        sampleMs: 120,
+        peakDbDelta: 10,
+        snoreDbMin: 6,
+        snoreDbMax: 16,
+        bruxDbMin: 14,
+        talkDbMin: 9,
+        talkDbMax: 20,
+        gPeakOffset: 0.08,
+        gMoveOffset: 0.05,
+        gPeakFloor: 0.12,
+        gPeakCeil: 0.28,
+        cooldownMs: 4500,
+        peakRecSec: 3
       };
 
       function toast(msg){
-        const box=document.getElementById('toast');
-        const t=document.createElement('div'); t.className='toast'; t.textContent=msg; box.appendChild(t);
-        setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity .25s'; setTimeout(()=>t.remove(),250); },1800);
+        const wrap = document.getElementById("toastWrap");
+        const t = document.createElement("div");
+        t.className = "toast";
+        t.textContent = msg;
+        wrap.appendChild(t);
+        setTimeout(() => {
+          t.style.opacity = "0";
+          t.style.transition = "opacity .25s";
+          setTimeout(() => t.remove(), 250);
+        }, 2100);
       }
 
-      function esc(s){ return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-      function formatHMS(sec){ const h=String(Math.floor(sec/3600)).padStart(2,'0'); const m=String(Math.floor((sec%3600)/60)).padStart(2,'0'); const s=String(sec%60).padStart(2,'0'); return `${h}:${m}:${s}`; }
-      function formatHM(sec){ const h=String(Math.floor(sec/3600)).padStart(2,'0'); const m=String(Math.floor((sec%3600)/60)).padStart(2,'0'); return `${h}:${m}`; }
-      function typeJa(t){ return t==='snore'?'いびき':t==='bruxism'?'歯ぎしり':t==='sleep_talk'?'寝言':t; }
+      function esc(v){
+        return String(v).replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m]));
+      }
 
-      function pushWin(arr,v,max){ arr.push(v); if(arr.length>max) arr.shift(); }
-      function median(arr){ if(!arr.length) return 0; const a=[...arr].sort((x,y)=>x-y); const m=Math.floor(a.length/2); return a.length%2?a[m]:(a[m-1]+a[m])/2; }
-      function dynGPeakThreshold(){ return Math.min(CFG.gCeilPeak, Math.max(CFG.gFloorPeak, median(gWin)+CFG.gOffsetPeak)); }
-      function dynGMoveThreshold(){ return Math.max(0.06, median(gWin)+CFG.gOffsetMove); }
+      function formatHMS(sec){
+        const h = String(Math.floor(sec/3600)).padStart(2,"0");
+        const m = String(Math.floor((sec%3600)/60)).padStart(2,"0");
+        const s = String(sec%60).padStart(2,"0");
+        return `${h}:${m}:${s}`;
+      }
+
+      function formatHM(sec){
+        const h = String(Math.floor(sec/3600)).padStart(2,"0");
+        const m = String(Math.floor((sec%3600)/60)).padStart(2,"0");
+        return `${h}:${m}`;
+      }
+
+      function median(arr){
+        if(!arr.length) return 0;
+        const a = [...arr].sort((x,y)=>x-y);
+        const m = Math.floor(a.length/2);
+        return a.length % 2 ? a[m] : (a[m-1]+a[m])/2;
+      }
+
+      function pushWin(arr,v,max){
+        arr.push(v);
+        if(arr.length>max) arr.shift();
+      }
+
+      function dynGPeakThreshold(){
+        return Math.min(CFG.gPeakCeil, Math.max(CFG.gPeakFloor, median(gWindow) + CFG.gPeakOffset));
+      }
+
+      function dynGMoveThreshold(){
+        return Math.max(0.06, median(gWindow) + CFG.gMoveOffset);
+      }
 
       function initBars(){
-        const c=document.getElementById('realBars'); c.innerHTML='';
-        for(let i=0;i<28;i++){
-          const b=document.createElement('div');
-          b.style.cssText='flex:1;min-height:4px;height:8px;background:#10b981;border-radius:2px;transition:height .08s linear';
-          b.id='bar'+i; c.appendChild(b);
+        const c = document.getElementById("realBars");
+        c.innerHTML = "";
+        for(let i=0;i<30;i++){
+          const b = document.createElement("div");
+          b.id = `bar-${i}`;
+          b.style.cssText = "flex:1;min-height:4px;height:8px;background:#10b981;border-radius:2px;transition:height .08s linear;";
+          c.appendChild(b);
         }
       }
+
       function drawBars(db){
-        for(let i=0;i<28;i++){
-          const b=document.getElementById('bar'+i);
-          const h=Math.min(50,Math.max(4,(db-22)*1.2+Math.random()*5));
-          b.style.height=h+'px';
-          b.style.background=(db>=baselineDb+CFG.peakDbDelta)?'#f59e0b':'#10b981';
+        for(let i=0;i<30;i++){
+          const b = document.getElementById(`bar-${i}`);
+          if(!b) continue;
+          const h = Math.min(52, Math.max(4, (db-22)*1.2 + Math.random()*5));
+          b.style.height = `${h}px`;
+          b.style.background = db >= baselineDb + CFG.peakDbDelta ? "#f59e0b" : "#10b981";
         }
       }
 
       function updateRuleText(){
-        document.getElementById('ruleText').textContent=[
-          `peak: dB>=baseline+${CFG.peakDbDelta} OR G>=dyn(${dynGPeakThreshold().toFixed(2)})`,
-          `snore: +${CFG.snoreDbDeltaMin}..+${CFG.snoreDbDeltaMax} & G<move(${dynGMoveThreshold().toFixed(2)})`,
-          `brux: +${CFG.bruxDbDelta}以上 & 低体動`,
-          `talk: +${CFG.talkDbDeltaMin}..+${CFG.talkDbDeltaMax} & 低体動`,
-          `cooldown:${Math.round(CFG.cooldownMs/1000)}s sample:${CFG.sampleMs}ms`
-        ].join('\n');
+        const txt = [
+          `peak: dB >= baseline + ${CFG.peakDbDelta}  OR  G >= dyn(${dynGPeakThreshold().toFixed(2)})`,
+          `snore: +${CFG.snoreDbMin}..+${CFG.snoreDbMax} dB  &  G < move(${dynGMoveThreshold().toFixed(2)})`,
+          `bruxism: +${CFG.bruxDbMin} dB 以上  &  低体動`,
+          `sleep_talk: +${CFG.talkDbMin}..+${CFG.talkDbMax} dB  &  低体動`,
+          `cooldown: ${Math.round(CFG.cooldownMs/1000)}s / sample: ${CFG.sampleMs}ms`
+        ].join("\n");
+        document.getElementById("ruleText").textContent = txt;
       }
 
       function updateDebug(){
-        const dDb=(currentDb-baselineDb).toFixed(1);
-        document.getElementById('deltaLabel').textContent=`ΔdB: ${dDb}`;
-        document.getElementById('debugPanel').textContent =
-`[Preflight]
-secure=${window.isSecureContext} getUserMedia=${!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)} motionAPI=${'DeviceMotionEvent' in window}
-micPermission=${preflight.micPermissionState||'unknown'}
+        const ddb = (currentDb - baselineDb).toFixed(1);
+        document.getElementById("deltaLabel").textContent = `ΔdB: ${ddb}`;
 
-[Runtime]
-recording=${isRecording} motionActive=${motionSensorActive} gotMotion=${gotMotion} wakeLock=${!!wakeLock}
-db=${currentDb.toFixed(1)} baseline=${baselineDb.toFixed(1)} dDb=+${dDb}
-g=${currentG.toFixed(2)} gPeakTh=${dynGPeakThreshold().toFixed(2)} gMoveTh=${dynGMoveThreshold().toFixed(2)}
-cooldownRemainMs=${Math.max(0, peakCooldown-Date.now())}
+        const dbg = [
+          "[Preflight]",
+          `secure=${window.isSecureContext} getUserMedia=${!!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)} motionAPI=${"DeviceMotionEvent" in window}`,
+          `micPermission=${preflight.micPermissionState || "unknown"}`,
+          "",
+          "[Runtime]",
+          `recording=${isRecording} wakeLock=${!!wakeLock} motionActive=${motionActive} gotMotion=${gotMotion}`,
+          `db=${currentDb.toFixed(1)} baseline=${baselineDb.toFixed(1)} dDb=+${ddb}`,
+          `g=${currentG.toFixed(2)} gPeakTh=${dynGPeakThreshold().toFixed(2)} gMoveTh=${dynGMoveThreshold().toFixed(2)}`,
+          `cooldownRemainMs=${Math.max(0, peakCooldownUntil - Date.now())}`,
+          "",
+          "[Decision]",
+          `lastDecision=${lastDecision}`,
+          `lastTrigger=${lastTrigger}`
+        ].join("\n");
 
-[Decision]
-lastDecision=${lastDecision}
-lastTrigger=${lastTrigger}`;
+        document.getElementById("debugPanel").textContent = dbg;
       }
 
       async function runPreflight(){
-        const out={};
-        out.isSecureContext=window.isSecureContext;
-        out.hasMediaDevices=!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia);
-        out.hasDeviceMotion=('DeviceMotionEvent' in window);
+        const out = {};
+        out.isSecureContext = window.isSecureContext;
+        out.hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+        out.hasDeviceMotion = "DeviceMotionEvent" in window;
         try{
-          if(navigator.permissions&&navigator.permissions.query){
-            const mic=await navigator.permissions.query({name:'microphone'});
-            out.micPermissionState=mic.state;
+          if(navigator.permissions && navigator.permissions.query){
+            const mic = await navigator.permissions.query({ name:"microphone" });
+            out.micPermissionState = mic.state;
+          }else{
+            out.micPermissionState = "unknown";
           }
-        }catch{ out.micPermissionState='unknown'; }
-        preflight=out; updateDebug();
-      }
-
-      async function requestWakeLock(){ try{ if('wakeLock' in navigator){ wakeLock=await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release',()=>wakeLock=null); } }catch{} }
-      function releaseWakeLock(){ if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; } }
-
-      function bindMotionRobust(){
-        if(bindMotionRobust._bound) return;
-        bindMotionRobust._bound=true;
-        window.addEventListener('devicemotion',(ev)=>{
-          const a=ev.accelerationIncludingGravity||ev.acceleration;
-          if(!a||a.x==null) return;
-          gotMotion=true; motionSensorActive=true;
-          const dx=Math.abs((a.x||0)-lastAccel.x), dy=Math.abs((a.y||0)-lastAccel.y), dz=Math.abs((a.z||0)-lastAccel.z);
-          lastAccel={x:a.x||0,y:a.y||0,z:a.z||0};
-          const dg=Math.sqrt(dx*dx+dy*dy+dz*dz)/9.8;
-          currentG=Math.max(0,dg-0.03);
-          if(isRecording&&currentG>maxG) maxG=currentG;
-          document.getElementById('valG').textContent=currentG.toFixed(2)+' G';
-        },{passive:true});
-      }
-
-      function checkMotionPermissionUI(){
-        const box=document.getElementById('sensorBox');
-        if(typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function') box.style.display='flex';
-        else { box.style.display='none'; bindMotionRobust(); }
-      }
-
-      async function requestSensorPermission(){
-        try{
-          if(typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function'){\r\n            const r=await DeviceMotionEvent.requestPermission();
-            if(r!=='granted'){ toast('モーション許可が拒否されました'); return; }
-          }
-          bindMotionRobust();
-          document.getElementById('sensorBox').style.display='none';
-          toast('モーション許可OK');
         }catch{
-          toast('モーション許可エラー');
+          out.micPermissionState = "unknown";
+        }
+        preflight = out;
+        updateDebug();
+      }
+
+      async function requestWakeLock(){
+        try{
+          if("wakeLock" in navigator){
+            wakeLock = await navigator.wakeLock.request("screen");
+            wakeLock.addEventListener("release", () => { wakeLock = null; updateDebug(); });
+          }
+        }catch{}
+      }
+
+      function releaseWakeLock(){
+        if(wakeLock){
+          wakeLock.release().catch(()=>{});
+          wakeLock = null;
+        }
+      }
+
+      function setupMotionUI(){
+        const box = document.getElementById("motionPermBox");
+        if(typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function"){
+          box.classList.remove("hidden");
+        }else{
+          box.classList.add("hidden");
+          bindMotion();
+        }
+      }
+
+      function bindMotion(){
+        if(motionBound) return;
+        motionBound = true;
+        window.addEventListener("devicemotion", ev => {
+          const a = ev.accelerationIncludingGravity || ev.acceleration;
+          if(!a || a.x == null) return;
+          gotMotion = true;
+          motionActive = true;
+
+          const dx = Math.abs((a.x||0)-lastAccel.x);
+          const dy = Math.abs((a.y||0)-lastAccel.y);
+          const dz = Math.abs((a.z||0)-lastAccel.z);
+          lastAccel = { x:a.x||0, y:a.y||0, z:a.z||0 };
+
+          const dg = Math.sqrt(dx*dx + dy*dy + dz*dz) / 9.8;
+          currentG = Math.max(0, dg - 0.03);
+          if(isRecording && currentG > maxG) maxG = currentG;
+
+          const gEl = document.getElementById("valG");
+          gEl.textContent = `${currentG.toFixed(2)} G`;
+        }, { passive:true });
+      }
+
+      async function requestMotionPermission(){
+        try{
+          if(typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function"){
+            const r = await DeviceMotionEvent.requestPermission();
+            if(r !== "granted"){
+              toast("モーション許可が拒否されました");
+              return;
+            }
+          }
+          bindMotion();
+          document.getElementById("motionPermBox").classList.add("hidden");
+          toast("モーション許可OK");
+        }catch{
+          toast("モーション許可でエラー");
         }
       }
 
       function calcDb(){
-        if(!analyser||!tdBuf) return 30+Math.random()*2;
-        analyser.getFloatTimeDomainData(tdBuf);
-        let s=0; for(let i=0;i<tdBuf.length;i++){ const x=tdBuf[i]; s+=x*x; }
-        const rms=Math.sqrt(s/tdBuf.length);
-        if(rms<=1e-8) return 24;
-        return Math.min(95,Math.max(24,20*Math.log10(rms)+71));
+        if(!analyser || !timeBuf) return 30 + Math.random()*2;
+        analyser.getFloatTimeDomainData(timeBuf);
+        let sum = 0;
+        for(let i=0;i<timeBuf.length;i++){
+          const x = timeBuf[i];
+          sum += x*x;
+        }
+        const rms = Math.sqrt(sum / timeBuf.length);
+        if(rms <= 1e-8) return 24;
+        return Math.min(95, Math.max(24, 20*Math.log10(rms) + 71));
+      }
+
+      async function ensureAudioAnalyserFromStream(stream){
+        const AC = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AC();
+        if(audioContext.state === "suspended"){
+          try{ await audioContext.resume(); }catch{}
+        }
+        const src = audioContext.createMediaStreamSource(stream);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 1024;
+        src.connect(analyser);
+        timeBuf = new Float32Array(analyser.fftSize);
       }
 
       async function calibrateBaseline(){
-        let own=false;
-        if(!mediaStream){
-          try{ mediaStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false}); own=true; }
-          catch(e){ alert('マイクが開けません: '+(e.message||e.name)); return; }
-          const AC=window.AudioContext||window.webkitAudioContext;
-          audioContext=new AC();
-          if(audioContext.state==='suspended'){ try{ await audioContext.resume(); }catch{} }
-          const src=audioContext.createMediaStreamSource(mediaStream);
-          analyser=audioContext.createAnalyser(); analyser.fftSize=1024; src.connect(analyser);
-          tdBuf=new Float32Array(analyser.fftSize);
+        let ownOpened = false;
+        try{
+          if(!mediaStream){
+            mediaStream = await navigator.mediaDevices.getUserMedia({ audio:true });
+            ownOpened = true;
+            await ensureAudioAnalyserFromStream(mediaStream);
+          }
+        }catch(e){
+          alert("マイクが開けません: " + (e.message || e.name));
+          return;
         }
 
-        toast('ベースライン計測中(3秒)');
-        const arr=[]; const t=setInterval(()=>{ arr.push(calcDb()); if(arr.length>100) arr.shift(); },30);
-        setTimeout(()=>{
+        toast("ベースライン計測中（3秒）");
+        const arr = [];
+        const t = setInterval(() => {
+          arr.push(calcDb());
+          if(arr.length > 140) arr.shift();
+        }, 20);
+
+        setTimeout(() => {
           clearInterval(t);
-          if(arr.length){ baselineDb=median(arr); document.getElementById('baselineLabel').textContent=`● ベースライン: ${baselineDb.toFixed(1)} dB`; }
-          updateRuleText(); updateDebug(); toast('ベースライン更新');
-          if(own&&!isRecording){ try{ mediaStream.getTracks().forEach(tr=>tr.stop()); audioContext.close(); }catch{} mediaStream=null; audioContext=null; analyser=null; tdBuf=null; }
-        },3000);
+          if(arr.length){
+            baselineDb = median(arr);
+            document.getElementById("baselineLabel").textContent = `● ベースライン: ${baselineDb.toFixed(1)} dB`;
+          }
+          updateRuleText();
+          updateDebug();
+          toast("ベースライン更新");
+
+          if(ownOpened && !isRecording){
+            try{ mediaStream.getTracks().forEach(tr => tr.stop()); }catch{}
+            try{ audioContext && audioContext.close(); }catch{}
+            mediaStream = null;
+            audioContext = null;
+            analyser = null;
+            timeBuf = null;
+          }
+        }, 3000);
+      }
+
+      function classifyPeakType(db, g){
+        const d = db - baselineDb;
+        if(g >= dynGPeakThreshold()) return "急な体動/音響";
+        if(d >= 16) return "大きないびき/音響";
+        if(d >= CFG.peakDbDelta) return "通常いびき";
+        return "イベント";
+      }
+
+      function pushEventLog(type, db, g){
+        const hhmm = formatHM(recSec);
+        eventLogs.push({
+          type,
+          time: formatHMS(recSec),
+          hhmm,
+          db: +db.toFixed(1),
+          g: +g.toFixed(2),
+          baseline: +baselineDb.toFixed(1),
+          dDb: +(db-baselineDb).toFixed(1)
+        });
       }
 
       async function blobToDataURL(blob){
-        return await new Promise((resolve,reject)=>{ const fr=new FileReader(); fr.onload=()=>resolve(fr.result); fr.onerror=reject; fr.readAsDataURL(blob); });
+        return await new Promise((resolve,reject)=>{
+          const fr = new FileReader();
+          fr.onload = () => resolve(fr.result);
+          fr.onerror = reject;
+          fr.readAsDataURL(blob);
+        });
       }
 
-      function savePeakEventsToStorage(){ localStorage.setItem('peak_events', JSON.stringify(peakEvents.slice(0,180))); }
-      function loadPeakEventsFromStorage(){ peakEvents=JSON.parse(localStorage.getItem('peak_events')||'[]'); }
-
-      function classifyPeakType(db,g){
-        const d=db-baselineDb;
-        if(g>=dynGPeakThreshold()) return '急な体動/音響';
-        if(d>=16) return '大きないびき/音響';
-        if(d>=CFG.peakDbDelta) return '通常いびき';
-        return 'イベント';
+      function savePeakStore(peaks){
+        localStorage.setItem(STORAGE_PEAKS, JSON.stringify(peaks.slice(0,300)));
       }
 
-      function pushEventLog(type,db,g){
-        const now=Date.now(), cool={snore:10000,bruxism:8000,sleep_talk:12000};
-        if(now-lastEventAt[type]<cool[type]) return;
-        lastEventAt[type]=now;
-        eventLogs.push({type,t:formatHMS(recSec),hhmm:formatHM(recSec),db:+db.toFixed(1),g:+g.toFixed(2),base:+baselineDb.toFixed(1),dDb:+(db-baselineDb).toFixed(1)});
+      function loadPeakStore(){
+        try{
+          return JSON.parse(localStorage.getItem(STORAGE_PEAKS) || "[]");
+        }catch{
+          return [];
+        }
       }
 
-      function recordPeakIfNeeded(db){
-        const now=Date.now(), gTh=dynGPeakThreshold();
-        const overDb=db>=(baselineDb+CFG.peakDbDelta), overG=currentG>=gTh;
+      function saveSessions(arr){
+        localStorage.setItem(STORAGE_SESSIONS, JSON.stringify(arr.slice(0,60)));
+      }
 
-        if(!(overDb||overG)){ lastDecision=`NO_TRIGGER: 閾値未満 dDb=${(db-baselineDb).toFixed(1)} g=${currentG.toFixed(2)}`; return; }
-        if(now<peakCooldown){ lastDecision=`NO_TRIGGER: cooldown ${peakCooldown-now}ms`; return; }
-        if(peakRecording){ lastDecision='NO_TRIGGER: 録音中'; return; }
-        if(!mediaStream){ lastDecision='NO_TRIGGER: mediaStreamなし'; return; }
-        if(typeof MediaRecorder==='undefined'){ lastDecision='NO_TRIGGER: MediaRecorder非対応'; return; }
+      function loadSessions(){
+        try{
+          return JSON.parse(localStorage.getItem(STORAGE_SESSIONS) || "[]");
+        }catch{
+          return [];
+        }
+      }
 
-        const snapDb=db, snapG=currentG, snapTime=formatHMS(recSec), snapBase=baselineDb;
-        peakRecording=true; peakChunks=[];
-        lastTrigger=`TRIGGER:${overDb?'dB':'G'} db=${snapDb.toFixed(1)} g=${snapG.toFixed(2)} base=${snapBase.toFixed(1)}`;
+      async function recordPeakIfNeeded(db){
+        const now = Date.now();
+        const gTh = dynGPeakThreshold();
+        const overDb = db >= (baselineDb + CFG.peakDbDelta);
+        const overG = currentG >= gTh;
 
-        let opt={}; try{
-          if(MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) opt={mimeType:'audio/webm;codecs=opus'};
-          else if(MediaRecorder.isTypeSupported('audio/webm')) opt={mimeType:'audio/webm'};
+        if(!(overDb || overG)){
+          lastDecision = `NO_TRIGGER: 閾値未満 dDb=${(db-baselineDb).toFixed(1)} g=${currentG.toFixed(2)}`;
+          return;
+        }
+        if(now < peakCooldownUntil){
+          lastDecision = `NO_TRIGGER: cooldown ${peakCooldownUntil-now}ms`;
+          return;
+        }
+        if(peakRecording){
+          lastDecision = "NO_TRIGGER: 録音中";
+          return;
+        }
+        if(!mediaStream){
+          lastDecision = "NO_TRIGGER: mediaStreamなし";
+          return;
+        }
+        if(typeof MediaRecorder === "undefined"){
+          lastDecision = "NO_TRIGGER: MediaRecorder非対応";
+          return;
+        }
+
+        peakRecording = true;
+        peakChunks = [];
+
+        const snapDb = db;
+        const snapG = currentG;
+        const snapTime = formatHMS(recSec);
+        const snapBase = baselineDb;
+
+        lastTrigger = `TRIGGER:${overDb?"dB":"G"} db=${snapDb.toFixed(1)} g=${snapG.toFixed(2)} base=${snapBase.toFixed(1)}`;
+
+        let opt = {};
+        try{
+          if(MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) opt = { mimeType:"audio/webm;codecs=opus" };
+          else if(MediaRecorder.isTypeSupported("audio/webm")) opt = { mimeType:"audio/webm" };
         }catch{}
 
         try{
-          mediaRecorder=new MediaRecorder(mediaStream,opt);
-          mediaRecorder.ondataavailable=(e)=>{ if(e.data&&e.data.size>0) peakChunks.push(e.data); };
-          mediaRecorder.onstop=async ()=>{
+          mediaRecorder = new MediaRecorder(mediaStream, opt);
+          mediaRecorder.ondataavailable = ev => {
+            if(ev.data && ev.data.size > 0) peakChunks.push(ev.data);
+          };
+          mediaRecorder.onstop = async () => {
             try{
-              const blob=new Blob(peakChunks,{type:mediaRecorder.mimeType||'audio/webm'});
-              if(blob.size>700){
-                const b64=await blobToDataURL(blob); currentPeakBase64=b64;
-                peakEvents.unshift({time:snapTime,type:classifyPeakType(snapDb,snapG),db:+snapDb.toFixed(1),g:+snapG.toFixed(2),base:+snapBase.toFixed(1),dDb:+(snapDb-snapBase).toFixed(1),audioBase64:b64,durationSec:3});
-                savePeakEventsToStorage(); renderPeakEvents();
-                lastDecision='TRIGGER_OK: 保存完了';
-              }else lastDecision='TRIGGER_FAIL: size不足';
-            }catch(e){ lastDecision='TRIGGER_FAIL: '+(e.message||e.name); }
-            peakRecording=false; peakCooldown=Date.now()+CFG.cooldownMs; updateDebug();
+              const blob = new Blob(peakChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+              if(blob.size > 700){
+                const b64 = await blobToDataURL(blob);
+                const ev = {
+                  id: `${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+                  sessionId: currentSessionIdForRecording,
+                  time: snapTime,
+                  type: classifyPeakType(snapDb, snapG),
+                  db: +snapDb.toFixed(1),
+                  g: +snapG.toFixed(2),
+                  baseline: +snapBase.toFixed(1),
+                  dDb: +(snapDb-snapBase).toFixed(1),
+                  durationSec: CFG.peakRecSec,
+                  audioBase64: b64
+                };
+                sessionPeakEvents.unshift(ev);
+                const allPeaks = loadPeakStore();
+                allPeaks.unshift(ev);
+                savePeakStore(allPeaks);
+                renderPeakEvents();
+                lastDecision = "TRIGGER_OK: 保存完了";
+              }else{
+                lastDecision = "TRIGGER_FAIL: size不足";
+              }
+            }catch(e){
+              lastDecision = "TRIGGER_FAIL: " + (e.message || e.name);
+            }
+            peakRecording = false;
+            peakCooldownUntil = Date.now() + CFG.cooldownMs;
+            updateDebug();
           };
           mediaRecorder.start();
-          setTimeout(()=>{ try{ if(mediaRecorder&&mediaRecorder.state==='recording') mediaRecorder.stop(); }catch{} },3000);
+          setTimeout(() => {
+            try{
+              if(mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
+            }catch{}
+          }, CFG.peakRecSec * 1000);
         }catch(e){
-          peakRecording=false; peakCooldown=Date.now()+2000; lastDecision='TRIGGER_FAIL: recorder開始失敗';
+          peakRecording = false;
+          peakCooldownUntil = Date.now() + 2000;
+          lastDecision = "TRIGGER_FAIL: recorder開始失敗";
         }
       }
+
+      let currentSessionIdForRecording = "";
 
       async function startMeasurement(){
         if(isRecording) return;
 
-        // ===== 最重要: ユーザータップ直後に最優先でマイク取得（V5安定順序） =====
+        // 要件: ボタン直後に最優先で getUserMedia 呼び出し
         try{
-          mediaStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:false });
+          mediaStream = await navigator.mediaDevices.getUserMedia({ audio:true });
         }catch(e){
-          alert('マイク権限エラー: '+(e.message||e.name));
-          lastDecision='mic failed: '+(e.message||e.name);
+          alert("マイク権限エラー: " + (e.message || e.name));
+          lastDecision = "mic failed: " + (e.message || e.name);
           updateDebug();
           return;
         }
 
-        // AudioContext 構築
         try{
-          const AC=window.AudioContext||window.webkitAudioContext;
-          audioContext=new AC();
-          if(audioContext.state==='suspended'){ try{ await audioContext.resume(); }catch{} }
-          const src=audioContext.createMediaStreamSource(mediaStream);
-          analyser=audioContext.createAnalyser(); analyser.fftSize=1024; src.connect(analyser);
-          tdBuf=new Float32Array(analyser.fftSize);
+          await ensureAudioAnalyserFromStream(mediaStream);
         }catch(e){
-          alert('音声解析初期化エラー: '+(e.message||e.name));
-          try{ mediaStream.getTracks().forEach(t=>t.stop()); }catch{}
-          mediaStream=null; audioContext=null; analyser=null; tdBuf=null;
+          alert("音声解析初期化エラー: " + (e.message || e.name));
+          try{ mediaStream.getTracks().forEach(t => t.stop()); }catch{}
+          mediaStream = null;
+          audioContext = null;
+          analyser = null;
+          timeBuf = null;
           return;
         }
 
-        // ここから後段（失敗しても測定継続）
-        runPreflight();
+        await runPreflight();
         try{
-          if(typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function'){
-            const r=await DeviceMotionEvent.requestPermission();
-            if(r!=='granted') console.warn('motion denied');
+          if(typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function"){
+            await DeviceMotionEvent.requestPermission();
           }
         }catch{}
-        bindMotionRobust();
-        requestWakeLock();
+        bindMotion();
+        await requestWakeLock();
 
-        // ===== セッション開始 =====
-        isRecording=true; recStart=new Date(); recSec=0;
-        audioSamples=[]; accelSamples=[]; bruxCount=0; snoreMin=0; maxG=0;
-        peakCooldown=0; currentPeakBase64=''; eventLogs=[]; lastEventAt={snore:0,bruxism:0,sleep_talk:0};
-        dbWin=[]; gWin=[]; gotMotion=false; lastDecision='測定開始'; lastTrigger='なし';
+        isRecording = true;
+        recStart = new Date();
+        recSec = 0;
+        currentSessionIdForRecording = String(Date.now());
 
-        document.getElementById('sessionBadge').textContent='測定中';
-        document.getElementById('sessionBadge').className='badge b-green';
-        document.getElementById('recState').textContent='● センサー取得中';
-        document.getElementById('recState').style.color='#ef4444';
-        document.getElementById('btnStart').disabled=true;
-        document.getElementById('btnStop').disabled=false;
-        document.getElementById('btnStop').className='btn btn-danger';
-        document.getElementById('btnBlack').disabled=false;
+        audioSamples = [];
+        accelSamples = [];
+        bruxCounter = 0;
+        snoreMinutes = 0;
+        maxG = 0;
+        eventLogs = [];
+        sessionPeakEvents = [];
+        dbWindow = [];
+        gWindow = [];
+        peakCooldownUntil = 0;
+        gotMotion = false;
+        lastDecision = "測定開始";
+        lastTrigger = "なし";
+
+        document.getElementById("sessionBadge").textContent = "測定中";
+        document.getElementById("sessionBadge").className = "badge b-green";
+        document.getElementById("recState").textContent = "● センサー取得中";
+        document.getElementById("recState").style.color = "#ef4444";
+        document.getElementById("btnStart").disabled = true;
+        document.getElementById("btnStop").disabled = false;
+        document.getElementById("btnStop").className = "btn btn-danger";
+        document.getElementById("btnBlackout").disabled = false;
 
         clearInterval(recTimer);
-        recTimer=setInterval(()=>{
+        recTimer = setInterval(() => {
           recSec++;
-          const h=String(Math.floor(recSec/3600)).padStart(2,'0');
-          const m=String(Math.floor((recSec%3600)/60)).padStart(2,'0');
-          const s=String(recSec%60).padStart(2,'0');
-          document.getElementById('recTime').textContent=`${h}:${m}:${s}`;
-          document.getElementById('blackoutClock').textContent=`${h}:${m}`;
-        },1000);
+          const h = String(Math.floor(recSec/3600)).padStart(2,"0");
+          const m = String(Math.floor((recSec%3600)/60)).padStart(2,"0");
+          const s = String(recSec%60).padStart(2,"0");
+          document.getElementById("recTime").textContent = `${h}:${m}:${s}`;
+          document.getElementById("blackoutClock").textContent = `${h}:${m}`;
+        }, 1000);
 
         clearInterval(sampleTimer);
-        sampleTimer=setInterval(()=>{
+        sampleTimer = setInterval(async () => {
           if(!isRecording) return;
-          currentDb=calcDb();
 
-          if(!motionSensorActive){
-            const d=Math.max(0,currentDb-baselineDb);
-            currentG=Math.min(0.9,d*0.015);
-            document.getElementById('valG').textContent=currentG.toFixed(2)+' G (推定)';
+          currentDb = calcDb();
+
+          if(!motionActive){
+            const d = Math.max(0, currentDb - baselineDb);
+            currentG = Math.min(0.9, d * 0.015);
+            document.getElementById("valG").textContent = `${currentG.toFixed(2)} G (推定)`;
           }
 
-          pushWin(dbWin,currentDb,DB_WIN_MAX); pushWin(gWin,currentG,G_WIN_MAX);
-          const dDb=currentDb-baselineDb, gMove=dynGMoveThreshold();
+          pushWin(dbWindow, currentDb, 140);
+          pushWin(gWindow, currentG, 140);
 
-          if(dDb>=CFG.snoreDbDeltaMin && dDb<=CFG.snoreDbDeltaMax && currentG<gMove){ snoreMin += (CFG.sampleMs/1000/60); pushEventLog('snore',currentDb,currentG); }
-          if(dDb>=CFG.bruxDbDelta && currentG<gMove*0.9){ bruxCount++; pushEventLog('bruxism',currentDb,currentG); }
-          if(dDb>=CFG.talkDbDeltaMin && dDb<=CFG.talkDbDeltaMax && currentG<gMove*0.8){ pushEventLog('sleep_talk',currentDb,currentG); }
+          const dDb = currentDb - baselineDb;
+          const gMove = dynGMoveThreshold();
 
-          recordPeakIfNeeded(currentDb);
+          if(dDb >= CFG.snoreDbMin && dDb <= CFG.snoreDbMax && currentG < gMove){
+            snoreMinutes += (CFG.sampleMs / 1000 / 60);
+            pushEventLog("snore", currentDb, currentG);
+          }
+          if(dDb >= CFG.bruxDbMin && currentG < gMove*0.9){
+            bruxCounter++;
+            pushEventLog("bruxism", currentDb, currentG);
+          }
+          if(dDb >= CFG.talkDbMin && dDb <= CFG.talkDbMax && currentG < gMove*0.8){
+            pushEventLog("sleep_talk", currentDb, currentG);
+          }
 
-          if(audioSamples.length<900){ audioSamples.push(+currentDb.toFixed(1)); accelSamples.push(+currentG.toFixed(2)); }
-          if(currentG>maxG) maxG=currentG;
+          await recordPeakIfNeeded(currentDb);
 
-          document.getElementById('valDb').textContent=currentDb.toFixed(1)+' dB';
-          drawBars(currentDb); updateRuleText(); updateDebug();
-        },CFG.sampleMs);
+          if(audioSamples.length < 1800){
+            audioSamples.push(+currentDb.toFixed(1));
+            accelSamples.push(+currentG.toFixed(2));
+          }
+          if(currentG > maxG) maxG = currentG;
 
-        toast('測定開始');
+          document.getElementById("valDb").textContent = `${currentDb.toFixed(1)} dB`;
+          drawBars(currentDb);
+          updateRuleText();
+          updateDebug();
+        }, CFG.sampleMs);
+
+        toast("測定開始");
       }
 
       function stopMeasurement(){
         if(!isRecording) return;
-        isRecording=false; clearInterval(recTimer); clearInterval(sampleTimer);
-        try{ if(mediaStream) mediaStream.getTracks().forEach(t=>t.stop()); if(audioContext) audioContext.close().catch(()=>{}); }catch{}
-        mediaStream=null; audioContext=null; analyser=null; tdBuf=null;
-        releaseWakeLock(); toggleBlackout(false);
+        isRecording = false;
 
-        const end=new Date();
-        const payload={
-          id:Date.now(),
-          startTime:recStart.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),
-          endTime:end.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),
-          dateStr:recStart.toLocaleDateString('ja-JP'),
-          durationSec:recSec,
-          baselineDb:+baselineDb.toFixed(1),
-          bruxismEvents:Math.round(bruxCount/5),
-          snoreMin:Math.round(snoreMin),
-          maxMotionG:+maxG.toFixed(2),
-          audioSamples, accelSamples, eventLogs,
-          peakAudioBase64:currentPeakBase64||''
+        clearInterval(recTimer);
+        clearInterval(sampleTimer);
+
+        try{
+          if(mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+        }catch{}
+        try{
+          if(audioContext) audioContext.close().catch(()=>{});
+        }catch{}
+        mediaStream = null;
+        audioContext = null;
+        analyser = null;
+        timeBuf = null;
+        releaseWakeLock();
+        toggleBlackout(false);
+
+        const end = new Date();
+        const durationSec = recSec;
+        const id = currentSessionIdForRecording || String(Date.now());
+
+        const session = {
+          id,
+          dateStr: recStart ? recStart.toLocaleDateString("ja-JP") : new Date().toLocaleDateString("ja-JP"),
+          startTime: recStart ? recStart.toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}) : "--:--",
+          endTime: end.toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
+          durationSec,
+          baselineDb: +baselineDb.toFixed(1),
+          bruxismEvents: Math.round(bruxCounter / 5),
+          snoreMin: Math.round(snoreMinutes),
+          maxMotionG: +maxG.toFixed(2),
+          audioSamples,
+          accelSamples,
+          eventLogs
         };
-        const arr=JSON.parse(localStorage.getItem('sleep_sessions')||'[]'); arr.unshift(payload);
-        localStorage.setItem('sleep_sessions', JSON.stringify(arr.slice(0,30)));
 
-        document.getElementById('sessionBadge').textContent='測定完了';
-        document.getElementById('sessionBadge').className='badge b-gray';
-        document.getElementById('recState').textContent='● 待機中';
-        document.getElementById('recState').style.color='#cbd5e1';
-        document.getElementById('btnStart').disabled=false;
-        document.getElementById('btnStop').disabled=true;
-        document.getElementById('btnStop').className='btn btn-soft';
-        document.getElementById('btnBlack').disabled=true;
+        const sessions = loadSessions();
+        sessions.unshift(session);
+        saveSessions(sessions);
 
-        lastDecision='測定終了・保存'; updateDebug();
-        loadHistory(); switchTab('history'); toast('保存完了');
+        document.getElementById("sessionBadge").textContent = "測定完了";
+        document.getElementById("sessionBadge").className = "badge b-gray";
+        document.getElementById("recState").textContent = "● 待機中";
+        document.getElementById("recState").style.color = "#cbd5e1";
+        document.getElementById("btnStart").disabled = false;
+        document.getElementById("btnStop").disabled = true;
+        document.getElementById("btnStop").className = "btn btn-soft";
+        document.getElementById("btnBlackout").disabled = true;
+
+        lastDecision = "測定終了・保存";
+        updateDebug();
+
+        loadHistoryUI();
+        loadShareSelect();
+        loadDoctorSelect();
+        switchPatientTab("history");
+        toast("保存完了");
       }
 
       function renderEventSummaryHTML(logs){
-        if(!logs||!logs.length) return '<div class="muted">イベント記録なし</div>';
-        return '<div style="margin-top:6px;">'+logs.map(ev=>`<div class="logline">${ev.hhmm} <strong>${typeJa(ev.type)}</strong> (${ev.db}dB / +${ev.dDb})</div>`).join('')+'</div>';
+        if(!logs || !logs.length) return '<div class="muted">イベント記録なし</div>';
+        return logs.slice(-10).map(ev => {
+          const ja = ev.type === "snore" ? "いびき" : ev.type === "bruxism" ? "歯ぎしり" : ev.type === "sleep_talk" ? "寝言" : ev.type;
+          return `<div class="muted" style="padding:2px 0;">${esc(ev.hhmm)} <strong>${ja}</strong> (${ev.db}dB / +${ev.dDb})</div>`;
+        }).join("");
       }
 
-      function renderPeakEvents(){
-        const list=document.getElementById('peakEventList'); if(!list) return;
-        if(!peakEvents.length){ list.innerHTML='<div style="padding:10px 0;color:#9bb3ce;font-size:12px">まだピーク録音イベントはありません。</div>'; return; }
-        list.innerHTML=peakEvents.map((e,idx)=>`
-          <div class="row" style="padding:10px 0;border-bottom:1px solid #213b5d;align-items:center">
-            <div style="width:110px;font-weight:800;color:#fff">${esc(e.time)}</div>
-            <div style="width:190px;color:#ffb020;font-weight:800">${esc(e.type)}</div>
-            <div style="width:110px;color:#ff4d4f;font-weight:800">${Number(e.db).toFixed(1)} dB</div>
-            <div style="width:110px;color:#fff;font-weight:800">${Number(e.g).toFixed(2)} G</div>
-            <div style="flex:1;display:flex;gap:8px;align-items:center">
-              <audio controls preload="metadata" style="width:100%;max-width:340px"><source src="${esc(e.audioBase64)}" type="audio/webm"></audio>
-              <button class="btn btn-soft" style="padding:6px 10px;background:#102846;color:#dbeafe;border-color:#2d4b72" onclick="App.playPeakByIndex(${idx})">再生</button>
-            </div>
-          </div>`).join('');
-      }
+      function loadHistoryUI(){
+        const list = document.getElementById("historyList");
+        const sessions = loadSessions();
+        list.innerHTML = "";
 
-      function loadHistory(){
-        const arr=JSON.parse(localStorage.getItem('sleep_sessions')||'[]');
-        const list=document.getElementById('historyList');
-        const sel=document.getElementById('docSelect');
-        const shareSel=document.getElementById('shareSelect');
-        list.innerHTML=''; sel.innerHTML=''; if(shareSel) shareSel.innerHTML='';
-
-        if(!arr.length){
-          list.innerHTML='<div class="muted">まだ測定履歴がありません。</div>';
-          sel.innerHTML='<option value="">保存済みセッションなし</option>';
-          if(shareSel) shareSel.innerHTML='<option value="">保存済み測定なし</option>';
-          updateShareSummary(null);
-          renderPeakEvents(); return;
+        if(!sessions.length){
+          list.innerHTML = '<div class="muted">まだ測定履歴がありません。</div>';
+          renderPeakEvents();
+          return;
         }
 
-        arr.forEach((s,i)=>{
-          const hasAudio=!!(s.peakAudioBase64&&s.peakAudioBase64.length>100);
-          const card=document.createElement('div'); card.className='card'; card.style.marginTop='8px';
-          card.innerHTML=`<div><strong>${s.dateStr}</strong> ${s.startTime}〜${s.endTime}</div>
-            <div class="muted">baseline ${Number(s.baselineDb||baselineDb).toFixed(1)} dB / 睡眠 ${Math.round(s.durationSec/60)}分 / いびき ${s.snoreMin}分 / 歯ぎしり疑い ${s.bruxismEvents}件 / 録音:${hasAudio?'あり':'なし'}</div>
-            ${renderEventSummaryHTML(s.eventLogs||[])}`;
-          list.appendChild(card);
-
-          const o=document.createElement('option');
-          o.value=s.id;
-          o.textContent=`${s.dateStr} (${s.startTime}〜${s.endTime}) baseline:${Number(s.baselineDb||baselineDb).toFixed(1)}dB`;
-          sel.appendChild(o);
-
-          if(shareSel){
-            const so=document.createElement('option');
-            so.value=s.id;
-            so.textContent=`${s.dateStr} ${s.startTime}〜${s.endTime} (${Math.round(s.durationSec/60)}分)`;
-            shareSel.appendChild(so);
-          }
-
-          if(i===0) selectedSession=s;
+        sessions.forEach((s, idx) => {
+          const item = document.createElement("div");
+          item.className = "session-item";
+          const dur = Math.round((s.durationSec||0)/60);
+          item.innerHTML = `
+            <div>
+              <div><strong>${esc(s.dateStr)}</strong></div>
+              <div class="muted">${esc(s.startTime)}〜${esc(s.endTime)} / ${dur}分 / baseline ${Number(s.baselineDb||0).toFixed(1)}dB</div>
+              <div class="muted">いびき ${s.snoreMin}分 / 歯ぎしり疑い ${s.bruxismEvents}件 / 最大体動 ${Number(s.maxMotionG||0).toFixed(2)}G</div>
+              <div>${renderEventSummaryHTML(s.eventLogs||[])}</div>
+            </div>
+            <span class="badge ${idx===0?"b-green":"b-gray"}">${idx===0?"最新":"保存済"}</span>
+          `;
+          list.appendChild(item);
         });
 
-        if(arr[0]){
-          onDoctorSessionChange(arr[0].id);
-          if(shareSel) shareSel.value=arr[0].id;
-          updateShareSummary(arr[0]);
-        }
         renderPeakEvents();
       }
 
-      function updateShareSummary(s){
-        const box=document.getElementById('shareSummary');
-        if(!box) return;
-        if(!s){
-          box.innerHTML='<span class="muted">測定履歴が存在しません。</span>';
+      function renderPeakEvents(){
+        const wrap = document.getElementById("peakEventList");
+        const peaks = loadPeakStore();
+        if(!peaks.length){
+          wrap.innerHTML = '<div class="muted" style="color:#9bb3ce;">まだピーク録音イベントはありません。</div>';
           return;
         }
-        const hasAudio=!!(s.peakAudioBase64 && s.peakAudioBase64.length>100);
-        const aLen=s.audioSamples?s.audioSamples.length:0;
-        const gLen=s.accelSamples?s.accelSamples.length:0;
-        const evLen=s.eventLogs?s.eventLogs.length:0;
-        box.innerHTML=`
-          <div><strong>測定日時:</strong> ${esc(s.dateStr)} ${esc(s.startTime)} 〜 ${esc(s.endTime)} (${Math.round(s.durationSec/60)}分)</div>
-          <div><strong>ベースライン音圧:</strong> ${Number(s.baselineDb||0).toFixed(1)} dB</div>
-          <div><strong>記録サンプル数:</strong> 音圧 ${aLen}件 / 加速度 ${gLen}件 / イベント ${evLen}件</div>
-          <div><strong>セッション録音:</strong> ${hasAudio ? '<span style="color:#10b981;font-weight:700">あり (Base64保持)</span>' : '<span class="muted">なし</span>'}</div>
-          <div><strong>保存済みピークイベント総数:</strong> ${peakEvents.length} 件</div>
-        `;
+        wrap.innerHTML = peaks.map((p, i) => `
+          <div class="event-row">
+            <div><strong>${esc(p.time)}</strong></div>
+            <div style="color:#ffb020;font-weight:800;">${esc(p.type)}</div>
+            <div style="color:#ff4d4f;font-weight:800;">${Number(p.db).toFixed(1)} dB</div>
+            <div style="font-weight:800;">${Number(p.g).toFixed(2)} G</div>
+            <div class="row">
+              <audio controls preload="metadata" style="width:100%;max-width:360px;">
+                <source src="${esc(p.audioBase64)}" type="audio/webm">
+              </audio>
+              <button class="btn btn-soft" style="padding:6px 10px;background:#102846;color:#dbeafe;border-color:#2d4b72;" onclick="App.playPeakByIndex(${i})">再生</button>
+            </div>
+          </div>
+        `).join("");
       }
 
-      function onShareSessionChange(id){
-        const arr=JSON.parse(localStorage.getItem('sleep_sessions')||'[]');
-        const s=arr.find(x=>String(x.id)===String(id))||arr[0]||null;
-        updateShareSummary(s);
-      }
-
-      function onDoctorSessionChange(id){
-        const arr=JSON.parse(localStorage.getItem('sleep_sessions')||'[]');
-        const s=arr.find(x=>String(x.id)===String(id))||arr[0];
-        if(!s) return;
-        selectedSession=s;
-
-        const b=Number(s.baselineDb||baselineDb).toFixed(1);
-        document.getElementById('docTime').textContent=`${s.startTime} 〜 ${s.endTime}`;
-        document.getElementById('docBase').textContent=`Baseline: ${b} dB`;
-        document.getElementById('docBrux').textContent=`歯ぎしり疑い: ${s.bruxismEvents}件`;
-        document.getElementById('docStats').textContent=`最大体動: ${s.maxMotionG} G / いびき疑い: ${s.snoreMin}分`;
-
-        const logs=s.eventLogs||[];
-        const hasAudio=!!(s.peakAudioBase64&&s.peakAudioBase64.length>100);
-        if(logs.length){
-          const txt=logs.slice(-12).map(ev=>`${ev.hhmm} ${typeJa(ev.type)}(+${ev.dDb}dB)`).join(' / ');
-          document.getElementById('docNote').innerHTML=`睡眠実測時間: <strong>${Math.round(s.durationSec/60)}分</strong><br>イベント時刻: ${logs.length}件<br>録音: ${hasAudio?'あり':'なし'}<br><span style="font-size:12px;color:#475569;">${txt}</span>`;
-        }else{
-          document.getElementById('docNote').innerHTML=`睡眠実測時間: <strong>${Math.round(s.durationSec/60)}分</strong><br>イベント時刻記録: なし<br>録音: ${hasAudio?'あり':'なし'}`;
+      function playPeakByIndex(idx){
+        const peaks = loadPeakStore();
+        const p = peaks[idx];
+        if(!p || !p.audioBase64){
+          toast("録音データがありません");
+          return;
         }
-
-        const audio=document.getElementById('docAudio');
-        if(hasAudio){ audio.src=s.peakAudioBase64; audio.style.display='block'; }
-        else { audio.removeAttribute('src'); audio.style.display='none'; }
-      }
-
-      function playPeakAudio(){
-        if(!selectedSession||!selectedSession.peakAudioBase64){ toast('録音データがありません'); return; }
-        const a=document.getElementById('docAudio');
-        a.src=selectedSession.peakAudioBase64; a.style.display='block';
-        a.play().catch(()=>toast('再生失敗'));
-      }
-      function playPeakByIndex(i){
-        const e=peakEvents[i]; if(!e||!e.audioBase64){ toast('録音データがありません'); return; }
-        const a=new Audio(e.audioBase64); a.play().catch(()=>toast('再生失敗'));
+        const a = new Audio(p.audioBase64);
+        a.play().catch(() => toast("再生失敗"));
       }
 
       function clearPeakEvents(){
-        if(!confirm('ピーク録音履歴を削除しますか？')) return;
-        peakEvents=[]; savePeakEventsToStorage(); renderPeakEvents(); toast('ピーク履歴削除');
+        if(!confirm("ピーク録音履歴を削除しますか？")) return;
+        localStorage.removeItem(STORAGE_PEAKS);
+        renderPeakEvents();
+        loadDoctorPeaksForSelected();
+        toast("ピーク履歴を削除しました");
       }
 
-      function clearAllLogs(){
-        if(!confirm('測定履歴・ピーク録音履歴をすべて削除しますか？')) return;
-        localStorage.removeItem('sleep_sessions'); localStorage.removeItem('peak_events');
-        selectedSession=null; peakEvents=[]; currentPeakBase64=''; eventLogs=[];
-        loadHistory(); renderPeakEvents();
-        const audio=document.getElementById('docAudio');
-        if(audio){ audio.pause(); audio.removeAttribute('src'); audio.style.display='none'; }
-        document.getElementById('docTime').textContent='--:-- 〜 --:--';
-        document.getElementById('docBase').textContent='Baseline: -- dB';
-        document.getElementById('docBrux').textContent='歯ぎしり疑い: --件';
-        document.getElementById('docStats').textContent='最大体動: -- G / いびき疑い: --分';
-        document.getElementById('docNote').textContent='--';
-        toast('全履歴削除完了');
+      function clearAllData(){
+        if(!confirm("測定履歴とピーク履歴を全削除しますか？")) return;
+        localStorage.removeItem(STORAGE_SESSIONS);
+        localStorage.removeItem(STORAGE_PEAKS);
+        loadHistoryUI();
+        loadShareSelect();
+        loadDoctorSelect();
+        clearDoctorSummary();
+        toast("全履歴削除完了");
       }
 
-      function switchRole(next){
-        role=next;
-        cleanupTests();
-        const pv=document.getElementById('patientView'), dv=document.getElementById('doctorView');
-        const rp=document.getElementById('rolePatient'), rd=document.getElementById('roleDoctor');
-        if(next==='patient'){ pv.classList.remove('hidden'); dv.classList.add('hidden'); rp.style.background='#fff'; rd.style.background='transparent'; }
-        else { pv.classList.add('hidden'); dv.classList.remove('hidden'); rd.style.background='#fff'; rp.style.background='transparent'; }
+      function switchMode(next){
+        mode = next;
+        const pv = document.getElementById("patientView");
+        const dv = document.getElementById("doctorView");
+        const bp = document.getElementById("btnModePatient");
+        const bd = document.getElementById("btnModeDoctor");
+
+        if(next === "patient"){
+          pv.classList.remove("hidden");
+          dv.classList.add("hidden");
+          bp.style.background = "#fff";
+          bd.style.background = "transparent";
+        }else{
+          pv.classList.add("hidden");
+          dv.classList.remove("hidden");
+          bd.style.background = "#fff";
+          bp.style.background = "transparent";
+          loadDoctorSelect();
+        }
       }
 
-      function switchTab(next){
-        tab=next;
-        cleanupTests();
-        ['record','history','day','share'].forEach(t=>{
-          document.getElementById('tab-'+t).classList.toggle('active', t===next);
-          document.getElementById('panel-'+t).classList.toggle('hidden', t!==next);
+      function switchPatientTab(next){
+        patientTab = next;
+        ["measure","history","daytest","share"].forEach(t => {
+          document.getElementById(`tab-${t}`).classList.toggle("active", t===next);
+          document.getElementById(`panel-${t}`).classList.toggle("hidden", t!==next);
         });
+        cleanupDayTests();
+        if(next === "share"){
+          loadShareSelect();
+          updateSharePreview();
+        }
+        if(next === "history"){
+          loadHistoryUI();
+        }
       }
 
       function toggleBlackout(on){
-        const b=document.getElementById('blackout');
-        if(on) b.classList.add('active'); else b.classList.remove('active');
+        const b = document.getElementById("blackout");
+        if(on) b.classList.add("active");
+        else b.classList.remove("active");
       }
 
-      // ===== ログ書き出し・共有機能 =====
-      function buildExportData(includeAudio){
-        const sel=document.getElementById('shareSelect');
-        const sid=sel ? sel.value : null;
-        const arr=JSON.parse(localStorage.getItem('sleep_sessions')||'[]');
-        const targetSession=arr.find(x=>String(x.id)===String(sid)) || arr[0];
-
-        if(!targetSession){
-          return null;
-        }
-
-        let sessionObj = JSON.parse(JSON.stringify(targetSession));
-        let exportPeakEvents = JSON.parse(JSON.stringify(peakEvents));
-
-        if(!includeAudio){
-          sessionObj.peakAudioBase64 = sessionObj.peakAudioBase64 ? '[EXCLUDED: lightweight mode]' : '';
-          exportPeakEvents = exportPeakEvents.map(e => {
-            const copy = {...e};
-            copy.audioBase64 = copy.audioBase64 ? '[EXCLUDED: lightweight mode]' : '';
-            return copy;
-          });
-        }
-
-        const now = new Date();
-        const exportDateStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString();
-
-        return {
-          exportInfo: {
-            appName: 'SleepTracker',
-            exportDate: exportDateStr,
-            formatVersion: '1.0',
-            includeAudio: includeAudio
-          },
-          session: sessionObj,
-          allPeakEvents: exportPeakEvents
-        };
-      }
-
-      function generateFileName(sessionObj, includeAudio){
-        let datePart = 'unknown';
-        if(sessionObj && sessionObj.id){
-          const d = new Date(sessionObj.id);
-          const y = d.getFullYear();
-          const m = String(d.getMonth()+1).padStart(2,'0');
-          const day = String(d.getDate()).padStart(2,'0');
-          const hh = String(d.getHours()).padStart(2,'0');
-          const mm = String(d.getMinutes()).padStart(2,'0');
-          datePart = `${y}${m}${day}_${hh}${mm}`;
-        }
-        const suffix = includeAudio ? 'full' : 'light';
-        return `SleepTracker_${datePart}_${suffix}.json`;
-      }
-
-      function downloadBlob(blob, fileName){
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      }
-
-      async function exportSessionLog(includeAudio, tryShare){
-        const exportData = buildExportData(includeAudio);
-        if(!exportData){
-          toast('書き出す測定データがありません');
-          return;
-        }
-
-        const fileName = generateFileName(exportData.session, includeAudio);
-        const jsonStr = JSON.stringify(exportData, null, 2);
-        const blob = new Blob([jsonStr], { type: 'application/json' });
-
-        if(tryShare){
-          if(navigator.share && navigator.canShare){
-            const file = new File([blob], fileName, { type: 'application/json' });
-            if(navigator.canShare({ files: [file] })){
-              try{
-                await navigator.share({
-                  files: [file],
-                  title: fileName,
-                  text: `SleepTracker 睡眠測定ログ: ${exportData.session.dateStr} (${exportData.session.startTime}〜${exportData.session.endTime})`
-                });
-                toast('共有を完了しました');
-                return;
-              }catch(e){
-                if(e.name !== 'AbortError'){
-                  console.warn('Share error, fallback to download:', e);
-                  downloadBlob(blob, fileName);
-                  toast('共有失敗のためダウンロードしました');
-                  return;
-                }
-                return;
-              }
-            }
-          }
-          downloadBlob(blob, fileName);
-          toast('共有非対応のためダウンロードしました');
-        }else{
-          downloadBlob(blob, fileName);
-          toast('JSONログを書き出しました');
-        }
-      }
-
-      // ===== 起床後ミニテスト（復活ロジック） =====
-      function setTestType(type) {
-        testType = type;
-        cleanupTests();
-
-        ['reaction', 'attention', 'memory'].forEach(t => {
+      function setDayTest(type){
+        dayTestType = type;
+        ["reaction","attention","memory"].forEach(t => {
           const btn = document.getElementById(`btnTest-${t}`);
-          if (btn) btn.className = (t === type) ? 'btn btn-primary' : 'btn btn-soft';
+          btn.className = t===type ? "btn btn-primary" : "btn btn-soft";
         });
-
-        const guideTitle = document.getElementById('testGuideTitle');
-        const guideSub = document.getElementById('testGuideSub');
-
-        if (type === 'reaction') {
-          guideTitle.textContent = '画面が「緑」に変わったら即タップ！';
-          guideSub.textContent = '「開始」を押すと待機画面（赤）になります';
-        } else if (type === 'attention') {
-          guideTitle.textContent = '「赤色の円」が現れた時だけタップ！';
-          guideSub.textContent = '青や緑は見送ってください（全5回）';
-        } else {
-          guideTitle.textContent = '光る色の順番を記憶して再現！';
-          guideSub.textContent = '4つの色が光ります。同じ順序でタップしてください';
+        cleanupDayTests();
+        const title = document.getElementById("testGuideTitle");
+        const sub = document.getElementById("testGuideSub");
+        if(type === "reaction"){
+          title.textContent = "画面が緑に変わった瞬間をタップ";
+          sub.textContent = "開始後、赤画面で待機します";
+        }else if(type === "attention"){
+          title.textContent = "赤い円だけタップ（Go/No-Go）";
+          sub.textContent = "全5試行。青/緑は見送ります";
+        }else{
+          title.textContent = "光る順（4ステップ）を再現";
+          sub.textContent = "4色の順序記憶テスト";
         }
       }
 
-      function cleanupTests() {
+      function cleanupDayTests(){
         clearTimeout(testTimer);
-        clearTimeout(attInterval);
-        testWaitingGreen = false;
-        memCanInput = false;
+        clearTimeout(attentionAutoTimeout);
+        reactionWaiting = false;
+        memoryCanInput = false;
 
-        const guide = document.getElementById('testGuide');
-        if (guide) guide.classList.remove('hidden');
-        ['panelReaction', 'panelAttention', 'panelMemory', 'testResultBox'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.classList.add('hidden');
-        });
-        const area = document.getElementById('testArea');
-        if (area) {
-          area.style.background = '#f8fafc';
-          area.style.borderColor = '#cbd5e1';
-        }
+        document.getElementById("testGuide").classList.remove("hidden");
+        document.getElementById("panelReaction").classList.add("hidden");
+        document.getElementById("panelAttention").classList.add("hidden");
+        document.getElementById("panelMemory").classList.add("hidden");
+        document.getElementById("dayResult").classList.add("hidden");
+
+        const box = document.getElementById("testBox");
+        box.style.background = "#f8fafc";
+        box.style.borderColor = "#cbd5e1";
       }
 
-      function startCurrentTest() {
-        document.getElementById('testGuide').classList.add('hidden');
-        document.getElementById('testResultBox').classList.add('hidden');
+      function startCurrentDayTest(){
+        document.getElementById("testGuide").classList.add("hidden");
+        document.getElementById("dayResult").classList.add("hidden");
 
-        if (testType === 'reaction') {
-          const p = document.getElementById('panelReaction');
-          p.classList.remove('hidden');
-          const area = document.getElementById('testArea');
-          area.style.background = '#ef4444';
-          area.style.borderColor = '#dc2626';
-          document.getElementById('reactPrompt').textContent = '待機中...';
-          document.getElementById('reactPrompt').style.color = '#fff';
-          document.getElementById('reactSubPrompt').textContent = '緑色に変わるまでタップ禁止';
-          document.getElementById('reactSubPrompt').style.color = '#fee2e2';
-
-          testWaitingGreen = false;
-          const delay = 1500 + Math.random() * 2000;
-          clearTimeout(testTimer);
+        if(dayTestType === "reaction"){
+          const p = document.getElementById("panelReaction");
+          p.classList.remove("hidden");
+          const box = document.getElementById("testBox");
+          box.style.background = "#ef4444";
+          box.style.borderColor = "#dc2626";
+          document.getElementById("reactionMain").textContent = "待機中...";
+          document.getElementById("reactionSub").textContent = "緑になるまでタップ禁止";
+          reactionWaiting = false;
+          const delay = 1500 + Math.random()*2000;
           testTimer = setTimeout(() => {
-            testWaitingGreen = true;
-            area.style.background = '#10b981';
-            area.style.borderColor = '#059669';
-            document.getElementById('reactPrompt').textContent = '今すぐタップ！';
-            document.getElementById('reactSubPrompt').textContent = '画面内をどこでもタップ';
-            testStartTime = Date.now();
+            reactionWaiting = true;
+            box.style.background = "#10b981";
+            box.style.borderColor = "#059669";
+            document.getElementById("reactionMain").textContent = "今すぐタップ！";
+            document.getElementById("reactionSub").textContent = "どこでもタップ";
+            reactionStartTs = Date.now();
           }, delay);
-        } else if (testType === 'attention') {
-          const p = document.getElementById('panelAttention');
-          p.classList.remove('hidden');
-          attRemaining = 5;
-          attScore = { correct: 0, miss: 0, falseAlarm: 0, times: [] };
-          nextAttentionTrial();
-        } else if (testType === 'memory') {
-          const p = document.getElementById('panelMemory');
-          p.classList.remove('hidden');
-          memSequence = [
-            Math.floor(Math.random() * 4),
-            Math.floor(Math.random() * 4),
-            Math.floor(Math.random() * 4),
-            Math.floor(Math.random() * 4)
-          
-          ];
-          memUserStep = 0;
-          memCanInput = false;
-          document.getElementById('memStatus').textContent = '光る順番をよく見て覚えてください...';
-          document.getElementById('memProgress').textContent = '系列長: 4ステップ (再生中)';
+        }
 
-          let stepIdx = 0;
-          const playSeq = () => {
-            if (stepIdx >= memSequence.length) {
-              memCanInput = true;
-              document.getElementById('memStatus').textContent = '【入力受付】覚えた順にタップ！';
-              document.getElementById('memProgress').textContent = '入力待ち: 0 / 4';
+        if(dayTestType === "attention"){
+          const p = document.getElementById("panelAttention");
+          p.classList.remove("hidden");
+          attentionRemain = 5;
+          attentionState = { correct:0, miss:0, falseAlarm:0, times:[] };
+          nextAttentionTrial();
+        }
+
+        if(dayTestType === "memory"){
+          const p = document.getElementById("panelMemory");
+          p.classList.remove("hidden");
+          memorySeq = [Math.floor(Math.random()*4),Math.floor(Math.random()*4),Math.floor(Math.random()*4),Math.floor(Math.random()*4)];
+          memoryStep = 0;
+          memoryCanInput = false;
+          document.getElementById("memStatus").textContent = "光る順を記憶してください...";
+          document.getElementById("memProg").textContent = "系列長: 4（再生中）";
+
+          let idx = 0;
+          const play = () => {
+            if(idx >= memorySeq.length){
+              memoryCanInput = true;
+              document.getElementById("memStatus").textContent = "入力受付: 順番通りにタップ";
+              document.getElementById("memProg").textContent = "入力 0 / 4";
               return;
             }
-            flashMemoryBtn(memSequence[stepIdx]);
-            stepIdx++;
-            testTimer = setTimeout(playSeq, 650);
+            flashMem(memorySeq[idx]);
+            idx++;
+            testTimer = setTimeout(play, 650);
           };
-          testTimer = setTimeout(playSeq, 500);
+          testTimer = setTimeout(play, 500);
         }
       }
 
-      function handleReactionTap() {
-        if (testType !== 'reaction') return;
-        if (!testWaitingGreen) {
+      function onReactionTap(){
+        if(dayTestType !== "reaction") return;
+        if(!reactionWaiting){
           clearTimeout(testTimer);
-          toast('お手付きです！緑色に変わる前にタップされました');
-          cleanupTests();
+          toast("お手付き：緑になる前にタップ");
+          cleanupDayTests();
           return;
         }
-        const reactMs = Date.now() - testStartTime;
-        cleanupTests();
-        showResultDisplay(
-          '① 反応速度テスト',
-          `${reactMs} ms`,
-          reactMs < 270 ? '良好：ベースライン同等の素早い覚醒度' : '通常よりやや遅延（無理せず休息を）',
-          reactMs < 270 ? '#065f46' : 'var(--warn)'
-        );
+        const ms = Date.now() - reactionStartTs;
+        cleanupDayTests();
+        showDayResult("①反応速度", `${ms} ms`, ms < 270 ? "ベースライン同等" : "疲労注意", ms < 270 ? "#065f46" : "#b45309");
       }
 
-      function nextAttentionTrial() {
-        if (attRemaining <= 0) {
+      function nextAttentionTrial(){
+        if(attentionRemain <= 0){
           finishAttention();
           return;
         }
-        document.getElementById('attCount').textContent = `残り: ${attRemaining}回`;
-        attRemaining--;
+        document.getElementById("attRemain").textContent = `残り: ${attentionRemain}回`;
+        attentionRemain--;
 
-        const btn = document.getElementById('attCircleBtn');
-        btn.style.background = '#cbd5e1';
-        btn.textContent = '...';
-        btn.style.pointerEvents = 'none';
-        attIsTarget = false;
+        const btn = document.getElementById("attCircle");
+        btn.style.background = "#cbd5e1";
+        btn.textContent = "...";
+        btn.style.pointerEvents = "none";
+        attentionTarget = false;
 
         testTimer = setTimeout(() => {
-          attIsTarget = Math.random() < 0.6;
-          btn.style.pointerEvents = 'auto';
-          if (attIsTarget) {
-            btn.style.background = '#ef4444';
-            btn.textContent = '赤 (押す!)';
-            attTargetStartTime = Date.now();
-          } else {
-            const colors = ['#3b82f6', '#10b981', '#f59e0b'];
-            btn.style.background = colors[Math.floor(Math.random() * colors.length)];
-            btn.textContent = '見送り';
+          attentionTarget = Math.random() < 0.6;
+          btn.style.pointerEvents = "auto";
+          if(attentionTarget){
+            btn.style.background = "#ef4444";
+            btn.textContent = "赤（押す）";
+            attentionTargetStart = Date.now();
+          }else{
+            const cs = ["#3b82f6","#10b981","#f59e0b"];
+            btn.style.background = cs[Math.floor(Math.random()*cs.length)];
+            btn.textContent = "見送り";
           }
 
-          attInterval = setTimeout(() => {
-            if (attIsTarget) attScore.miss++;
+          attentionAutoTimeout = setTimeout(() => {
+            if(attentionTarget) attentionState.miss++;
             nextAttentionTrial();
           }, 1200);
         }, 500);
       }
 
-      function handleAttentionTap() {
-        clearTimeout(attInterval);
-        const btn = document.getElementById('attCircleBtn');
-        btn.style.pointerEvents = 'none';
+      function onAttentionTap(){
+        clearTimeout(attentionAutoTimeout);
+        const btn = document.getElementById("attCircle");
+        btn.style.pointerEvents = "none";
 
-        if (attIsTarget) {
-          attScore.correct++;
-          attScore.times.push(Date.now() - attTargetStartTime);
-        } else {
-          attScore.falseAlarm++;
+        if(attentionTarget){
+          attentionState.correct++;
+          attentionState.times.push(Date.now() - attentionTargetStart);
+        }else{
+          attentionState.falseAlarm++;
         }
         testTimer = setTimeout(nextAttentionTrial, 300);
       }
 
-      function finishAttention() {
-        cleanupTests();
-        const avg = attScore.times.length ? Math.round(attScore.times.reduce((a,b)=>a+b,0)/attScore.times.length) : 0;
-        const success = attScore.falseAlarm === 0 && attScore.correct >= 2;
-        showResultDisplay(
-          '② 注意テスト (赤色選択)',
-          `正答 ${attScore.correct}回 / 誤答 ${attScore.falseAlarm}回 (${avg}ms)`,
-          success ? '良好：注意維持力・抑制機能は正常' : 'やや散漫：見落とし・誤反応あり',
-          success ? '#065f46' : 'var(--warn)'
+      function finishAttention(){
+        cleanupDayTests();
+        const avg = attentionState.times.length ? Math.round(attentionState.times.reduce((a,b)=>a+b,0)/attentionState.times.length) : 0;
+        const good = attentionState.falseAlarm===0 && attentionState.correct>=2;
+        showDayResult(
+          "②注意力",
+          `正答${attentionState.correct} / 誤答${attentionState.falseAlarm} / 平均${avg}ms`,
+          good ? "ベースライン同等" : "疲労注意",
+          good ? "#065f46" : "#b45309"
         );
       }
 
-      function flashMemoryBtn(idx) {
-        const btn = document.getElementById(`memBtn-${idx}`);
-        if (!btn) return;
-        btn.style.opacity = '1';
-        btn.style.transform = 'scale(1.08)';
+      function flashMem(idx){
+        const b = document.getElementById(`mem-${idx}`);
+        b.style.opacity = "1";
+        b.style.transform = "scale(1.08)";
         setTimeout(() => {
-          btn.style.opacity = '0.6';
-          btn.style.transform = 'scale(1)';
-        }, 300);
+          b.style.opacity = ".6";
+          b.style.transform = "scale(1)";
+        }, 280);
       }
 
-      function handleMemoryTap(idx) {
-        if (!memCanInput) return;
-        flashMemoryBtn(idx);
+      function onMemoryTap(idx){
+        if(!memoryCanInput) return;
+        flashMem(idx);
 
-        if (idx !== memSequence[memUserStep]) {
-          memCanInput = false;
-          toast(`順番が違いました（正解は ${memUserStep + 1}番目が別の色でした）`);
-          cleanupTests();
-          showResultDisplay(
-            '③ 記憶系列テスト',
-            `再現成功: ${memUserStep} / 4ステップ`,
-            '通常ベースラインより低下（疲労の可能性あり）',
-            'var(--warn)'
-          );
+        if(idx !== memorySeq[memoryStep]){
+          memoryCanInput = false;
+          cleanupDayTests();
+          showDayResult("③記憶力", `再現成功 ${memoryStep} / 4`, "疲労注意", "#b45309");
           return;
         }
 
-        memUserStep++;
-        document.getElementById('memProgress').textContent = `入力中: ${memUserStep} / 4`;
-
-        if (memUserStep >= memSequence.length) {
-          memCanInput = false;
-          cleanupTests();
-          showResultDisplay(
-            '③ 記憶系列テスト',
-            '完全再現 (4/4 成功)',
-            '短期記憶力・集中力はベースライン同等',
-            '#065f46'
-          );
+        memoryStep++;
+        document.getElementById("memProg").textContent = `入力 ${memoryStep} / 4`;
+        if(memoryStep >= memorySeq.length){
+          memoryCanInput = false;
+          cleanupDayTests();
+          showDayResult("③記憶力", "完全再現 4 / 4", "ベースライン同等", "#065f46");
         }
       }
 
-      function showResultDisplay(title, score, comp, compColor) {
-        const box = document.getElementById('testResultBox');
-        box.classList.remove('hidden');
-        document.getElementById('resTestTitle').textContent = title;
-        document.getElementById('resScoreVal').textContent = score;
-        const compEl = document.getElementById('resCompVal');
-        compEl.textContent = comp;
-        compEl.style.color = compColor;
+      function showDayResult(title, score, judge, color){
+        const box = document.getElementById("dayResult");
+        box.classList.remove("hidden");
+        document.getElementById("dayResultTitle").textContent = title;
+        document.getElementById("dayResultScore").textContent = score;
+        const j = document.getElementById("dayResultJudge");
+        j.textContent = judge;
+        j.style.color = color;
         toast(`${title} 完了`);
       }
 
-      function init(){
-        initBars();
-        document.getElementById('btnStart').addEventListener('click', async (e)=>{
-          e.preventDefault();
-          await startMeasurement();
-        }, { passive:false });
-
-        checkMotionPermissionUI();
-        loadPeakEventsFromStorage();
-        loadHistory();
-        document.getElementById('baselineLabel').textContent=`● ベースライン: ${baselineDb.toFixed(1)} dB`;
-        runPreflight();
-        updateRuleText();
-        setInterval(updateDebug, 500);
-      }
-
-      return {
-        init, switchRole, switchTab, requestSensorPermission, runPreflight,
-        calibrateBaseline, startMeasurement, stopMeasurement, toggleBlackout,
-        onDoctorSessionChange, onShareSessionChange, exportSessionLog, playPeakAudio, playPeakByIndex, clearPeakEvents, clearAllLogs,
-        // ミニゲーム用公開関数
-        setTestType, startCurrentTest, handleReactionTap, handleAttentionTap, handleMemoryTap
-      };
-    })();
-
-    window.addEventListener('DOMContentLoaded', ()=>App.init());
-  </script>
-</body>
-</html>
-        const exportDateStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString();
-
+      function buildFullLog(session){
+        const peaks = loadPeakStore().filter(p => String(p.sessionId) === String(session.id));
         return {
-          exportInfo: {
-            appName: 'SleepTracker',
-            exportDate: exportDateStr,
-            formatVersion: '1.0',
-            includeAudio: includeAudio
+          meta: {
+            app: "SleepTracker",
+            version: "single-file-complete",
+            exportedAt: new Date().toISOString(),
+            locale: "ja-JP"
           },
-          session: sessionObj,
-          allPeakEvents: exportPeakEvents
+          session: {
+            ...session
+          },
+          peaks: peaks
         };
       }
 
-      function generateFileName(sessionObj, includeAudio){
-        let datePart = 'unknown';
-        if(sessionObj && sessionObj.id){
-          const d = new Date(sessionObj.id);
-          const y = d.getFullYear();
-          const m = String(d.getMonth()+1).padStart(2,'0');
-          const day = String(d.getDate()).padStart(2,'0');
-          const hh = String(d.getHours()).padStart(2,'0');
-          const mm = String(d.getMinutes()).padStart(2,'0');
-          datePart = `${y}${m}${day}_${hh}${mm}`;
-        }
-        const suffix = includeAudio ? 'full' : 'light';
-        return `SleepTracker_${datePart}_${suffix}.json`;
+      function buildLiteLog(session){
+        const peaks = loadPeakStore()
+          .filter(p => String(p.sessionId) === String(session.id))
+          .map(p => ({
+            id: p.id,
+            sessionId: p.sessionId,
+            time: p.time,
+            type: p.type,
+            db: p.db,
+            g: p.g,
+            baseline: p.baseline,
+            dDb: p.dDb,
+            durationSec: p.durationSec
+          }));
+
+        return {
+          meta: {
+            app: "SleepTracker",
+            version: "single-file-complete",
+            exportedAt: new Date().toISOString(),
+            locale: "ja-JP",
+            lightweight: true
+          },
+          session: {
+            id: session.id,
+            dateStr: session.dateStr,
+            startTime: session.startTime,
+            endTime: session.endTime,
+            durationSec: session.durationSec,
+            baselineDb: session.baselineDb,
+            bruxismEvents: session.bruxismEvents,
+            snoreMin: session.snoreMin,
+            maxMotionG: session.maxMotionG,
+            audioSamples: session.audioSamples,
+            accelSamples: session.accelSamples,
+            eventLogs: session.eventLogs
+          },
+          peaks
+        };
       }
 
-      function downloadBlob(blob, fileName){
+      function getSelectedShareSession(){
+        const sessions = loadSessions();
+        const selId = document.getElementById("shareSessionSelect").value;
+        return sessions.find(s => String(s.id) === String(selId)) || sessions[0] || null;
+      }
+
+      function downloadJSON(obj, filename){
+        const blob = new Blob([JSON.stringify(obj, null, 2)], { type:"application/json;charset=utf-8" });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        const a = document.createElement("a");
         a.href = url;
-        a.download = fileName;
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+          a.remove();
+        }, 0);
+        return blob;
       }
 
-      async function exportSessionLog(includeAudio, tryShare){
-        const exportData = buildExportData(includeAudio);
-        if(!exportData){
-          toast('書き出す測定データがありません');
-          return;
-        }
+      async function shareBlobOrDownload(blob, filename, title, text){
+        const file = new File([blob], filename, { type:"application/json" });
 
-        const fileName = generateFileName(exportData.session, includeAudio);
-        const jsonStr = JSON.stringify(exportData, null, 2);
-        const blob = new Blob([jsonStr], { type: 'application/json' });
-
-        if(tryShare){
-          if(navigator.share && navigator.canShare){
-            const file = new File([blob], fileName, { type: 'application/json' });
-            if(navigator.canShare({ files: [file] })){
-              try{
-                await navigator.share({
-                  files: [file],
-                  title: fileName,
-                  text: `SleepTracker 睡眠測定ログ: ${exportData.session.dateStr} (${exportData.session.startTime}〜${exportData.session.endTime})`
-                });
-                toast('共有を完了しました');
-                return;
-              }catch(e){
-                if(e.name !== 'AbortError'){
-                  console.warn('Share error, fallback to download:', e);
-                  downloadBlob(blob, fileName);
-                  toast('共有失敗のためダウンロードしました');
-                  return;
-                }
-                return;
-              }
-            }
-          }
-          downloadBlob(blob, fileName);
-          toast('共有非対応のためダウンロードしました');
-        }else{
-          downloadBlob(blob, fileName);
-          toast('JSONログを書き出しました');
-        }
-      }
-
-      // ===== 起床後ミニテスト（復活ロジック） =====
-      function setTestType(type) {
-        testType = type;
-        cleanupTests();
-
-        ['reaction', 'attention', 'memory'].forEach(t => {
-          const btn = document.getElementById(`btnTest-${t}`);
-          if (btn) btn.className = (t === type) ? 'btn btn-primary' : 'btn btn-soft';
-        });
-
-        const guideTitle = document.getElementById('testGuideTitle');
-        const guideSub = document.getElementById('testGuideSub');
-
-        if (type === 'reaction') {
-          guideTitle.textContent = '画面が「緑」に変わったら即タップ！';
-          guideSub.textContent = '「開始」を押すと待機画面（赤）になります';
-        } else if (type === 'attention') {
-          guideTitle.textContent = '「赤色の円」が現れた時だけタップ！';
-          guideSub.textContent = '青や緑は見送ってください（全5回）';
-        } else {
-          guideTitle.textContent = '光る色の順番を記憶して再現！';
-          guideSub.textContent = '4つの色が光ります。同じ順序でタップしてください';
-        }
-      }
-
-      function cleanupTests() {
-        clearTimeout(testTimer);
-        clearTimeout(attInterval);
-        testWaitingGreen = false;
-        memCanInput = false;
-
-        const guide = document.getElementById('testGuide');
-        if (guide) guide.classList.remove('hidden');
-        ['panelReaction', 'panelAttention', 'panelMemory', 'testResultBox'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.classList.add('hidden');
-        });
-        const area = document.getElementById('testArea');
-        if (area) {
-          area.style.background = '#f8fafc';
-          area.style.borderColor = '#cbd5e1';
-        }
-      }
-
-      function startCurrentTest() {
-        document.getElementById('testGuide').classList.add('hidden');
-        document.getElementById('testResultBox').classList.add('hidden');
-
-        if (testType === 'reaction') {
-          const p = document.getElementById('panelReaction');
-          p.classList.remove('hidden');
-          const area = document.getElementById('testArea');
-          area.style.background = '#ef4444';
-          area.style.borderColor = '#dc2626';
-          document.getElementById('reactPrompt').textContent = '待機中...';
-          document.getElementById('reactPrompt').style.color = '#fff';
-          document.getElementById('reactSubPrompt').textContent = '緑色に変わるまでタップ禁止';
-          document.getElementById('reactSubPrompt').style.color = '#fee2e2';
-
-          testWaitingGreen = false;
-          const delay = 1500 + Math.random() * 2000;
-          clearTimeout(testTimer);
-          testTimer = setTimeout(() => {
-            testWaitingGreen = true;
-            area.style.background = '#10b981';
-            area.style.borderColor = '#059669';
-            document.getElementById('reactPrompt').textContent = '今すぐタップ！';
-            document.getElementById('reactSubPrompt').textContent = '画面内をどこでもタップ';
-            testStartTime = Date.now();
-          }, delay);
-        } else if (testType === 'attention') {
-          const p = document.getElementById('panelAttention');
-          p.classList.remove('hidden');
-          attRemaining = 5;
-          attScore = { correct: 0, miss: 0, falseAlarm: 0, times: [] };
-          nextAttentionTrial();
-        } else if (testType === 'memory') {
-          const p = document.getElementById('panelMemory');
-          p.classList.remove('hidden');
-          memSequence = [
-            Math.floor(Math.random() * 4),
-            Math.floor(Math.random() * 4),
-            Math.floor(Math.random() * 4),
-            Math.floor(Math.random() * 4)
-          ];
-          memUserStep = 0;
-          memCanInput = false;
-          document.getElementById('memStatus').textContent = '光る順番をよく見て覚えてください...';
-          document.getElementById('memProgress').textContent = '系列長: 4ステップ (再生中)';
-
-          let stepIdx = 0;
-          const playSeq = () => {
-            if (stepIdx >= memSequence.length) {
-              memCanInput = true;
-              document.getElementById('memStatus').textContent = '【入力受付】覚えた順にタップ！';
-              document.getElementById('memProgress').textContent = '入力待ち: 0 / 4';
+        if(navigator.share && navigator.canShare){
+          try{
+            if(navigator.canShare({ files:[file] })){
+              await navigator.share({ title, text, files:[file] });
+              toast("共有しました");
               return;
             }
-            flashMemoryBtn(memSequence[stepIdx]);
-            stepIdx++;
-            testTimer = setTimeout(playSeq, 650);
-          };
-          testTimer = setTimeout(playSeq, 500);
-        }
-      }
-
-      function handleReactionTap() {
-        if (testType !== 'reaction') return;
-        if (!testWaitingGreen) {
-          clearTimeout(testTimer);
-          toast('お手付きです！緑色に変わる前にタップされました');
-          cleanupTests();
-          return;
-        }
-        const reactMs = Date.now() - testStartTime;
-        cleanupTests();
-        showResultDisplay(
-          '① 反応速度テスト',
-          `${reactMs} ms`,
-          reactMs < 270 ? '良好：ベースライン同等の素早い覚醒度' : '通常よりやや遅延（無理せず休息を）',
-          reactMs < 270 ? '#065f46' : 'var(--warn)'
-        );
-      }
-
-      function nextAttentionTrial() {
-        if (attRemaining <= 0) {
-          finishAttention();
-          return;
-        }
-        document.getElementById('attCount').textContent = `残り: ${attRemaining}回`;
-        attRemaining--;
-
-        const btn = document.getElementById('attCircleBtn');
-        btn.style.background = '#cbd5e1';
-        btn.textContent = '...';
-        btn.style.pointerEvents = 'none';
-        attIsTarget = false;
-
-        testTimer = setTimeout(() => {
-          attIsTarget = Math.random() < 0.6;
-          btn.style.pointerEvents = 'auto';
-          if (attIsTarget) {
-            btn.style.background = '#ef4444';
-            btn.textContent = '赤 (押す!)';
-            attTargetStartTime = Date.now();
-          } else {
-            const colors = ['#3b82f6', '#10b981', '#f59e0b'];
-            btn.style.background = colors[Math.floor(Math.random() * colors.length)];
-            btn.textContent = '見送り';
+          }catch{
+            toast("共有をキャンセルしました");
+            return;
           }
-
-          attInterval = setTimeout(() => {
-            if (attIsTarget) attScore.miss++;
-            nextAttentionTrial();
-          }, 1200);
-        }, 500);
-      }
-
-      function handleAttentionTap() {
-        clearTimeout(attInterval);
-        const btn = document.getElementById('attCircleBtn');
-        btn.style.pointerEvents = 'none';
-
-        if (attIsTarget) {
-          attScore.correct++;
-          attScore.times.push(Date.now() - attTargetStartTime);
-        } else {
-          attScore.falseAlarm++;
         }
-        testTimer = setTimeout(nextAttentionTrial, 300);
-      }
 
-      function finishAttention() {
-        cleanupTests();
-        const avg = attScore.times.length ? Math.round(attScore.times.reduce((a,b)=>a+b,0)/attScore.times.length) : 0;
-        const success = attScore.falseAlarm === 0 && attScore.correct >= 2;
-        showResultDisplay(
-          '② 注意テスト (赤色選択)',
-          `正答 ${attScore.correct}回 / 誤答 ${attScore.falseAlarm}回 (${avg}ms)`,
-          success ? '良好：注意維持力・抑制機能は正常' : 'やや散漫：見落とし・誤反応あり',
-          success ? '#065f46' : 'var(--warn)'
-        );
-      }
-
-      function flashMemoryBtn(idx) {
-        const btn = document.getElementById(`memBtn-${idx}`);
-        if (!btn) return;
-        btn.style.opacity = '1';
-        btn.style.transform = 'scale(1.08)';
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
         setTimeout(() => {
-          btn.style.opacity = '0.6';
-          btn.style.transform = 'scale(1)';
-        }, 300);
+          URL.revokeObjectURL(url);
+          a.remove();
+        }, 0);
+        toast("共有API非対応のためダウンロードしました");
       }
 
-      function handleMemoryTap(idx) {
-        if (!memCanInput) return;
-        flashMemoryBtn(idx);
+      function loadShareSelect(){
+        const sel = document.getElementById("shareSessionSelect");
+        const sessions = loadSessions();
+        sel.innerHTML = "";
+        if(!sessions.length){
+          sel.innerHTML = `<option value="">保存済みセッションなし</option>`;
+          document.getElementById("sharePreview").value = "";
+          return;
+        }
+        sessions.forEach(s => {
+          const op = document.createElement("option");
+          op.value = s.id;
+          op.textContent = `${s.dateStr} ${s.startTime}〜${s.endTime} / baseline ${Number(s.baselineDb).toFixed(1)}dB`;
+          sel.appendChild(op);
+        });
+        sel.onchange = () => updateSharePreview();
+        updateSharePreview();
+      }
 
-        if (idx !== memSequence[memUserStep]) {
-          memCanInput = false;
-          toast(`順番が違いました（正解は ${memUserStep + 1}番目が別の色でした）`);
-          cleanupTests();
-          showResultDisplay(
-            '③ 記憶系列テスト',
-            `再現成功: ${memUserStep} / 4ステップ`,
-            '通常ベースラインより低下（疲労の可能性あり）',
-            'var(--warn)'
-          );
+      function updateSharePreview(){
+        const s = getSelectedShareSession();
+        const ta = document.getElementById("sharePreview");
+        if(!s){
+          ta.value = "";
+          return;
+        }
+        const full = buildFullLog(s);
+        ta.value = JSON.stringify(full, null, 2).slice(0, 4000);
+      }
+
+      function exportFullLog(){
+        const s = getSelectedShareSession();
+        if(!s){ toast("セッションがありません"); return; }
+        const full = buildFullLog(s);
+        const name = `SleepTracker_full_${s.dateStr.replaceAll("/","-")}_${String(s.startTime).replace(":","")}.json`;
+        downloadJSON(full, name);
+        toast("完全ログを書き出しました");
+      }
+
+      async function shareFullLog(){
+        const s = getSelectedShareSession();
+        if(!s){ toast("セッションがありません"); return; }
+        const full = buildFullLog(s);
+        const content = JSON.stringify(full, null, 2);
+        const blob = new Blob([content], { type:"application/json;charset=utf-8" });
+        const name = `SleepTracker_full_${s.dateStr.replaceAll("/","-")}_${String(s.startTime).replace(":","")}.json`;
+        await shareBlobOrDownload(blob, name, "SleepTracker 完全ログ", "睡眠測定ログ（完全版）");
+      }
+
+      function exportLiteLog(){
+        const s = getSelectedShareSession();
+        if(!s){ toast("セッションがありません"); return; }
+        const lite = buildLiteLog(s);
+        const name = `SleepTracker_lite_${s.dateStr.replaceAll("/","-")}_${String(s.startTime).replace(":","")}.json`;
+        downloadJSON(lite, name);
+        toast("軽量ログを書き出しました");
+      }
+
+      async function shareLiteLog(){
+        const s = getSelectedShareSession();
+        if(!s){ toast("セッションがありません"); return; }
+        const lite = buildLiteLog(s);
+        const content = JSON.stringify(lite, null, 2);
+        const blob = new Blob([content], { type:"application/json;charset=utf-8" });
+        const name = `SleepTracker_lite_${s.dateStr.replaceAll("/","-")}_${String(s.startTime).replace(":","")}.json`;
+        await shareBlobOrDownload(blob, name, "SleepTracker 解析用軽量ログ", "睡眠測定ログ（軽量版）");
+      }
+
+      function loadDoctorSelect(){
+        const sel = document.getElementById("doctorSessionSelect");
+        const sessions = loadSessions();
+        sel.innerHTML = "";
+        if(!sessions.length){
+          sel.innerHTML = `<option value="">保存済みセッションなし</option>`;
+          clearDoctorSummary();
+          return;
+        }
+        sessions.forEach(s => {
+          const op = document.createElement("option");
+          op.value = s.id;
+          op.textContent = `${s.dateStr} ${s.startTime}〜${s.endTime}`;
+          sel.appendChild(op);
+        });
+        onDoctorSessionChange(sessions[0].id);
+      }
+
+      function clearDoctorSummary(){
+        document.getElementById("docTime").textContent = "--:--〜--:--";
+        document.getElementById("docDur").textContent = "--分";
+        document.getElementById("docBase").textContent = "-- dB";
+        document.getElementById("docBrux").textContent = "--件";
+        document.getElementById("docSnore").textContent = "--分";
+        document.getElementById("docMaxG").textContent = "-- G";
+        document.getElementById("docNote").textContent = "セッションを選択してください。";
+        document.getElementById("docPeakList").innerHTML = "";
+      }
+
+      function loadDoctorPeaksForSelected(sessionId){
+        const list = document.getElementById("docPeakList");
+        const peaks = loadPeakStore().filter(p => String(p.sessionId) === String(sessionId));
+        if(!peaks.length){
+          list.innerHTML = '<div class="muted">このセッションのピーク録音はありません。</div>';
+          return;
+        }
+        list.innerHTML = peaks.map((p, i) => `
+          <div class="card" style="padding:8px;">
+            <div class="row" style="justify-content:space-between;">
+              <strong>${esc(p.time)} / ${esc(p.type)}</strong>
+              <span class="badge b-amber">+${Number(p.dDb).toFixed(1)} dB</span>
+            </div>
+            <div class="muted">音圧 ${Number(p.db).toFixed(1)} dB / 体動 ${Number(p.g).toFixed(2)} G / baseline ${Number(p.baseline).toFixed(1)} dB</div>
+            <audio controls preload="metadata" style="width:100%;margin-top:6px;">
+              <source src="${esc(p.audioBase64)}" type="audio/webm">
+            </audio>
+            <button class="btn btn-soft" style="margin-top:6px;" onclick="App.playDoctorPeakByIndex('${esc(p.id)}')">再生</button>
+          </div>
+        `).join("");
+      }
+
+      function playDoctorPeakByIndex(peakId){
+        const p = loadPeakStore().find(x => String(x.id) === String(peakId));
+        if(!p || !p.audioBase64){
+          toast("録音データがありません");
+          return;
+        }
+        const a = new Audio(p.audioBase64);
+        a.play().catch(() => toast("再生失敗"));
+      }
+
+      function onDoctorSessionChange(sessionId){
+        const sessions = loadSessions();
+        const s = sessions.find(x => String(x.id) === String(sessionId)) || sessions[0];
+        if(!s){
+          clearDoctorSummary();
           return;
         }
 
-        memUserStep++;
-        document.getElementById('memProgress').textContent = `入力中: ${memUserStep} / 4`;
+        document.getElementById("docTime").textContent = `${s.startTime}〜${s.endTime}`;
+        document.getElementById("docDur").textContent = `${Math.round((s.durationSec||0)/60)}分`;
+        document.getElementById("docBase").textContent = `${Number(s.baselineDb||0).toFixed(1)} dB`;
+        document.getElementById("docBrux").textContent = `${s.bruxismEvents||0}件`;
+        document.getElementById("docSnore").textContent = `${s.snoreMin||0}分`;
+        document.getElementById("docMaxG").textContent = `${Number(s.maxMotionG||0).toFixed(2)} G`;
 
-        if (memUserStep >= memSequence.length) {
-          memCanInput = false;
-          cleanupTests();
-          showResultDisplay(
-            '③ 記憶系列テスト',
-            '完全再現 (4/4 成功)',
-            '短期記憶力・集中力はベースライン同等',
-            '#065f46'
-          );
+        const logs = s.eventLogs || [];
+        if(logs.length){
+          const tail = logs.slice(-12).map(ev => {
+            const ja = ev.type === "snore" ? "いびき" : ev.type === "bruxism" ? "歯ぎしり" : ev.type === "sleep_talk" ? "寝言" : ev.type;
+            return `${ev.hhmm} ${ja}(+${ev.dDb}dB)`;
+          }).join(" / ");
+          document.getElementById("docNote").innerHTML = `睡眠実測時間: <strong>${Math.round((s.durationSec||0)/60)}分</strong><br>イベント記録: ${logs.length}件<br><span style="font-size:12px;color:#475569;">${esc(tail)}</span>`;
+        }else{
+          document.getElementById("docNote").innerHTML = `睡眠実測時間: <strong>${Math.round((s.durationSec||0)/60)}分</strong><br>イベント記録なし`;
         }
+
+        loadDoctorPeaksForSelected(s.id);
       }
 
-      function showResultDisplay(title, score, comp, compColor) {
-        const box = document.getElementById('testResultBox');
-        box.classList.remove('hidden');
-        document.getElementById('resTestTitle').textContent = title;
-        document.getElementById('resScoreVal').textContent = score;
-        const compEl = document.getElementById('resCompVal');
-        compEl.textContent = comp;
-        compEl.style.color = compColor;
-        toast(`${title} 完了`);
+      function bindStartButton(){
+        const btn = document.getElementById("btnStart");
+        btn.addEventListener("click", async (e) => {
+          e.preventDefault();
+          await startMeasurement();
+        }, { passive:false });
       }
 
       function init(){
         initBars();
-        document.getElementById('btnStart').addEventListener('click', async (e)=>{
-          e.preventDefault();
-          await startMeasurement();
-        }, { passive:false });
-
-        checkMotionPermissionUI();
-        loadPeakEventsFromStorage();
-        loadHistory();
-        document.getElementById('baselineLabel').textContent=`● ベースライン: ${baselineDb.toFixed(1)} dB`;
+        bindStartButton();
+        setupMotionUI();
+        loadHistoryUI();
+        loadShareSelect();
+        loadDoctorSelect();
         runPreflight();
         updateRuleText();
-        setInterval(updateDebug, 500);
+        document.getElementById("baselineLabel").textContent = `● ベースライン: ${baselineDb.toFixed(1)} dB`;
+        updateDebug();
       }
 
       return {
-        init, switchRole, switchTab, requestSensorPermission, runPreflight,
-        calibrateBaseline, startMeasurement, stopMeasurement, toggleBlackout,
-        onDoctorSessionChange, onShareSessionChange, exportSessionLog, playPeakAudio, playPeakByIndex, clearPeakEvents, clearAllLogs,
-        setTestType, startCurrentTest, handleReactionTap, handleAttentionTap, handleMemoryTap
+        init,
+        runPreflight,
+        requestMotionPermission,
+        calibrateBaseline,
+        startMeasurement,
+        stopMeasurement,
+        toggleBlackout,
+        switchMode,
+        switchPatientTab,
+        clearAllData,
+        clearPeakEvents,
+        playPeakByIndex,
+        setDayTest,
+        startCurrentDayTest,
+        onReactionTap,
+        onAttentionTap,
+        onMemoryTap,
+        exportFullLog,
+        shareFullLog,
+        exportLiteLog,
+        shareLiteLog,
+        onDoctorSessionChange,
+        playDoctorPeakByIndex
       };
     })();
 
-    window.addEventListener('DOMContentLoaded', ()=>App.init());
+    window.addEventListener("DOMContentLoaded", () => {
+      App.init();
+    });
   </script>
 </body>
 </html>
