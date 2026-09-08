@@ -46,7 +46,7 @@
   </style>
 </head>
 <body>
-  <div id="toast"></div>
+  <div id=\"toast\"></div>
 
   <div id="blackout" onclick="App.toggleBlackout(false)">
     <div id="blackoutClock">00:00</div>
@@ -154,7 +154,41 @@
       </div>
 
       <div id="panel-day" class="hidden"><div class="card">昼間テスト（プレースホルダ）</div></div>
-      <div id="panel-share" class="hidden"><div class="card">共有（プレースホルダ）</div></div>
+
+      <!-- 共有タブ -->
+      <div id="panel-share" class="hidden col">
+        <div class="card col">
+          <div>
+            <strong>測定ログの書き出し・共有</strong>
+            <div class="muted">保存された実測データをJSON形式で書き出し、調査・分析に活用できます。</div>
+          </div>
+
+          <div class="col" style="gap:4px">
+            <label for="shareSelect" style="font-size:12px;font-weight:700;color:#334155">対象測定セッション</label>
+            <select id="shareSelect" onchange="App.onShareSessionChange(this.value)"></select>
+          </div>
+
+          <div id="shareSummary" class="card" style="background:#f8fafc;padding:10px;font-size:13px;line-height:1.6">
+            対象の測定データがありません。
+          </div>
+
+          <div class="col" style="gap:8px">
+            <div class="row">
+              <button id="btnDownloadFull" class="btn btn-primary" style="flex:1" onclick="App.exportSessionLog(true, false)">完全ログを書き出す (.json)</button>
+              <button id="btnShareFull" class="btn btn-soft" style="flex:1" onclick="App.exportSessionLog(true, true)">共有 (完全版)</button>
+            </div>
+            <div class="row">
+              <button id="btnDownloadLight" class="btn btn-soft" style="flex:1" onclick="App.exportSessionLog(false, false)">解析用ログ (録音除外・軽量)</button>
+              <button id="btnShareLight" class="btn btn-soft" style="flex:1" onclick="App.exportSessionLog(false, true)">共有 (軽量版)</button>
+            </div>
+          </div>
+
+          <div class="muted" style="line-height:1.4">
+            ※「完全ログ」には端末に記録された3秒ピーク音声（Base64）を含みます。<br>
+            ※「共有」ボタンは対応端末（Android Chrome等）でGoogle Driveやメール等へ直接渡せます。未対応時は自動でダウンロードされます。
+          </div>
+        </div>
+      </div>
     </section>
 
     <section id="doctorView" class="hidden col">
@@ -169,7 +203,7 @@
         <div id="docStats">最大体動: -- G / いびき疑い: --分</div>
         <div id="docNote" class="muted">--</div>
         <audio id="docAudio" controls style="width:100%;display:none"></audio>
-        <button class="btn btn-primary" onclick="App.playPeakAudio()">録音再生</button>
+        <button class="btn btn-primary" onclick="App.playPeakAudio()\">録音再生</button>
       </div>
     </section>
   </main>
@@ -577,10 +611,14 @@ lastTrigger=${lastTrigger}`;
         const arr=JSON.parse(localStorage.getItem('sleep_sessions')||'[]');
         const list=document.getElementById('historyList');
         const sel=document.getElementById('docSelect');
-        list.innerHTML=''; sel.innerHTML='';
+        const shareSel=document.getElementById('shareSelect');
+        list.innerHTML=''; sel.innerHTML=''; if(shareSel) shareSel.innerHTML='';
+
         if(!arr.length){
           list.innerHTML='<div class="muted">まだ測定履歴がありません。</div>';
           sel.innerHTML='<option value="">保存済みセッションなし</option>';
+          if(shareSel) shareSel.innerHTML='<option value="">保存済み測定なし</option>';
+          updateShareSummary(null);
           renderPeakEvents(); return;
         }
 
@@ -596,11 +634,49 @@ lastTrigger=${lastTrigger}`;
           o.value=s.id;
           o.textContent=`${s.dateStr} (${s.startTime}〜${s.endTime}) baseline:${Number(s.baselineDb||baselineDb).toFixed(1)}dB`;
           sel.appendChild(o);
+
+          if(shareSel){
+            const so=document.createElement('option');
+            so.value=s.id;
+            so.textContent=`${s.dateStr} ${s.startTime}〜${s.endTime} (${Math.round(s.durationSec/60)}分)`;
+            shareSel.appendChild(so);
+          }
+
           if(i===0) selectedSession=s;
         });
 
-        if(arr[0]) onDoctorSessionChange(arr[0].id);
+        if(arr[0]){
+          onDoctorSessionChange(arr[0].id);
+          if(shareSel) shareSel.value=arr[0].id;
+          updateShareSummary(arr[0]);
+        }
         renderPeakEvents();
+      }
+
+      function updateShareSummary(s){
+        const box=document.getElementById('shareSummary');
+        if(!box) return;
+        if(!s){
+          box.innerHTML='<span class="muted">測定履歴が存在しません。</span>';
+          return;
+        }
+        const hasAudio=!!(s.peakAudioBase64 && s.peakAudioBase64.length>100);
+        const aLen=s.audioSamples?s.audioSamples.length:0;
+        const gLen=s.accelSamples?s.accelSamples.length:0;
+        const evLen=s.eventLogs?s.eventLogs.length:0;
+        box.innerHTML=`
+          <div><strong>測定日時:</strong> ${esc(s.dateStr)} ${esc(s.startTime)} 〜 ${esc(s.endTime)} (${Math.round(s.durationSec/60)}分)</div>
+          <div><strong>ベースライン音圧:</strong> ${Number(s.baselineDb||0).toFixed(1)} dB</div>
+          <div><strong>記録サンプル数:</strong> 音圧 ${aLen}件 / 加速度 ${gLen}件 / イベント ${evLen}件</div>
+          <div><strong>セッション録音:</strong> ${hasAudio ? '<span style="color:#10b981;font-weight:700">あり (Base64保持)</span>' : '<span class="muted">なし</span>'}</div>
+          <div><strong>保存済みピークイベント総数:</strong> ${peakEvents.length} 件</div>
+        `;
+      }
+
+      function onShareSessionChange(id){
+        const arr=JSON.parse(localStorage.getItem('sleep_sessions')||'[]');
+        const s=arr.find(x=>String(x.id)===String(id))||arr[0]||null;
+        updateShareSummary(s);
       }
 
       function onDoctorSessionChange(id){
@@ -681,6 +757,115 @@ lastTrigger=${lastTrigger}`;
         if(on) b.classList.add('active'); else b.classList.remove('active');
       }
 
+      // ===== ログ書き出し・共有機能 =====
+      function buildExportData(includeAudio){
+        const sel=document.getElementById('shareSelect');
+        const sid=sel ? sel.value : null;
+        const arr=JSON.parse(localStorage.getItem('sleep_sessions')||'[]');
+        const targetSession=arr.find(x=>String(x.id)===String(sid)) || arr[0];
+
+        if(!targetSession){
+          return null;
+        }
+
+        // セッションオブジェクトの複製（元データを壊さない）
+        let sessionObj = JSON.parse(JSON.stringify(targetSession));
+        let exportPeakEvents = JSON.parse(JSON.stringify(peakEvents));
+
+        if(!includeAudio){
+          sessionObj.peakAudioBase64 = sessionObj.peakAudioBase64 ? '[EXCLUDED: lightweight mode]' : '';
+          exportPeakEvents = exportPeakEvents.map(e => {
+            const copy = {...e};
+            copy.audioBase64 = copy.audioBase64 ? '[EXCLUDED: lightweight mode]' : '';
+            return copy;
+          });
+        }
+
+        // 現在の日本時間ISO形式文字列
+        const now = new Date();
+        const exportDateStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString();
+
+        return {
+          exportInfo: {
+            appName: 'SleepTracker',
+            exportDate: exportDateStr,
+            formatVersion: '1.0',
+            includeAudio: includeAudio
+          },
+          session: sessionObj,
+          allPeakEvents: exportPeakEvents
+        };
+      }
+
+      function generateFileName(sessionObj, includeAudio){
+        let datePart = 'unknown';
+        if(sessionObj && sessionObj.id){
+          const d = new Date(sessionObj.id);
+          const y = d.getFullYear();
+          const m = String(d.getMonth()+1).padStart(2,'0');
+          const day = String(d.getDate()).padStart(2,'0');
+          const hh = String(d.getHours()).padStart(2,'0');
+          const mm = String(d.getMinutes()).padStart(2,'0');
+          datePart = `${y}${m}${day}_${hh}${mm}`;
+        }
+        const suffix = includeAudio ? 'full' : 'light';
+        return `SleepTracker_${datePart}_${suffix}.json`;
+      }
+
+      function downloadBlob(blob, fileName){
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      async function exportSessionLog(includeAudio, tryShare){
+        const exportData = buildExportData(includeAudio);
+        if(!exportData){
+          toast('書き出す測定データがありません');
+          return;
+        }
+
+        const fileName = generateFileName(exportData.session, includeAudio);
+        const jsonStr = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+
+        if(tryShare){
+          if(navigator.share && navigator.canShare){
+            const file = new File([blob], fileName, { type: 'application/json' });
+            if(navigator.canShare({ files: [file] })){
+              try{
+                await navigator.share({
+                  files: [file],
+                  title: fileName,
+                  text: `SleepTracker 睡眠測定ログ: ${exportData.session.dateStr} (${exportData.session.startTime}〜${exportData.session.endTime})`
+                });
+                toast('共有を完了しました');
+                return;
+              }catch(e){
+                if(e.name !== 'AbortError'){
+                  console.warn('Share error, fallback to download:', e);
+                  downloadBlob(blob, fileName);
+                  toast('共有失敗のためダウンロードしました');
+                  return;
+                }
+                return; // ユーザーキャンセル時は何もしない
+              }
+            }
+          }
+          // Web Share非対応環境へのフォールバック
+          downloadBlob(blob, fileName);
+          toast('共有非対応のためダウンロードしました');
+        }else{
+          downloadBlob(blob, fileName);
+          toast('JSONログを書き出しました');
+        }
+      }
+
       function init(){
         initBars();
         document.getElementById('btnStart').addEventListener('click', async (e)=>{
@@ -700,7 +885,7 @@ lastTrigger=${lastTrigger}`;
       return {
         init, switchRole, switchTab, requestSensorPermission, runPreflight,
         calibrateBaseline, startMeasurement, stopMeasurement, toggleBlackout,
-        onDoctorSessionChange, playPeakAudio, playPeakByIndex, clearPeakEvents, clearAllLogs
+        onDoctorSessionChange, onShareSessionChange, exportSessionLog, playPeakAudio, playPeakByIndex, clearPeakEvents, clearAllLogs
       };
     })();
 
