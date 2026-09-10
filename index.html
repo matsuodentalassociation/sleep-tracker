@@ -213,7 +213,7 @@
                 <span style="color:var(--apnea);">● 無呼吸疑い</span>
               </div>
             </div>
-            <div class="muted">上部: 音量(dB) / 下部: 体動(G) ※PC測定時は体動は常に0（平坦）になります</div>
+            <div class="muted">上部: 音量(dB) / 下部: 体動(G)（寝返り・体の傾きを青色で表示）</div>
             <div style="width: 100%; height: 220px; background: #020617; border-radius: 8px; position: relative; overflow: hidden; border: 1px solid #1e293b;">
               <canvas id="detailTimelineCanvas" style="width: 100%; height: 100%; display: block;"></canvas>
             </div>
@@ -352,7 +352,7 @@
   <script>
     // 起動時自動キャッシュクリア・最新化スクリプト
     (function checkCacheBust() {
-      const CURRENT_APP_VERSION = "2026-09-10_v7_direct_detail_fixed";
+      const CURRENT_APP_VERSION = "2026-09-10_v8_motion_boost";
       const savedVersion = localStorage.getItem("app_cache_version");
 
       if (savedVersion !== CURRENT_APP_VERSION) {
@@ -480,7 +480,9 @@
       let isCapturingPeak = false, peakCooldownUntil = 0;
 
       let motionBound = false, motionActive = false, gotMotion = false;
-      let lastAccel = { x:0, y:0, z:0 }, currentG = 0, maxG = 0;
+      let gravity = { x: 0, y: 0, z: 0 };
+      let hasInitGravity = false;
+      let currentG = 0, maxG = 0;
       let currentDb = 32.0, baselineDb = 32.0, dbWindow = [], gWindow = [];
 
       let audioSamples = [], accelSamples = [], bruxCounter = 0, snoreMinutes = 0;
@@ -493,10 +495,15 @@
       let recentSnoreExpiry = 0;
       let silenceStartSec = null;
 
+      // 感度調整（体動・寝返りを逃さない設定）
       const CFG = {
         sampleMs: 120, peakDbDelta: 10, snoreDbMin: 6, snoreDbMax: 16, bruxDbMin: 14,
-        talkDbMin: 9, talkDbMax: 20, gPeakOffset: 0.08, gMoveOffset: 0.05,
-        gPeakFloor: 0.12, gPeakCeil: 0.28, cooldownMs: 45000,
+        talkDbMin: 9, talkDbMax: 20,
+        gPeakOffset: 0.04,
+        gMoveOffset: 0.02,
+        gPeakFloor: 0.05,
+        gPeakCeil: 0.20,
+        cooldownMs: 45000,
         apneaSilenceMinSec: 10, apneaSilenceMaxSec: 45
       };
 
@@ -553,7 +560,7 @@
       }
       function pushWin(arr,v,max){ arr.push(v); if(arr.length>max) arr.shift(); }
       function dynGPeakThreshold(){ return Math.min(CFG.gPeakCeil, Math.max(CFG.gPeakFloor, median(gWindow) + CFG.gPeakOffset)); }
-      function dynGMoveThreshold(){ return Math.max(0.06, median(gWindow) + CFG.gMoveOffset); }
+      function dynGMoveThreshold(){ return Math.max(0.025, median(gWindow) + CFG.gMoveOffset); }
 
       async function toggleBlackout(on){
         const b = document.getElementById("blackout");
@@ -648,6 +655,7 @@
         }
       }
 
+      // 傾き・寝返りを高感度＆自然に検出するハイパス加速度フィルター
       function bindMotion(){
         if(motionBound) return;
         motionBound = true;
@@ -656,12 +664,32 @@
           if(!a || a.x == null) return;
           gotMotion = true;
           motionActive = true;
-          const dx = Math.abs((a.x||0)-lastAccel.x);
-          const dy = Math.abs((a.y||0)-lastAccel.y);
-          const dz = Math.abs((a.z||0)-lastAccel.z);
-          lastAccel = { x:a.x||0, y:a.y||0, z:a.z||0 };
-          const dg = Math.sqrt(dx*dx + dy*dy + dz*dz) / 9.8;
-          currentG = Math.max(0, dg - 0.03);
+
+          const ax = a.x || 0;
+          const ay = a.y || 0;
+          const az = a.z || 0;
+
+          if (!hasInitGravity) {
+            gravity = { x: ax, y: ay, z: az };
+            hasInitGravity = true;
+            return;
+          }
+
+          // 重力成分のローパス追従（傾きの基準軸）
+          const alpha = 0.82;
+          gravity.x = alpha * gravity.x + (1 - alpha) * ax;
+          gravity.y = alpha * gravity.y + (1 - alpha) * ay;
+          gravity.z = alpha * gravity.z + (1 - alpha) * az;
+
+          // 端末の急な傾き・寝返りによる体動加速度
+          const lx = ax - gravity.x;
+          const ly = ay - gravity.y;
+          const lz = az - gravity.z;
+
+          const rawG = Math.sqrt(lx*lx + ly*ly + lz*lz) / 9.80665;
+          // 微細な端末ノイズ(0.008G以下)のみ除去し、寝返りの揺れを確実に取得
+          currentG = rawG < 0.008 ? 0 : rawG;
+
           if(isRecording && currentG > maxG) maxG = currentG;
           const vg = document.getElementById("valG");
           if(vg) vg.textContent = `${currentG.toFixed(2)} G`;
@@ -865,7 +893,7 @@
 
       function classifyPeakType(db, g){
         const d = db - baselineDb;
-        if(gotMotion && g >= dynGPeakThreshold()) return "急な体動/音響";
+        if(gotMotion && g >= dynGPeakThreshold()) return "急な体動/寝返り";
         if(d >= 16) return "大きないびき/音響";
         if(d >= CFG.peakDbDelta) return "通常いびき";
         return "イベント";
@@ -1720,7 +1748,8 @@
           ctx.fillRect(x, y, Math.max(1, step), h);
         }
 
-        const accelHeight = height * 0.3;
+        // 体動（青）の描画スケール：0.15G程度で波形がしっかり立ち上がる感度に最適化
+        const accelHeight = height * 0.35;
         const accelYOffset = height;
         ctx.beginPath();
         ctx.moveTo(0, accelYOffset);
@@ -1729,11 +1758,11 @@
           const srcIdx = Math.min(len - 1, i * stride);
           const g = accelData ? (accelData[srcIdx] || 0) : 0;
           const x = i * step;
-          const h = Math.min(1, g / 0.5) * accelHeight;
+          const h = Math.min(1, g / 0.15) * accelHeight;
           ctx.lineTo(x, accelYOffset - h);
         }
         ctx.lineTo(width, accelYOffset);
-        ctx.fillStyle = 'rgba(59, 130, 246, 0.5)';
+        ctx.fillStyle = 'rgba(59, 130, 246, 0.6)';
         ctx.fill();
 
         if(apneaLogs && apneaLogs.length > 0 && durationSec > 0){
