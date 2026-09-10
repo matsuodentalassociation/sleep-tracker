@@ -41,7 +41,7 @@
     .b-amber{ background:#fef3c7; color:#92400e; }
     .b-purple{ background:#f3e8ff; color:#6b21a8; }
     .tabs{ display:flex; overflow:auto; border:1px solid var(--line); border-radius:12px; background:#fff; scrollbar-width:none; }
-    .tab{ border:none; background:transparent; min-width:90px; padding:10px 10px; color:#475569; font-size:12px; font-weight:800; border-bottom:2px solid transparent; cursor:pointer; flex:1; }
+    .tab{ border:none; background:transparent; min-width:90px; padding:10px 10px; color:#475569; font-size:12px; font-weight:800; border-bottom:2px solid transparent; cursor:pointer; flex:1; text-align:center; }
     .tab.active{ color:var(--primary); border-bottom-color:var(--primary); }
     .muted{ font-size:12px; color:var(--muted); }
     .mono{ font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
@@ -59,27 +59,11 @@
     .dbg{ background:#0b1220; color:#dbeafe; border:1px solid #22314f; border-radius:10px; padding:10px; font-size:12px; line-height:1.45; white-space:pre-wrap; min-height:142px; }
     .list{ display:flex; flex-direction:column; gap:8px; }
     select,textarea{ width:100%; border:1px solid var(--line); border-radius:10px; padding:10px; font-size:13px; background:#fff; color:var(--text); }
-    .test-box{ height:300px; border:2px dashed #cbd5e1; border-radius:14px; background:#f8fafc; display:flex; align-items:center; justify-content:center; flex-direction:column; user-select:none; position:relative; overflow:hidden; }
-    .circle-btn{ width:92px; height:92px; border-radius:999px; border:0; color:#fff; font-size:13px; font-weight:800; cursor:pointer; }
-    .mem-grid{ display:grid; grid-template-columns:repeat(2,70px); gap:10px; }
-    .mem-cell{ height:70px; border:0; border-radius:10px; opacity:.6; transition:transform .15s, opacity .15s; cursor:pointer; }
     .share-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
     .summary-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
     .sum{ border:1px solid var(--line); background:#f8fafc; border-radius:8px; padding:10px; }
     .sum .k{ font-size:11px; color:#64748b; margin-bottom:2px; }
     .sum .v{ font-weight:900; font-size:18px; color:#0f172a; }
-    .progress-pill{ display:inline-flex; align-items:center; justify-content:center; border-radius:999px; padding:4px 10px; background:#e0e7ff; color:#3730a3; font-weight:800; font-size:12px; }
-    .modal-backdrop{ position:fixed; inset:0; background:rgba(2,6,23,.55); z-index:120; display:none; align-items:center; justify-content:center; padding:16px; }
-    .modal-backdrop.active{ display:flex; }
-    .modal{ width:min(94vw,480px); background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; box-shadow:0 10px 30px rgba(2,6,23,.25); display:flex; flex-direction:column; gap:12px; }
-    .modal h3{ font-size:18px; line-height:1.2; }
-    .modal p{ font-size:13px; color:#334155; line-height:1.6; }
-
-    .waveform-box{width:100%;height:60px;background:#020617;border-radius:6px;position:relative;overflow:hidden;cursor:pointer;margin-top:6px; border:1px solid #1e293b;}
-    .wave-canvas{width:100%;height:100%;display:block;}
-    .play-cursor{position:absolute;top:0;bottom:0;left:0;width:2px;background:var(--danger);pointer-events:none;display:none;}
-    .play-btn-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,0.2);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;pointer-events:none; backdrop-filter: blur(2px);}
-    .play-btn-overlay::after{content:"▶";color:white;font-size:16px;margin-left:3px;}
 
     @media (max-width:740px){
       .share-grid,.summary-grid,.kv{ grid-template-columns:1fr; }
@@ -92,17 +76,6 @@
   <div id="blackout" onclick="App.toggleBlackout(false)">
     <div id="blackoutClock">00:00</div>
     <div class="muted" style="margin-top:8px;color:#475569;">🌙 就寝モード（タップで復帰）</div>
-  </div>
-
-  <div id="wakeCheckModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="wakeCheckTitle">
-    <div class="modal">
-      <h3 id="wakeCheckTitle">☀️ 起床後チェック</h3>
-      <p>脳の目覚め度（反射神経・判断力・短期記憶）をサクッと測定しませんか？</p>
-      <div class="row" style="justify-content:flex-end;flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="App.goConditionNow()">今すぐチェックする</button>
-        <button class="btn btn-soft" onclick="App.skipConditionNow()">スキップする / あとで</button>
-      </div>
-    </div>
   </div>
 
   <header class="top">
@@ -126,7 +99,6 @@
       <div class="tabs">
         <button id="tab-measure" class="tab active" onclick="App.switchPatientTab('measure')">測定</button>
         <button id="tab-history" class="tab" onclick="App.switchPatientTab('history')">履歴</button>
-        <button id="tab-condition" class="tab" onclick="App.switchPatientTab('condition')">コンディションcheck</button>
         <button id="tab-share" class="tab" onclick="App.switchPatientTab('share')">共有</button>
       </div>
 
@@ -181,7 +153,7 @@
         </div>
       </div>
 
-      <!-- 履歴タブ（直接詳細画面を表示） -->
+      <!-- 履歴タブ -->
       <div id="panel-history" class="hidden col">
         <div class="card col">
           <div class="row" style="justify-content:space-between;">
@@ -202,14 +174,13 @@
               <div class="sum"><div class="k">最大音量</div><div id="detMaxDb" class="v">-- dB</div></div>
               <div class="sum"><div class="k">最大体動</div><div id="detMaxG" class="v">-- G</div></div>
             </div>
-            <div class="muted" style="font-size:11px;color:#64748b;">※無呼吸疑い・簡易AHIは診断値ではなく、いびき直後の静寂を捉えた音響参考目安です。</div>
           </div>
 
           <div class="card col">
             <div class="row" style="justify-content:space-between;">
               <strong>音量 ＆ 体動タイムライン</strong>
               <div class="row" style="gap:12px;font-size:11px;">
-                <span style="color:#ef4444;">● ピーク録音</span>
+                <span style="color:#ef4444;">● ピークイベント</span>
                 <span style="color:var(--apnea);">● 無呼吸疑い</span>
               </div>
             </div>
@@ -217,72 +188,6 @@
             <div style="width: 100%; height: 220px; background: #020617; border-radius: 8px; position: relative; overflow: hidden; border: 1px solid #1e293b;">
               <canvas id="detailTimelineCanvas" style="width: 100%; height: 100%; display: block;"></canvas>
             </div>
-          </div>
-
-          <div class="card col">
-            <div class="row" style="justify-content:space-between;">
-              <strong>録音データ（ノイズ低減再生）</strong>
-              <span class="badge b-green">ホワイトノイズ除去済</span>
-            </div>
-            <div class="muted" style="margin-bottom: 8px;">ピーク音量や無呼吸後のあえぎ呼吸を検知した際の録音です（高周波雑音を低減して再生）。</div>
-            <div id="detailPeakList" class="list"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- コンディションcheckタブ -->
-      <div id="panel-condition" class="hidden col">
-        <div class="card col">
-          <div class="row" style="justify-content:space-between;align-items:flex-start;">
-            <div>
-              <strong>コンディションcheck</strong>
-              <div class="muted">起床後の反射神経・判断力・短期記憶を3連続で測定</div>
-            </div>
-            <span id="condProgressPill" class="progress-pill">待機中</span>
-          </div>
-
-          <div id="condGuide" class="col" style="background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:10px;">
-            <div style="font-size:13px;font-weight:800;">ワンストップ測定</div>
-            <div id="condGuideText" class="muted">「チェック開始」で 1/3→2/3→3/3 を自動実行します。</div>
-            <button id="btnConditionStart" class="btn btn-primary" onclick="App.startConditionFlow()">チェック開始</button>
-          </div>
-
-          <div id="condTestBox" class="test-box">
-            <div id="condIdlePanel" class="col" style="align-items:center;text-align:center;padding:12px;">
-              <strong>準備OK</strong>
-              <div class="muted">チェック開始を押すとすぐ開始します</div>
-            </div>
-
-            <div id="condReactionPanel" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;" onclick="App.onConditionReactionTap()">
-              <div id="condReactionMain" style="font-size:24px;font-weight:900;color:#fff;">待機中...</div>
-              <div id="condReactionSub" style="font-size:11px;color:#fee2e2;">画面が緑になるまでタップしないでください</div>
-            </div>
-
-            <div id="condAttentionPanel" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:12px;">
-              <div class="row" style="justify-content:space-between;width:100%;">
-                <strong style="font-size:12px;">赤色の円が出た時だけタップ！（全5回）</strong>
-                <span id="condAttRemain" style="font-size:12px;">残り: 5回</span>
-              </div>
-              <button id="condAttCircle" class="circle-btn" onclick="App.onConditionAttentionTap()">...</button>
-              <div class="muted">青・緑は見送り</div>
-            </div>
-
-            <div id="condMemoryPanel" class="hidden" style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:12px;">
-              <div id="condMemStatus" style="font-size:12px;font-weight:800;">4色の順番を覚えてください...</div>
-              <div class="mem-grid">
-                <button id="condMem-0" class="mem-cell" style="background:#ef4444;" onclick="App.onConditionMemoryTap(0)"></button>
-                <button id="condMem-1" class="mem-cell" style="background:#3b82f6;" onclick="App.onConditionMemoryTap(1)"></button>
-                <button id="condMem-2" class="mem-cell" style="background:#f59e0b;" onclick="App.onConditionMemoryTap(2)"></button>
-                <button id="condMem-3" class="mem-cell" style="background:#10b981;" onclick="App.onConditionMemoryTap(3)"></button>
-              </div>
-              <div id="condMemProg" class="muted">系列長: 4</div>
-            </div>
-          </div>
-
-          <div id="condResultBox" class="hidden" style="background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:12px;">
-            <div style="font-size:12px;color:#64748b;">トータル判定</div>
-            <div id="condResultText" style="font-size:22px;font-weight:900;margin-top:4px;">測定完了！OK☕</div>
-            <div class="muted">この結果は履歴保存され、医師モードと共有JSONに連携されます。</div>
           </div>
         </div>
       </div>
@@ -296,13 +201,11 @@
           <select id="shareSessionSelect"></select>
 
           <div class="share-grid">
-            <button class="btn btn-primary" onclick="App.exportFullLog()">完全ログ書き出し (.json)</button>
-            <button class="btn btn-soft" onclick="App.shareFullLog()">完全ログ共有（navigator.share）</button>
-            <button class="btn btn-primary" onclick="App.exportLiteLog()">解析用軽量ログ書き出し (.json)</button>
-            <button class="btn btn-soft" onclick="App.shareLiteLog()">解析用軽量ログ共有</button>
+            <button id="btnExportLite" class="btn btn-primary" onclick="App.exportLiteLog()">解析用軽量ログ書き出し (.json)</button>
+            <button id="btnShareLite" class="btn btn-soft" onclick="App.shareLiteLog()">解析用軽量ログ共有</button>
           </div>
 
-          <textarea id="sharePreview" rows="11" readonly></textarea>
+          <textarea id="sharePreview" rows="8" readonly placeholder="ログサマリープレビュー"></textarea>
         </div>
       </div>
     </section>
@@ -330,29 +233,19 @@
           <div class="sum"><div class="k">最大音量</div><div id="docMaxDb" class="v">-- dB</div></div>
         </div>
 
-        <div id="docNote" class="muted">セッションを選択してください。</div>
+        <div id="docNote" class="muted" style="margin-top:10px;">セッションを選択してください。</div>
 
         <div style="width: 100%; height: 180px; background: rgba(0,0,0,0.8); border-radius: 8px; margin-top: 12px; margin-bottom: 16px; position: relative; overflow: hidden;">
           <canvas id="timelineCanvas" style="width: 100%; height: 100%; display: block;"></canvas>
-        </div>
-
-        <div class="col">
-          <strong style="font-size:12px;">ピーク録音（ノイズ低減再生）</strong>
-          <div id="docPeakList" class="list"></div>
-        </div>
-
-        <div class="card col" style="background:#f8fafc;">
-          <strong style="font-size:13px;">起床後コンディション推移</strong>
-          <div id="docConditionPanel" class="muted">紐付くコンディションcheck結果がありません。</div>
         </div>
       </div>
     </section>
   </main>
 
   <script>
-    // 起動時自動キャッシュクリア・最新化スクリプト
+    // キャッシュ強制更新スクリプト
     (function checkCacheBust() {
-      const CURRENT_APP_VERSION = "2026-09-10_v8_motion_boost";
+      const CURRENT_APP_VERSION = "2026-09-11_v11_fix_syntax";
       const savedVersion = localStorage.getItem("app_cache_version");
 
       if (savedVersion !== CURRENT_APP_VERSION) {
@@ -368,25 +261,21 @@
           });
         }
         if (savedVersion) {
-          console.log("New version detected, auto-reloading...");
           window.location.reload(true);
         }
       }
     })();
 
     const App = (() => {
-      const STORAGE_CONDITION = "condition_checks_v1";
       const DB_NAME = 'SleepTrackerDB';
       const DB_VERSION = 1;
       let db = null;
-      let dbInitPromise = null;
 
       function initDB() {
-        if (dbInitPromise) return dbInitPromise;
-        dbInitPromise = new Promise((resolve) => {
+        return new Promise((resolve) => {
           try {
             const request = indexedDB.open(DB_NAME, DB_VERSION);
-            request.onerror = () => { dbInitPromise = null; resolve(null); };
+            request.onerror = () => resolve(null);
             request.onsuccess = (e) => { db = e.target.result; resolve(db); };
             request.onupgradeneeded = (e) => {
               const d = e.target.result;
@@ -394,11 +283,9 @@
               if (!d.objectStoreNames.contains('peaks')) d.createObjectStore('peaks', { keyPath: 'id' });
             };
           } catch(err) {
-            dbInitPromise = null;
             resolve(null);
           }
         });
-        return dbInitPromise;
       }
 
       async function saveSessionToDB(session) {
@@ -427,32 +314,6 @@
         });
       }
 
-      async function savePeakToDB(peak) {
-        if (!db) await initDB();
-        if (!db) return;
-        return new Promise((resolve) => {
-          try {
-            const tx = db.transaction('peaks', 'readwrite');
-            tx.objectStore('peaks').put(peak);
-            tx.oncomplete = () => resolve();
-            tx.onerror = () => resolve();
-          } catch(e) { resolve(); }
-        });
-      }
-
-      async function getPeaksFromDB() {
-        if (!db) await initDB();
-        if (!db) return [];
-        return new Promise((resolve) => {
-          try {
-            const tx = db.transaction('peaks', 'readonly');
-            const req = tx.objectStore('peaks').getAll();
-            req.onsuccess = () => resolve((req.result || []).sort((a,b) => String(b.id).localeCompare(String(a.id))));
-            req.onerror = () => resolve([]);
-          } catch(e) { resolve([]); }
-        });
-      }
-
       async function clearDB() {
         if (!db) await initDB();
         if (!db) return;
@@ -475,9 +336,6 @@
       let mediaStream = null;
 
       let audioContext = null, analyser = null, timeBuf = null;
-      let pcmBuffer = null, pcmIndex = 0, pcmTotalSamples = 0, pcmSampleRate = 44100;
-      const MAX_RECORD_SEC = 125;
-      let isCapturingPeak = false, peakCooldownUntil = 0;
 
       let motionBound = false, motionActive = false, gotMotion = false;
       let gravity = { x: 0, y: 0, z: 0 };
@@ -487,7 +345,7 @@
 
       let audioSamples = [], accelSamples = [], bruxCounter = 0, snoreMinutes = 0;
       let apneaEventsCount = 0;
-      let eventLogs = [], sessionPeakEvents = [];
+      let eventLogs = [];
       let preflight = {}, lastDecision = "待機", lastTrigger = "なし";
       let currentSessionIdForRecording = "", lastSavedSessionId = "";
 
@@ -495,14 +353,10 @@
       let recentSnoreExpiry = 0;
       let silenceStartSec = null;
 
-      // 感度調整（体動・寝返りを逃さない設定）
       const CFG = {
         sampleMs: 120, peakDbDelta: 10, snoreDbMin: 6, snoreDbMax: 16, bruxDbMin: 14,
         talkDbMin: 9, talkDbMax: 20,
-        gPeakOffset: 0.04,
-        gMoveOffset: 0.02,
-        gPeakFloor: 0.05,
-        gPeakCeil: 0.20,
+        gPeakOffset: 0.04, gMoveOffset: 0.02, gPeakFloor: 0.05, gPeakCeil: 0.20,
         cooldownMs: 45000,
         apneaSilenceMinSec: 10, apneaSilenceMaxSec: 45
       };
@@ -547,10 +401,6 @@
         const h = String(Math.floor(sec/3600)).padStart(2,"0");
         const m = String(Math.floor((sec%3600)/60)).padStart(2,"0");
         return `${h}:${m}`;
-      }
-      function nowJaYmdHm(){
-        const d = new Date();
-        return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
       }
       function median(arr){
         if(!arr.length) return 0;
@@ -603,7 +453,7 @@
           `peak: dB >= baseline + ${CFG.peakDbDelta} ${gotMotion ? ` OR G >= dyn(${dynGPeakThreshold().toFixed(2)})` : "(PC: 音圧のみ判定)"}`,
           `apnea(無呼吸目安): いびき直後の静寂 ${CFG.apneaSilenceMinSec}〜${CFG.apneaSilenceMaxSec}秒後の呼吸再開`,
           `snore: +${CFG.snoreDbMin}..+${CFG.snoreDbMax} dB ${gotMotion ? ` & G < move(${dynGMoveThreshold().toFixed(2)})` : ""}`,
-          `cooldown: ${Math.round(CFG.cooldownMs/1000)}s / sample: ${CFG.sampleMs}ms`
+          `sample: ${CFG.sampleMs}ms`
         ].join("\n");
         el.textContent = txt;
       }
@@ -655,7 +505,6 @@
         }
       }
 
-      // 傾き・寝返りを高感度＆自然に検出するハイパス加速度フィルター
       function bindMotion(){
         if(motionBound) return;
         motionBound = true;
@@ -675,20 +524,17 @@
             return;
           }
 
-          // 重力成分のローパス追従（傾きの基準軸）
           const alpha = 0.82;
           gravity.x = alpha * gravity.x + (1 - alpha) * ax;
           gravity.y = alpha * gravity.y + (1 - alpha) * ay;
           gravity.z = alpha * gravity.z + (1 - alpha) * az;
 
-          // 端末の急な傾き・寝返りによる体動加速度
           const lx = ax - gravity.x;
           const ly = ay - gravity.y;
           const lz = az - gravity.z;
 
           const rawG = Math.sqrt(lx*lx + ly*ly + lz*lz) / 9.80665;
-          // 微細な端末ノイズ(0.008G以下)のみ除去し、寝返りの揺れを確実に取得
-          currentG = rawG < 0.008 ? 0 : rawG;
+          currentG = rawG < 0.005 ? 0 : rawG;
 
           if(isRecording && currentG > maxG) maxG = currentG;
           const vg = document.getElementById("valG");
@@ -708,123 +554,17 @@
         }catch{ toast("モーション許可でエラー"); }
       }
 
-      function encodeWAV(samples, sampleRate) {
-        const buffer = new ArrayBuffer(44 + samples.length * 2);
-        const view = new DataView(buffer);
-        const writeString = (view, offset, string) => {
-          for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
-        };
-        writeString(view, 0, 'RIFF');
-        view.setUint32(4, 36 + samples.length * 2, true);
-        writeString(view, 8, 'WAVE');
-        writeString(view, 12, 'fmt ');
-        view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true);
-        view.setUint16(22, 1, true);
-        view.setUint32(24, sampleRate, true);
-        view.setUint32(28, sampleRate * 2, true);
-        view.setUint16(32, 2, true);
-        view.setUint16(34, 16, true);
-        writeString(view, 36, 'data');
-        view.setUint32(40, samples.length * 2, true);
-        let offset = 44;
-        for (let i = 0; i < samples.length; i++, offset += 2) {
-          let s = Math.max(-1, Math.min(1, samples[i]));
-          view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-        }
-        return new Blob([view], { type: 'audio/wav' });
-      }
-
-      async function blobToDataURL(blob){
-        return await new Promise((resolve,reject)=>{
-          const fr = new FileReader();
-          fr.onload = () => resolve(fr.result);
-          fr.onerror = reject;
-          fr.readAsDataURL(blob);
-        });
-      }
-
       async function ensureAudioAnalyserFromStream(stream){
         if(audioContext) return;
         const AC = window.AudioContext || window.webkitAudioContext;
         audioContext = new AC();
         if(audioContext.state === "suspended"){ try{ await audioContext.resume(); }catch{} }
-        pcmSampleRate = audioContext.sampleRate;
 
         const src = audioContext.createMediaStreamSource(stream);
-
         analyser = audioContext.createAnalyser();
         analyser.fftSize = 1024;
         src.connect(analyser);
         timeBuf = new Float32Array(analyser.fftSize);
-
-        const bufferLength = pcmSampleRate * MAX_RECORD_SEC;
-        pcmBuffer = new Float32Array(bufferLength);
-        pcmIndex = 0;
-        pcmTotalSamples = 0;
-
-        const processor = audioContext.createScriptProcessor(4096, 1, 1);
-        processor.onaudioprocess = (e) => {
-          const input = e.inputBuffer.getChannelData(0);
-          for (let i = 0; i < input.length; i++) {
-            pcmBuffer[pcmIndex] = input[i];
-            pcmIndex = (pcmIndex + 1) % bufferLength;
-            pcmTotalSamples++;
-          }
-        };
-
-        src.connect(processor);
-        const gain = audioContext.createGain();
-        gain.gain.value = 0;
-        processor.connect(gain);
-        gain.connect(audioContext.destination);
-      }
-
-      async function extractAndSaveRollingBuffer(snapDb, snapG, snapTime, snapBase, customType) {
-        if(!pcmBuffer) return;
-        const bufferLength = pcmBuffer.length;
-        const availableSamples = Math.min(pcmTotalSamples, bufferLength);
-        if(availableSamples === 0) return;
-
-        const targetRate = 16000;
-        const ratio = Math.max(1, Math.floor(pcmSampleRate / targetRate));
-        const actualRate = Math.floor(pcmSampleRate / ratio);
-
-        const outSamples = new Float32Array(Math.floor(availableSamples / ratio));
-        let outIdx = 0;
-
-        let readIdx = (pcmTotalSamples >= bufferLength) ? pcmIndex : 0;
-
-        for (let i = 0; i < availableSamples; i++) {
-          if (i % ratio === 0) {
-            outSamples[outIdx++] = pcmBuffer[readIdx];
-          }
-          readIdx = (readIdx + 1) % bufferLength;
-        }
-
-        const wavBlob = encodeWAV(outSamples.subarray(0, outIdx), actualRate);
-        const b64 = await blobToDataURL(wavBlob);
-        const actualDurationSec = Math.floor(availableSamples / pcmSampleRate);
-
-        const evType = customType || classifyPeakType(snapDb, snapG);
-
-        const ev = {
-          id: `${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
-          sessionId: currentSessionIdForRecording,
-          time: snapTime,
-          type: evType,
-          db: +snapDb.toFixed(1),
-          g: +snapG.toFixed(2),
-          baseline: +snapBase.toFixed(1),
-          dDb: +(snapDb-snapBase).toFixed(1),
-          durationSec: actualDurationSec,
-          audioBase64: b64
-        };
-
-        sessionPeakEvents.unshift(ev);
-        await savePeakToDB(ev);
-        lastDecision = `TRIGGER_OK: 過去${actualDurationSec}秒の録音を保存(${evType})`;
-        updateDebug();
       }
 
       function calcDb(){
@@ -854,7 +594,7 @@
           if(!mediaStream){
             mediaStream = await navigator.mediaDevices.getUserMedia({ audio:true });
             await ensureAudioAnalyserFromStream(mediaStream);
-            toast("マイク接続OK（常時録音待機中）");
+            toast("マイク接続OK");
           } else {
             toast("マイクは既に接続されています");
           }
@@ -891,14 +631,6 @@
         }, 3000);
       }
 
-      function classifyPeakType(db, g){
-        const d = db - baselineDb;
-        if(gotMotion && g >= dynGPeakThreshold()) return "急な体動/寝返り";
-        if(d >= 16) return "大きないびき/音響";
-        if(d >= CFG.peakDbDelta) return "通常いびき";
-        return "イベント";
-      }
-
       function pushEventLog(type, db, g){
         const hhmm = formatHM(recSec);
         eventLogs.push({
@@ -908,32 +640,7 @@
         });
       }
 
-      async function triggerRecording(db, typeName){
-        if(isCapturingPeak) return;
-        isCapturingPeak = true;
-
-        const snapDb = db;
-        const snapG = gotMotion ? currentG : 0;
-        const snapTime = formatHMS(recSec);
-        const snapBase = baselineDb;
-
-        lastTrigger = `TRIGGER:${typeName} db=${snapDb.toFixed(1)} g=${snapG.toFixed(2)}`;
-        lastDecision = `TRIGGER_OK: 5秒後にバッファ切り出し開始(${typeName})`;
-        updateDebug();
-
-        setTimeout(async () => {
-          try {
-            await extractAndSaveRollingBuffer(snapDb, snapG, snapTime, snapBase, typeName);
-          } catch(e) {
-            lastDecision = "TRIGGER_FAIL: " + (e.message || e.name);
-          }
-          isCapturingPeak = false;
-          peakCooldownUntil = Date.now() + CFG.cooldownMs;
-          updateDebug();
-        }, 5000);
-      }
-
-      async function processAudioTick(db){
+      function processAudioTick(db){
         const now = Date.now();
         const dDb = db - baselineDb;
         const gMove = dynGMoveThreshold();
@@ -971,9 +678,6 @@
                 apneaEventsCount++;
                 pushEventLog("apnea", db, currentG);
                 toast(`無呼吸疑いを検知（静寂${silenceDuration}秒後）`);
-                if(now >= peakCooldownUntil && !isCapturingPeak){
-                  await triggerRecording(db, "無呼吸疑い（呼吸再開音）");
-                }
               }
               silenceStartSec = null;
             }
@@ -985,8 +689,9 @@
         const overDb = db >= (baselineDb + CFG.peakDbDelta);
         const overG = gotMotion ? (currentG >= dynGPeakThreshold()) : false;
 
-        if((overDb || overG) && now >= peakCooldownUntil && !isCapturingPeak && audioContext){
-          await triggerRecording(db, classifyPeakType(db, currentG));
+        if(overDb || overG){
+          lastTrigger = `PEAK: db=${db.toFixed(1)} g=${currentG.toFixed(2)}`;
+          lastDecision = "PEAK_DETECTED";
         }
       }
 
@@ -1012,9 +717,8 @@
 
         audioSamples = []; accelSamples = []; bruxCounter = 0; snoreMinutes = 0; maxG = 0;
         apneaEventsCount = 0; hadRecentSnore = false; silenceStartSec = null;
-        eventLogs = []; sessionPeakEvents = []; dbWindow = []; gWindow = [];
-        peakCooldownUntil = 0; gotMotion = false; lastDecision = "測定開始"; lastTrigger = "なし";
-        isCapturingPeak = false;
+        eventLogs = []; dbWindow = []; gWindow = [];
+        gotMotion = false; lastDecision = "測定開始"; lastTrigger = "なし";
 
         document.getElementById("sessionBadge").textContent = "測定中";
         document.getElementById("sessionBadge").className = "badge b-green";
@@ -1031,24 +735,27 @@
           const h = String(Math.floor(recSec/3600)).padStart(2,"0");
           const m = String(Math.floor((recSec%3600)/60)).padStart(2,"0");
           const s = String(recSec%60).padStart(2,"0");
-          document.getElementById("recTime").textContent = `${h}:${m}:${s}`;
-          document.getElementById("blackoutClock").textContent = `${h}:${m}`;
+          const rt = document.getElementById("recTime");
+          if(rt) rt.textContent = `${h}:${m}:${s}`;
+          const bc = document.getElementById("blackoutClock");
+          if(bc) bc.textContent = `${h}:${m}`;
         }, 1000);
 
         clearInterval(sampleTimer);
-        sampleTimer = setInterval(async () => {
+        sampleTimer = setInterval(() => {
           if(!isRecording) return;
           currentDb = calcDb();
 
           if(!gotMotion){
             currentG = 0;
-            document.getElementById("valG").textContent = "— G (PC/未検出)";
+            const vg = document.getElementById("valG");
+            if(vg) vg.textContent = "— G (PC/未検出)";
           }
 
           pushWin(dbWindow, currentDb, 140);
           if(gotMotion) pushWin(gWindow, currentG, 140);
 
-          await processAudioTick(currentDb);
+          processAudioTick(currentDb);
 
           if(audioSamples.length < 28800){
             audioSamples.push(+currentDb.toFixed(1));
@@ -1056,7 +763,8 @@
           }
           if(gotMotion && currentG > maxG) maxG = currentG;
 
-          document.getElementById("valDb").textContent = `${currentDb.toFixed(1)} dB`;
+          const vd = document.getElementById("valDb");
+          if(vd) vd.textContent = `${currentDb.toFixed(1)} dB`;
           drawBars(currentDb);
           updateRuleText();
           updateDebug();
@@ -1115,42 +823,40 @@
         updateDebug();
 
         await loadPatientHistorySelect();
-        loadShareSelect();
-        loadDoctorSelect();
-        prepareConditionIdle();
-        openWakeCheckModal();
+        await loadShareSelect();
+        await loadDoctorSelect();
 
         toast("保存完了");
       }
 
       async function clearAllData(){
-        if(!confirm("すべての測定履歴と録音データを消去しますか？")) return;
+        if(!confirm("すべての測定履歴を消去しますか？")) return;
         await clearDB();
-        localStorage.removeItem(STORAGE_CONDITION);
         toast("全データを消去しました");
-        stopCurrentPlayback();
         const prev = document.getElementById("sharePreview");
         if(prev) prev.value = "";
         clearDoctorSummary();
         await loadPatientHistorySelect();
-        loadShareSelect();
-        loadDoctorSelect();
+        await loadShareSelect();
+        await loadDoctorSelect();
       }
 
       function switchMode(m){
         mode = m;
-        document.getElementById("btnModePatient").className = m==="patient" ? "btn btn-soft active-mode" : "btn btn-soft";
-        document.getElementById("btnModeDoctor").className = m==="doctor" ? "btn btn-soft active-mode" : "btn btn-soft";
-        document.getElementById("btnModePatient").style.background = m==="patient" ? "#fff" : "transparent";
-        document.getElementById("btnModeDoctor").style.background = m==="doctor" ? "#fff" : "transparent";
-        document.getElementById("patientView").classList.toggle("hidden", m!=="patient");
-        document.getElementById("doctorView").classList.toggle("hidden", m!=="doctor");
+        const bp = document.getElementById("btnModePatient");
+        const bd = document.getElementById("btnModeDoctor");
+        if(bp) bp.style.background = m==="patient" ? "#fff" : "transparent";
+        if(bd) bd.style.background = m==="doctor" ? "#fff" : "transparent";
+        const pv = document.getElementById("patientView");
+        const dv = document.getElementById("doctorView");
+        if(pv) pv.classList.toggle("hidden", m!=="patient");
+        if(dv) dv.classList.toggle("hidden", m!=="doctor");
         if(m==="doctor") loadDoctorSelect();
       }
 
       function switchPatientTab(t){
         patientTab = t;
-        ["measure","history","condition","share"].forEach(x => {
+        ["measure","history","share"].forEach(x => {
           const tabEl = document.getElementById(`tab-${x}`);
           const panEl = document.getElementById(`panel-${x}`);
           if(tabEl) tabEl.classList.toggle("active", x===t);
@@ -1193,7 +899,6 @@
       }
 
       async function showHistoryDetail(sessionId) {
-        stopCurrentPlayback();
         const sessions = await getSessionsFromDB();
         const s = sessions.find(x => String(x.id) === String(sessionId)) || sessions[0];
         if(!s) return;
@@ -1219,386 +924,33 @@
         const valG = Number(s.maxMotionG || 0);
         if(elMaxG) elMaxG.textContent = valG > 0 ? `${valG.toFixed(2)} G` : "0.00 G (PC)";
 
-        const peaksAll = await getPeaksFromDB();
-        const peaks = peaksAll.filter(p => String(p.sessionId) === String(s.id));
         const apneaLogs = (s.eventLogs || []).filter(e => e.type === "apnea");
 
         setTimeout(() => {
           const canvas = document.getElementById('detailTimelineCanvas');
-          if(canvas) drawTimelineChart(canvas, s.audioSamples, s.accelSamples, s.baselineDb, s.durationSec, peaks, apneaLogs);
+          if(canvas) drawTimelineChart(canvas, s.audioSamples, s.accelSamples, s.baselineDb, s.durationSec, apneaLogs);
         }, 50);
-
-        renderPeakList(peaks, "detailPeakList", "det");
-      }
-
-      function saveConditionChecks(arr){ localStorage.setItem(STORAGE_CONDITION, JSON.stringify(arr.slice(0,120))); }
-      function loadConditionChecks(){ try{ return JSON.parse(localStorage.getItem(STORAGE_CONDITION) || "[]"); }catch{ return []; } }
-
-      let condFlowRunning = false, condPhase = 0, condTimer = null;
-      const condRaw = { reactionMs: null, attention: { total:5, correct:0, miss:0, falseAlarm:0, times:[] }, memory: { total:4, success:0, full:false } };
-      let condReactionWaiting = false, condReactionStartTs = 0;
-      let condAttRemain = 5, condAttTarget = false, condAttTargetStart = 0, condAttTimeout = null;
-      let condMemSeq = [], condMemStep = 0, condMemCanInput = false;
-
-      function openWakeCheckModal(){
-        const el = document.getElementById("wakeCheckModal");
-        if(el) el.classList.add("active");
-      }
-      function closeWakeCheckModal(){
-        const el = document.getElementById("wakeCheckModal");
-        if(el) el.classList.remove("active");
-      }
-      function goConditionNow(){ closeWakeCheckModal(); switchPatientTab("condition"); prepareConditionIdle(); }
-      function skipConditionNow(){ closeWakeCheckModal(); switchPatientTab("history"); }
-
-      function resetConditionRaw(){
-        condRaw.reactionMs = null;
-        condRaw.attention = { total:5, correct:0, miss:0, falseAlarm:0, times:[] };
-        condRaw.memory = { total:4, success:0, full:false };
-      }
-
-      function prepareConditionIdle(){
-        clearTimeout(condTimer); clearTimeout(condAttTimeout);
-        condFlowRunning = false; condPhase = 0; condReactionWaiting = false; condMemCanInput = false;
-        resetConditionRaw();
-
-        const box = document.getElementById("condTestBox");
-        if(box){
-          box.style.background = "#f8fafc";
-          box.style.borderColor = "#cbd5e1";
-        }
-
-        const pill = document.getElementById("condProgressPill");
-        if(pill) pill.textContent = "待機中";
-        const gt = document.getElementById("condGuideText");
-        if(gt) gt.textContent = "「チェック開始」で 1/3→2/3→3/3 を自動実行します。";
-        const btn = document.getElementById("btnConditionStart");
-        if(btn) btn.disabled = false;
-
-        const ip = document.getElementById("condIdlePanel");
-        const rp = document.getElementById("condReactionPanel");
-        const ap = document.getElementById("condAttentionPanel");
-        const mp = document.getElementById("condMemoryPanel");
-        const rb = document.getElementById("condResultBox");
-
-        if(ip) ip.classList.remove("hidden");
-        if(rp) rp.classList.add("hidden");
-        if(ap) ap.classList.add("hidden");
-        if(mp) mp.classList.add("hidden");
-        if(rb) rb.classList.add("hidden");
-      }
-
-      function showConditionPhase(phase){
-        condPhase = phase;
-        const pill = document.getElementById("condProgressPill");
-        if(!pill) return;
-        if(phase === 1) pill.textContent = "1/3 反射神経";
-        if(phase === 2) pill.textContent = "2/3 判断力";
-        if(phase === 3) pill.textContent = "3/3 短期記憶";
-      }
-
-      function startConditionFlow(){
-        if(condFlowRunning) return;
-        prepareConditionIdle();
-        condFlowRunning = true;
-        const btn = document.getElementById("btnConditionStart");
-        if(btn) btn.disabled = true;
-        const rb = document.getElementById("condResultBox");
-        if(rb) rb.classList.add("hidden");
-        runConditionReaction();
-      }
-
-      function runConditionReaction(){
-        showConditionPhase(1);
-        const box = document.getElementById("condTestBox");
-        const gt = document.getElementById("condGuideText");
-        if(gt) gt.textContent = "画面が緑に変わった瞬間を素早くタップ！";
-        const ip = document.getElementById("condIdlePanel");
-        const rp = document.getElementById("condReactionPanel");
-        if(ip) ip.classList.add("hidden");
-        if(rp) rp.classList.remove("hidden");
-
-        if(box){
-          box.style.background = "#ef4444";
-          box.style.borderColor = "#dc2626";
-        }
-        const rm = document.getElementById("condReactionMain");
-        const rs = document.getElementById("condReactionSub");
-        if(rm) rm.textContent = "待機中...";
-        if(rs) rs.textContent = "画面が緑になるまでタップしないでください";
-
-        condReactionWaiting = false;
-        const delay = 1500 + Math.random()*2000;
-        condTimer = setTimeout(() => {
-          condReactionWaiting = true;
-          if(box){
-            box.style.background = "#10b981";
-            box.style.borderColor = "#059669";
-          }
-          if(rm) rm.textContent = "今すぐタップ！";
-          if(rs) rs.textContent = "どこでもタップ";
-          condReactionStartTs = Date.now();
-        }, delay);
-      }
-
-      function onConditionReactionTap(){
-        if(!condFlowRunning || condPhase !== 1) return;
-        if(!condReactionWaiting) return;
-        condRaw.reactionMs = Date.now() - condReactionStartTs;
-        condReactionWaiting = false;
-
-        const gt = document.getElementById("condGuideText");
-        if(gt) gt.textContent = "次は判断力チェックに進みます…";
-        condTimer = setTimeout(() => { runConditionAttention(); }, 1000);
-      }
-
-      function runConditionAttention(){
-        showConditionPhase(2);
-        const gt = document.getElementById("condGuideText");
-        if(gt) gt.textContent = "赤色の円が出た時だけタップ！（全5回）";
-        const box = document.getElementById("condTestBox");
-        if(box){
-          box.style.background = "#f8fafc";
-          box.style.borderColor = "#cbd5e1";
-        }
-        const rp = document.getElementById("condReactionPanel");
-        const ap = document.getElementById("condAttentionPanel");
-        if(rp) rp.classList.add("hidden");
-        if(ap) ap.classList.remove("hidden");
-
-        condAttRemain = 5;
-        condRaw.attention = { total:5, correct:0, miss:0, falseAlarm:0, times:[] };
-        nextConditionAttentionTrial();
-      }
-
-      function nextConditionAttentionTrial(){
-        if(condAttRemain <= 0){
-          const gt = document.getElementById("condGuideText");
-          if(gt) gt.textContent = "次は短期記憶チェックに進みます…";
-          condTimer = setTimeout(() => { runConditionMemory(); }, 1000);
-          return;
-        }
-        const ar = document.getElementById("condAttRemain");
-        if(ar) ar.textContent = `残り: ${condAttRemain}回`;
-        condAttRemain--;
-
-        const btn = document.getElementById("condAttCircle");
-        if(btn){
-          btn.style.background = "#cbd5e1";
-          btn.textContent = "...";
-          btn.style.pointerEvents = "none";
-        }
-        condAttTarget = false;
-
-        condTimer = setTimeout(() => {
-          condAttTarget = Math.random() < 0.6;
-          if(btn){
-            btn.style.pointerEvents = "auto";
-            if(condAttTarget){
-              btn.style.background = "#ef4444";
-              btn.textContent = "赤";
-              condAttTargetStart = Date.now();
-            }else{
-              const cs = ["#3b82f6","#10b981","#f59e0b"];
-              btn.style.background = cs[Math.floor(Math.random()*cs.length)];
-              btn.textContent = "見送り";
-            }
-          }
-          condAttTimeout = setTimeout(() => {
-            if(condAttTarget) condRaw.attention.miss++;
-            nextConditionAttentionTrial();
-          }, 1200);
-        }, 500);
-      }
-
-      function onConditionAttentionTap(){
-        if(!condFlowRunning || condPhase !== 2) return;
-        clearTimeout(condAttTimeout);
-        const btn = document.getElementById("condAttCircle");
-        if(btn) btn.style.pointerEvents = "none";
-
-        if(condAttTarget){
-          condRaw.attention.correct++;
-          condRaw.attention.times.push(Date.now() - condAttTargetStart);
-        }else{
-          condRaw.attention.falseAlarm++;
-        }
-        condTimer = setTimeout(nextConditionAttentionTrial, 300);
-      }
-
-      function runConditionMemory(){
-        showConditionPhase(3);
-        const gt = document.getElementById("condGuideText");
-        if(gt) gt.textContent = "4色の光る順番を覚えて、同じ順にタップ！";
-        const box = document.getElementById("condTestBox");
-        if(box){
-          box.style.background = "#f8fafc";
-          box.style.borderColor = "#cbd5e1";
-        }
-        const ap = document.getElementById("condAttentionPanel");
-        const mp = document.getElementById("condMemoryPanel");
-        if(ap) ap.classList.add("hidden");
-        if(mp) mp.classList.remove("hidden");
-
-        condMemSeq = [Math.floor(Math.random()*4),Math.floor(Math.random()*4),Math.floor(Math.random()*4),Math.floor(Math.random()*4)];
-        condMemStep = 0; condMemCanInput = false;
-        condRaw.memory = { total:4, success:0, full:false };
-
-        const ms = document.getElementById("condMemStatus");
-        const mpEl = document.getElementById("condMemProg");
-        if(ms) ms.textContent = "光る順番を覚えてください...";
-        if(mpEl) mpEl.textContent = "系列長: 4（再生中）";
-
-        let idx = 0;
-        const play = () => {
-          if(idx >= condMemSeq.length){
-            condMemCanInput = true;
-            if(ms) ms.textContent = "入力受付: 同じ順番でタップ";
-            if(mpEl) mpEl.textContent = "入力 0 / 4";
-            return;
-          }
-          flashCondMem(condMemSeq[idx]);
-          idx++;
-          condTimer = setTimeout(play, 650);
-        };
-        condTimer = setTimeout(play, 500);
-      }
-
-      function flashCondMem(idx){
-        const b = document.getElementById(`condMem-${idx}`);
-        if(!b) return;
-        b.style.opacity = "1"; b.style.transform = "scale(1.08)";
-        setTimeout(() => { b.style.opacity = ".6"; b.style.transform = "scale(1)"; }, 280);
-      }
-
-      function onConditionMemoryTap(idx){
-        if(!condFlowRunning || condPhase !== 3) return;
-        if(!condMemCanInput) return;
-        flashCondMem(idx);
-
-        if(idx !== condMemSeq[condMemStep]){
-          condRaw.memory.success = condMemStep; condRaw.memory.full = false;
-          condMemCanInput = false; finishConditionFlow();
-          return;
-        }
-        condMemStep++;
-        const mpEl = document.getElementById("condMemProg");
-        if(mpEl) mpEl.textContent = `入力 ${condMemStep} / 4`;
-        if(condMemStep >= condMemSeq.length){
-          condRaw.memory.success = 4; condRaw.memory.full = true;
-          condMemCanInput = false; finishConditionFlow();
-        }
-      }
-
-      function evaluateConditionComment(raw){
-        const reaction = raw.reactionMs == null ? 9999 : raw.reactionMs;
-        const attScore = (raw.attention.correct / raw.attention.total) * 100;
-        const memScore = (raw.memory.success / raw.memory.total) * 100;
-        let level = 2;
-        if(reaction <= 230 && attScore >= 100 && memScore >= 100) level = 4;
-        else if(reaction <= 300 && attScore >= 80 && memScore >= 75) level = 3;
-        else if(reaction <= 420 && attScore >= 60 && memScore >= 50) level = 2;
-        else level = 1;
-
-        if(level === 4) return "測定完了！Good！🌟";
-        if(level === 3) return "測定完了！Good✨";
-        if(level === 2) return "測定完了！OK☕";
-        return "測定完了！少しぼんやり気味かもしれません🍃";
-      }
-
-      async function finishConditionFlow(){
-        clearTimeout(condTimer); clearTimeout(condAttTimeout);
-        condFlowRunning = false;
-        const btn = document.getElementById("btnConditionStart");
-        if(btn) btn.disabled = false;
-        const pill = document.getElementById("condProgressPill");
-        if(pill) pill.textContent = "完了";
-
-        const comment = evaluateConditionComment(condRaw);
-        const box = document.getElementById("condTestBox");
-        if(box){
-          box.style.background = "#f8fafc";
-          box.style.borderColor = "#cbd5e1";
-        }
-        const mp = document.getElementById("condMemoryPanel");
-        const ip = document.getElementById("condIdlePanel");
-        if(mp) mp.classList.add("hidden");
-        if(ip) ip.classList.remove("hidden");
-
-        const rt = document.getElementById("condResultText");
-        const rb = document.getElementById("condResultBox");
-        const gt = document.getElementById("condGuideText");
-        if(rt) rt.textContent = comment;
-        if(rb) rb.classList.remove("hidden");
-        if(gt) gt.textContent = "チェック完了。次回も起床後に続けて記録できます。";
-
-        const checks = loadConditionChecks();
-        const sessions = await getSessionsFromDB();
-        const linkedSessionId = lastSavedSessionId || (sessions[0] ? sessions[0].id : "");
-
-        checks.unshift({
-          id: `${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
-          dateTime: nowJaYmdHm(),
-          linkedSessionId: String(linkedSessionId || ""),
-          raw: {
-            reactionMs: condRaw.reactionMs,
-            attention: {
-              total: condRaw.attention.total, correct: condRaw.attention.correct,
-              miss: condRaw.attention.miss, falseAlarm: condRaw.attention.falseAlarm,
-              accuracy: condRaw.attention.total ? Number((condRaw.attention.correct / condRaw.attention.total * 100).toFixed(1)) : 0
-            },
-            memory: {
-              total: condRaw.memory.total, success: condRaw.memory.success,
-              successRate: condRaw.memory.total ? Number((condRaw.memory.success / condRaw.memory.total * 100).toFixed(1)) : 0,
-              full: condRaw.memory.full
-            }
-          },
-          comment
-        });
-        saveConditionChecks(checks);
-
-        loadDoctorConditionPanelBySession(linkedSessionId);
-        loadShareSelect();
-        updateSharePreview();
-        toast("コンディションcheckを保存しました");
-      }
-
-      async function buildFullLog(session){
-        const peaksAll = await getPeaksFromDB();
-        const peaks = peaksAll.filter(p => String(p.sessionId) === String(session.id));
-        const checksAll = loadConditionChecks();
-        const linkedChecks = checksAll.filter(c => String(c.linkedSessionId) === String(session.id));
-
-        return {
-          meta: { app: "SleepTracker", version: "apnea-denoise-v5-fixed", exportedAt: new Date().toISOString(), locale: "ja-JP" },
-          session: { ...session },
-          peaks: peaks,
-          conditionChecks: linkedChecks
-        };
       }
 
       async function buildLiteLog(session){
-        const peaksAll = await getPeaksFromDB();
-        const peaks = peaksAll
-          .filter(p => String(p.sessionId) === String(session.id))
-          .map(p => ({ id: p.id, sessionId: p.sessionId, time: p.time, type: p.type, db: p.db, g: p.g, baseline: p.baseline, dDb: p.dDb, durationSec: p.durationSec }));
-
-        const checksAll = loadConditionChecks();
-        const linkedChecks = checksAll
-          .filter(c => String(c.linkedSessionId) === String(session.id))
-          .map(c => ({ id: c.id, dateTime: c.dateTime, linkedSessionId: c.linkedSessionId, raw: c.raw, comment: c.comment }));
-
         return {
-          meta: { app: "SleepTracker", version: "apnea-denoise-v5-fixed", exportedAt: new Date().toISOString(), locale: "ja-JP", lightweight: true },
+          meta: { app: "SleepTracker", version: "v11_stable", exportedAt: new Date().toISOString(), locale: "ja-JP" },
           session: {
-            id: session.id, dateStr: session.dateStr, startTime: session.startTime, endTime: session.endTime,
-            durationSec: session.durationSec, baselineDb: session.baselineDb, bruxismEvents: session.bruxismEvents,
-            snoreMin: session.snoreMin, apneaCount: session.apneaCount, ahiEstimate: session.ahiEstimate,
-            maxMotionG: session.maxMotionG, audioSamples: session.audioSamples,
-            accelSamples: session.accelSamples, eventLogs: session.eventLogs
-          },
-          peaks,
-          conditionChecks: linkedChecks
+            id: session.id,
+            dateStr: session.dateStr,
+            startTime: session.startTime,
+            endTime: session.endTime,
+            durationSec: session.durationSec,
+            baselineDb: session.baselineDb,
+            bruxismEvents: session.bruxismEvents,
+            snoreMin: session.snoreMin,
+            apneaCount: session.apneaCount,
+            ahiEstimate: session.ahiEstimate,
+            maxMotionG: session.maxMotionG,
+            audioSamples: session.audioSamples,
+            accelSamples: session.accelSamples,
+            eventLogs: session.eventLogs
+          }
         };
       }
 
@@ -1613,27 +965,11 @@
         const blob = new Blob([JSON.stringify(obj, null, 2)], { type:"application/json;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = url; a.download = filename;
-        document.body.appendChild(a); a.click();
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
         setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
-      }
-
-      async function shareBlobOrDownload(blob, filename, title, text){
-        const file = new File([blob], filename, { type:"application/json" });
-        if(navigator.share && navigator.canShare){
-          try{
-            if(navigator.canShare({ files:[file] })){
-              await navigator.share({ title, text, files:[file] });
-              toast("共有しました"); return;
-            }
-          }catch{ toast("共有をキャンセルしました"); return; }
-        }
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url; a.download = filename;
-        document.body.appendChild(a); a.click();
-        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
-        toast("共有API非対応のためダウンロードしました");
       }
 
       async function loadShareSelect(){
@@ -1663,36 +999,26 @@
         const ta = document.getElementById("sharePreview");
         if(!ta) return;
         if(!s){ ta.value = ""; return; }
-        const full = await buildFullLog(s);
-        ta.value = JSON.stringify(full, null, 2).slice(0, 7000);
-      }
-
-      async function exportFullLog(){
-        const s = await getSelectedShareSession();
-        if(!s){ toast("セッションがありません"); return; }
-        const full = await buildFullLog(s);
-        const name = `SleepTracker_full_${s.dateStr.replaceAll("/","-")}_${String(s.startTime).replace(":","")}.json`;
-        downloadJSON(full, name);
-        toast("完全ログを書き出しました");
-      }
-
-      async function shareFullLog(){
-        const s = await getSelectedShareSession();
-        if(!s){ toast("セッションがありません"); return; }
-        const full = await buildFullLog(s);
-        const content = JSON.stringify(full, null, 2);
-        const blob = new Blob([content], { type:"application/json;charset=utf-8" });
-        const name = `SleepTracker_full_${s.dateStr.replaceAll("/","-")}_${String(s.startTime).replace(":","")}.json`;
-        await shareBlobOrDownload(blob, name, "SleepTracker 完全ログ", "睡眠測定ログ（完全版）");
+        const previewObj = {
+          date: s.dateStr,
+          time: `${s.startTime}〜${s.endTime}`,
+          durationSec: s.durationSec,
+          apneaCount: s.apneaCount,
+          ahiEstimate: s.ahiEstimate,
+          maxDb: Math.max(...(s.audioSamples||[0])),
+          maxG: s.maxMotionG,
+          totalEventLogs: (s.eventLogs || []).length
+        };
+        ta.value = JSON.stringify(previewObj, null, 2);
       }
 
       async function exportLiteLog(){
         const s = await getSelectedShareSession();
         if(!s){ toast("セッションがありません"); return; }
         const lite = await buildLiteLog(s);
-        const name = `SleepTracker_lite_${s.dateStr.replaceAll("/","-")}_${String(s.startTime).replace(":","")}.json`;
+        const name = `SleepTracker_${s.dateStr.replaceAll("/","-")}_${String(s.startTime).replace(":","")}.json`;
         downloadJSON(lite, name);
-        toast("軽量ログを書き出しました");
+        toast("ログを書き出しました");
       }
 
       async function shareLiteLog(){
@@ -1701,11 +1027,23 @@
         const lite = await buildLiteLog(s);
         const content = JSON.stringify(lite, null, 2);
         const blob = new Blob([content], { type:"application/json;charset=utf-8" });
-        const name = `SleepTracker_lite_${s.dateStr.replaceAll("/","-")}_${String(s.startTime).replace(":","")}.json`;
-        await shareBlobOrDownload(blob, name, "SleepTracker 解析用軽量ログ", "睡眠測定ログ（軽量版）");
+        const name = `SleepTracker_${s.dateStr.replaceAll("/","-")}_${String(s.startTime).replace(":","")}.json`;
+        const file = new File([blob], name, { type:"application/json" });
+        if(navigator.share && navigator.canShare && navigator.canShare({ files:[file] })){
+          try{
+            await navigator.share({ title:"SleepTracker 実測ログ", text:"睡眠測定ログ", files:[file] });
+            toast("共有しました");
+            return;
+          }catch{
+            toast("共有をキャンセルしました");
+            return;
+          }
+        }
+        downloadJSON(lite, name);
+        toast("ダウンロードしました");
       }
 
-      function drawTimelineChart(canvas, audioData, accelData, baselineDb, durationSec, peaks, apneaLogs) {
+      function drawTimelineChart(canvas, audioData, accelData, baselineDb, durationSec, apneaLogs) {
         if(!canvas || !canvas.parentElement) return;
         const ctx = canvas.getContext('2d');
         const width = canvas.parentElement.clientWidth;
@@ -1748,7 +1086,6 @@
           ctx.fillRect(x, y, Math.max(1, step), h);
         }
 
-        // 体動（青）の描画スケール：0.15G程度で波形がしっかり立ち上がる感度に最適化
         const accelHeight = height * 0.35;
         const accelYOffset = height;
         ctx.beginPath();
@@ -1785,213 +1122,6 @@
             ctx.fill();
           });
         }
-
-        if (peaks && peaks.length > 0 && durationSec > 0) {
-          peaks.forEach(p => {
-            const parts = p.time.split(':');
-            let sec = 0;
-            if (parts.length === 3) {
-              sec = parseInt(parts[0])*3600 + parseInt(parts[1])*60 + parseInt(parts[2]);
-            }
-
-            const x = (sec / durationSec) * width;
-
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, audioHeight);
-            ctx.strokeStyle = 'rgba(239, 68, 68, 0.7)';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.moveTo(x - 4, 0);
-            ctx.lineTo(x + 4, 0);
-            ctx.lineTo(x, 6);
-            ctx.fillStyle = '#ef4444';
-            ctx.fill();
-          });
-        }
-      }
-
-      let playbackAudioCtx = null;
-      let currentSource = null;
-      let currentAnimFrame = null;
-
-      function drawWaveform(canvas, audioBuffer) {
-        if(!canvas || !canvas.parentElement) return;
-        const ctx = canvas.getContext('2d');
-        const width = canvas.parentElement.clientWidth;
-        const height = canvas.parentElement.clientHeight;
-        canvas.width = width;
-        canvas.height = height;
-
-        const data = audioBuffer.getChannelData(0);
-        const step = Math.ceil(data.length / width);
-        const amp = height / 2;
-
-        ctx.fillStyle = '#f59e0b';
-        ctx.clearRect(0, 0, width, height);
-
-        for (let i = 0; i < width; i++) {
-          let min = 1.0;
-          let max = -1.0;
-          for (let j = 0; j < step; j++) {
-            const datum = data[(i * step) + j];
-            if (datum < min) min = datum;
-            if (datum > max) max = datum;
-          }
-          ctx.fillRect(i, (1 + min) * amp, 1, Math.max(1, (max - min) * amp));
-        }
-      }
-
-      function stopCurrentPlayback() {
-        if (currentSource) {
-          try{ currentSource.stop(); }catch{}
-          try{ currentSource.disconnect(); }catch{}
-          currentSource = null;
-        }
-        if (currentAnimFrame) {
-          cancelAnimationFrame(currentAnimFrame);
-          currentAnimFrame = null;
-        }
-        document.querySelectorAll('.play-cursor').forEach(c => c.style.display = 'none');
-        document.querySelectorAll('.play-btn-overlay').forEach(b => b.style.display = 'flex');
-      }
-
-      async function playPeakById(peakId, index, prefix) {
-        stopCurrentPlayback();
-        const peaks = await getPeaksFromDB();
-        const p = peaks.find(x => String(x.id) === String(peakId));
-        if(!p || !p.audioBase64){ toast("録音データがありません"); return; }
-
-        if (!playbackAudioCtx) playbackAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (playbackAudioCtx.state === 'suspended') await playbackAudioCtx.resume();
-
-        try {
-          const binaryString = window.atob(p.audioBase64.split(',')[1]);
-          const len = binaryString.length;
-          const bytes = new Uint8Array(len);
-          for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
-
-          const audioBuffer = await playbackAudioCtx.decodeAudioData(bytes.buffer.slice(0));
-
-          const waveCanvas = document.getElementById(`wavecanvas-${prefix}-${index}`);
-          if (waveCanvas) drawWaveform(waveCanvas, audioBuffer);
-
-          currentSource = playbackAudioCtx.createBufferSource();
-          currentSource.buffer = audioBuffer;
-
-          // 1. 低周波環境音（エアコン・ファン等）をカットするハイパスフィルター (120Hz)
-          const highpass = playbackAudioCtx.createBiquadFilter();
-          highpass.type = "highpass";
-          highpass.frequency.value = 120;
-
-          // 2. 高周波ホワイトノイズ（サー音）をカットするローパスフィルター (3500Hz)
-          const lowpass = playbackAudioCtx.createBiquadFilter();
-          lowpass.type = "lowpass";
-          lowpass.frequency.value = 3500;
-
-          // 3. 人間の呼吸・いびき帯域（300Hz〜2kHz）を明瞭にするピークEQ
-          const eq = playbackAudioCtx.createBiquadFilter();
-          eq.type = "peaking";
-          eq.frequency.value = 800;
-          eq.Q.value = 1.0;
-          eq.gain.value = 3.0;
-
-          currentSource.connect(highpass);
-          highpass.connect(lowpass);
-          lowpass.connect(eq);
-          eq.connect(playbackAudioCtx.destination);
-
-          const cursor = document.getElementById(`cursor-${prefix}-${index}`);
-          const btn = document.getElementById(`playbtn-${prefix}-${index}`);
-
-          if (cursor) cursor.style.display = 'block';
-          if (btn) btn.style.display = 'none';
-
-          const startTime = playbackAudioCtx.currentTime;
-          const duration = audioBuffer.duration;
-
-          function updateCursor() {
-            const elapsed = playbackAudioCtx.currentTime - startTime;
-            const progress = elapsed / duration;
-            if (progress >= 1) {
-              if (cursor) cursor.style.display = 'none';
-              if (btn) btn.style.display = 'flex';
-              return;
-            }
-            if (cursor) cursor.style.left = `${progress * 100}%`;
-            currentAnimFrame = requestAnimationFrame(updateCursor);
-          }
-
-          currentSource.onended = () => {
-            if (cursor) cursor.style.display = 'none';
-            if (btn) btn.style.display = 'flex';
-            if (currentAnimFrame) cancelAnimationFrame(currentAnimFrame);
-            currentAnimFrame = null;
-          };
-
-          currentSource.start();
-          updateCursor();
-        } catch (e) {
-          console.error("再生エラー:", e);
-          toast("再生に失敗しました");
-        }
-      }
-
-      async function renderPeakList(peaks, containerId, prefix) {
-        const list = document.getElementById(containerId);
-        if(!list) return;
-        list.innerHTML = '';
-        if(!peaks.length){
-          list.innerHTML = '<div class="muted">ピーク録音はありません。</div>';
-          return;
-        }
-
-        if (!playbackAudioCtx) playbackAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-        for (let i = 0; i < peaks.length; i++) {
-          const p = peaks[i];
-          const isApnea = p.type && p.type.includes("無呼吸");
-          const item = document.createElement('div');
-          item.className = 'card';
-          item.style.padding = '12px';
-          item.style.marginBottom = '8px';
-          item.innerHTML = `
-            <div class="row" style="justify-content:space-between;">
-              <div>
-                <strong>${esc(p.time)} / ${esc(p.type)}</strong>
-                ${isApnea ? `<span class="badge b-purple" style="margin-left:6px;">無呼吸疑い</span>` : ''}
-              </div>
-              <span class="badge ${isApnea ? 'b-purple' : 'b-amber'}">+${Number(p.dDb).toFixed(1)} dB</span>
-            </div>
-            <div class="muted" style="margin-top:4px;">音圧 ${Number(p.db).toFixed(1)} dB / 体動 ${Number(p.g) > 0 ? Number(p.g).toFixed(2) + ' G' : '0.00 G (PC)'} / baseline ${Number(p.baseline).toFixed(1)} dB</div>
-            <div class="waveform-box" id="wavebox-${prefix}-${i}">
-              <canvas class="wave-canvas" id="wavecanvas-${prefix}-${i}"></canvas>
-              <div class="play-cursor" id="cursor-${prefix}-${i}"></div>
-              <div class="play-btn-overlay" id="playbtn-${prefix}-${i}"></div>
-            </div>
-          `;
-          list.appendChild(item);
-
-          const canvas = document.getElementById(`wavecanvas-${prefix}-${i}`);
-          if (canvas && canvas.parentElement) {
-            const c = canvas.getContext('2d');
-            const w = canvas.parentElement.clientWidth;
-            const h = canvas.parentElement.clientHeight;
-            canvas.width = w; canvas.height = h;
-            c.fillStyle = '#334155';
-            c.fillRect(0, 0, w, h);
-            c.fillStyle = isApnea ? '#c084fc' : '#94a3b8';
-            for (let x=0; x<w; x+=3) {
-              const hh = (Math.sin(x*0.08)+1)*0.5*h*0.6 + 2;
-              c.fillRect(x, (h-hh)/2, 2, hh);
-            }
-          }
-
-          const box = document.getElementById(`wavebox-${prefix}-${i}`);
-          if(box) box.onclick = () => playPeakById(p.id, i, prefix);
-        }
       }
 
       async function loadDoctorSelect(){
@@ -2025,8 +1155,6 @@
         const dmg = document.getElementById("docMaxG");
         const dmd = document.getElementById("docMaxDb");
         const dn = document.getElementById("docNote");
-        const dpl = document.getElementById("docPeakList");
-        const dcp = document.getElementById("docConditionPanel");
 
         if(dt) dt.textContent = "--:--〜--:--";
         if(dd) dd.textContent = "--";
@@ -2038,41 +1166,12 @@
         if(dmg) dmg.textContent = "-- G";
         if(dmd) dmd.textContent = "-- dB";
         if(dn) dn.textContent = "セッションを選択してください。";
-        if(dpl) dpl.innerHTML = "";
-        if(dcp) dcp.innerHTML = "紐付くコンディションcheck結果がありません。";
 
         const canvas = document.getElementById('timelineCanvas');
         if(canvas) {
           const ctx = canvas.getContext('2d');
           ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
-      }
-
-      function loadDoctorConditionPanelBySession(sessionId){
-        const panel = document.getElementById("docConditionPanel");
-        if(!panel) return;
-        const checks = loadConditionChecks().filter(c => String(c.linkedSessionId) === String(sessionId));
-
-        if(!checks.length){
-          panel.innerHTML = "紐付くコンディションcheck結果がありません。";
-          return;
-        }
-
-        panel.innerHTML = checks.slice(0, 10).map(c => {
-          const r = c.raw || {};
-          const reaction = r.reactionMs != null ? `${r.reactionMs}ms` : "--";
-          const attC = r.attention ? `${r.attention.correct}/${r.attention.total}正答` : "--";
-          const mem = r.memory ? `${r.memory.success}/${r.memory.total}${r.memory.full ? "（完全再現）" : ""}` : "--";
-          return `
-            <div class="card" style="padding:8px;">
-              <div class="row" style="justify-content:space-between;">
-                <strong>${esc(c.dateTime)}</strong>
-                <span class="badge b-green">${esc(c.comment)}</span>
-              </div>
-              <div class="muted">反応 ${reaction} / 判断 ${attC} / 記憶 ${mem}</div>
-            </div>
-          `;
-        }).join("");
       }
 
       async function onDoctorSessionChange(sessionId){
@@ -2120,21 +1219,17 @@
             }).join(" / ");
             dn.innerHTML = `睡眠実測時間: <strong>${formatDurationFriendly(s.durationSec)}</strong><br>無呼吸疑い: <strong>${apnea}回（簡易AHI目安: ${ahi}）</strong><br><span style="font-size:12px;color:#475569;">※本指標は医療診断用ではなく、音響検知による目安です。<br>${esc(tail)}</span>`;
           }else{
-            dn.innerHTML = `睡眠実測時間: <strong>${formatDurationFriendly(s.durationSec)}</strong><br>イベント記録なし`;
+            dn.innerHTML = `睡眠実測時間: <strong>${formatDurationFriendly
+(s.durationSec)}</strong><br>イベント記録なし`;
           }
         }
 
-        const peaksAll = await getPeaksFromDB();
-        const peaks = peaksAll.filter(p => String(p.sessionId) === String(s.id));
         const apneaLogs = (s.eventLogs || []).filter(e => e.type === "apnea");
 
         setTimeout(() => {
           const canvas = document.getElementById('timelineCanvas');
-          if(canvas) drawTimelineChart(canvas, s.audioSamples, s.accelSamples, s.baselineDb, s.durationSec, peaks, apneaLogs);
+          if(canvas) drawTimelineChart(canvas, s.audioSamples, s.accelSamples, s.baselineDb, s.durationSec, apneaLogs);
         }, 50);
-
-        renderPeakList(peaks, "docPeakList", "doc");
-        loadDoctorConditionPanelBySession(s.id);
       }
 
       function bindStartButton(){
@@ -2160,15 +1255,13 @@
         const bl = document.getElementById("baselineLabel");
         if(bl) bl.textContent = `● ベースライン: ${baselineDb.toFixed(1)} dB`;
         updateDebug();
-        prepareConditionIdle();
       }
 
       return {
         init, runPreflight, requestMotionPermission, calibrateBaseline,
         startMeasurement, stopMeasurement, toggleBlackout, switchMode, switchPatientTab,
-        clearAllData, onPatientHistoryChange, exportFullLog, shareFullLog, exportLiteLog, shareLiteLog,
-        onDoctorSessionChange, goConditionNow, skipConditionNow,
-        startConditionFlow, onConditionReactionTap, onConditionAttentionTap, onConditionMemoryTap
+        clearAllData, onPatientHistoryChange, exportLiteLog, shareLiteLog,
+        onDoctorSessionChange
       };
     })();
 
