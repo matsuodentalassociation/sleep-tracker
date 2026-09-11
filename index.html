@@ -1,1280 +1,1420 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>SleepTracker</title>
-  <meta name="theme-color" content="#000000">
-  <style>
-    :root{
-      --bg:#f1f5f9; --card:#ffffff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
-      --primary:#4f46e5; --primary-hover:#4338ca; --ok:#10b981; --warn:#f59e0b;
-      --danger:#ef4444; --apnea:#a855f7; --ink:#020617; --ink2:#0f172a; --blue:#3b82f6; --amber:#f59e0b;
-    }
-    *{ box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; -webkit-tap-highlight-color:transparent; }
-    body{ background:var(--bg); color:var(--text); line-height:1.4; padding-bottom:80px; }
-    .top{ position:sticky; top:0; z-index:40; background:#fff; border-bottom:1px solid var(--line); }
-    .top-inner{ max-width:1100px; height:58px; margin:0 auto; padding:0 12px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
-    .brand{ display:flex; align-items:center; gap:8px; }
-    .brand .logo{ width:30px; height:30px; border-radius:9px; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:800; }
-    .brand .ttl{ font-weight:800; font-size:14px; line-height:1.1; }
-    .brand .sub{ font-size:10px; color:var(--muted); }
-    .mode-switch{ background:#eef2ff; padding:3px; border-radius:10px; display:flex; gap:4px; }
-    .container{ max-width:1100px; margin:12px auto 0; padding:0 12px; display:flex; flex-direction:column; gap:12px; }
-    .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; box-shadow:0 1px 3px rgba(15,23,42,.05); }
-    .hidden{ display:none !important; }
-    .row{ display:flex; align-items:center; gap:8px; }
-    .col{ display:flex; flex-direction:column; gap:10px; }
-    .btn{ border:1px solid transparent; border-radius:10px; padding:10px 12px; font-size:13px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; transition:.15s all; }
-    .btn:active{ transform:scale(.98); }
-    .btn:disabled{ opacity:.45; cursor:not-allowed; }
-    .btn-primary{ background:var(--primary); color:#fff; }
-    .btn-primary:hover{ background:var(--primary-hover); }
-    .btn-soft{ background:#f8fafc; border-color:#cbd5e1; color:#334155; }
-    .btn-danger{ background:var(--danger); color:#fff; }
-    .badge{ display:inline-flex; align-items:center; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:800; }
-    .b-gray{ background:#e2e8f0; color:#475569; }
-    .b-green{ background:#d1fae5; color:#065f46; }
-    .b-amber{ background:#fef3c7; color:#92400e; }
-    .b-purple{ background:#f3e8ff; color:#6b21a8; }
-    .tabs{ display:flex; overflow:auto; border:1px solid var(--line); border-radius:12px; background:#fff; scrollbar-width:none; }
-    .tab{ border:none; background:transparent; min-width:90px; padding:10px 10px; color:#475569; font-size:12px; font-weight:800; border-bottom:2px solid transparent; cursor:pointer; flex:1; text-align:center; }
-    .tab.active{ color:var(--primary); border-bottom-color:var(--primary); }
-    .muted{ font-size:12px; color:var(--muted); }
-    .mono{ font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
-    #toastWrap{ position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:100; width:min(92vw,420px); display:flex; flex-direction:column; gap:8px; pointer-events:none; }
-    .toast{ background:rgba(2,6,23,.92); color:#fff; border-radius:10px; padding:10px; font-size:12px; text-align:center; }
-    #blackout{ position:fixed; inset:0; z-index:90; background:#000; display:none; align-items:center; justify-content:center; flex-direction:column; }
-    #blackout.active{ display:flex; }
-    #blackoutClock{ font-size:38px; color:#334155; font-weight:900; font-family:ui-monospace,Menlo,Consolas,monospace; }
-    #realBars{ height:56px; background:#020617; border-radius:8px; display:flex; align-items:flex-end; gap:2px; padding:4px; overflow:hidden; }
-    .kv{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-    .tile{ background:#1e293b; border-radius:8px; padding:8px; }
-    .tile .k{ font-size:10px; color:#94a3b8; }
-    .tile .v{ font-size:17px; font-weight:900; }
-    .rule{ background:#eef2ff; border:1px solid #c7d2fe; border-radius:10px; padding:8px; font-size:12px; color:#1e3a8a; white-space:pre-wrap; }
-    .dbg{ background:#0b1220; color:#dbeafe; border:1px solid #22314f; border-radius:10px; padding:10px; font-size:12px; line-height:1.45; white-space:pre-wrap; min-height:142px; }
-    .list{ display:flex; flex-direction:column; gap:8px; }
-    select,textarea{ width:100%; border:1px solid var(--line); border-radius:10px; padding:10px; font-size:13px; background:#fff; color:var(--text); }
-    .share-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-    .summary-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
-    .sum{ border:1px solid var(--line); background:#f8fafc; border-radius:8px; padding:10px; }
-    .sum .k{ font-size:11px; color:#64748b; margin-bottom:2px; }
-    .sum .v{ font-weight:900; font-size:18px; color:#0f172a; }
+<meta charset="UTF-8" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>SleepTracker</title>
+<meta name="theme-color" content="#000000">
+<style>
+  :root{
+    --bg:#f1f5f9; --card:#ffffff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
+    --primary:#4f46e5; --primary-hover:#4338ca; --ok:#10b981; --warn:#f59e0b;
+    --danger:#ef4444; --apnea:#a855f7; --ink:#020617; --ink2:#0f172a; --blue:#3b82f6; --amber:#f59e0b;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; -webkit-tap-highlight-color:transparent; }
+  body{ background:var(--bg); color:var(--text); line-height:1.4; padding-bottom:80px; }
+  .top{ position:sticky; top:0; z-index:40; background:#fff; border-bottom:1px solid var(--line); }
+  .top-inner{ max-width:1100px; height:58px; margin:0 auto; padding:0 12px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .brand{ display:flex; align-items:center; gap:8px; }
+  .brand .logo{ width:30px; height:30px; border-radius:9px; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:800; }
+  .brand .ttl{ font-weight:800; font-size:14px; line-height:1.1; }
+  .brand .sub{ font-size:10px; color:var(--muted); }
+  .mode-switch{ background:#eef2ff; padding:3px; border-radius:10px; display:flex; gap:4px; }
+  .container{ max-width:1100px; margin:12px auto 0; padding:0 12px; display:flex; flex-direction:column; gap:12px; }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; box-shadow:0 1px 3px rgba(15,23,42,.05); }
+  .hidden{ display:none !important; }
+  .row{ display:flex; align-items:center; gap:8px; }
+  .col{ display:flex; flex-direction:column; gap:10px; }
+  .btn{ border:1px solid transparent; border-radius:10px; padding:10px 12px; font-size:13px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; transition:.15s all; }
+  .btn:active{ transform:scale(.98); }
+  .btn:disabled{ opacity:.45; cursor:not-allowed; }
+  .btn-primary{ background:var(--primary); color:#fff; }
+  .btn-primary:hover{ background:var(--primary-hover); }
+  .btn-soft{ background:#f8fafc; border-color:#cbd5e1; color:#334155; }
+  .btn-danger{ background:var(--danger); color:#fff; }
+  .badge{ display:inline-flex; align-items:center; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:800; }
+  .b-gray{ background:#e2e8f0; color:#475569; }
+  .b-green{ background:#d1fae5; color:#065f46; }
+  .b-amber{ background:#fef3c7; color:#92400e; }
+  .b-purple{ background:#f3e8ff; color:#6b21a8; }
+  .tabs{ display:flex; overflow:auto; border:1px solid var(--line); border-radius:12px; background:#fff; scrollbar-width:none; }
+  .tab{ border:none; background:transparent; min-width:90px; padding:10px 10px; color:#475569; font-size:12px; font-weight:800; border-bottom:2px solid transparent; cursor:pointer; flex:1; text-align:center; }
+  .tab.active{ color:var(--primary); border-bottom-color:var(--primary); }
+  .muted{ font-size:12px; color:var(--muted); }
+  .mono{ font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  #toastWrap{ position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:100; width:min(92vw,420px); display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+  .toast{ background:rgba(2,6,23,.92); color:#fff; border-radius:10px; padding:10px; font-size:12px; text-align:center; }
+  #blackout{ position:fixed; inset:0; z-index:90; background:#000; display:none; align-items:center; justify-content:center; flex-direction:column; }
+  #blackout.active{ display:flex; }
+  #blackoutClock{ font-size:38px; color:#334155; font-weight:900; font-family:ui-monospace,Menlo,Consolas,monospace; }
+  #realBars{ height:56px; background:#020617; border-radius:8px; display:flex; align-items:flex-end; gap:2px; padding:4px; overflow:hidden; }
+  .kv{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .tile{ background:#1e293b; border-radius:8px; padding:8px; }
+  .tile .k{ font-size:10px; color:#94a3b8; }
+  .tile .v{ font-size:17px; font-weight:900; }
+  .rule{ background:#eef2ff; border:1px solid #c7d2fe; border-radius:10px; padding:8px; font-size:12px; color:#1e3a8a; white-space:pre-wrap; }
+  .dbg{ background:#0b1220; color:#dbeafe; border:1px solid #22314f; border-radius:10px; padding:10px; font-size:12px; line-height:1.45; white-space:pre-wrap; min-height:142px; }
+  .list{ display:flex; flex-direction:column; gap:8px; }
+  select,textarea{ width:100%; border:1px solid var(--line); border-radius:10px; padding:10px; font-size:13px; background:#fff; color:var(--text); }
+  .share-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .summary-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  .sum{ border:1px solid var(--line); background:#f8fafc; border-radius:8px; padding:10px; }
+  .sum .k{ font-size:11px; color:#64748b; margin-bottom:2px; }
+  .sum .v{ font-weight:900; font-size:18px; color:#0f172a; }
 
-    @media (max-width:740px){
-      .share-grid,.summary-grid,.kv{ grid-template-columns:1fr; }
-    }
-  </style>
+  /* リカバリアラート */
+  #recoveryBanner{ background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+
+  @media (max-width:740px){
+    .share-grid,.summary-grid,.kv{ grid-template-columns:1fr; }
+  }
+</style>
 </head>
 <body>
-  <div id="toastWrap"></div>
+<div id="toastWrap"></div>
 
-  <div id="blackout" onclick="App.toggleBlackout(false)">
-    <div id="blackoutClock">00:00</div>
-    <div class="muted" style="margin-top:8px;color:#475569;">🌙 就寝モード（タップで復帰）</div>
-  </div>
+<div id="blackout" onclick="App.toggleBlackout(false)">
+  <div id="blackoutClock">00:00</div>
+  <div class="muted" style="margin-top:8px;color:#475569;">🌙 就寝モード（タップで復帰）</div>
+</div>
 
-  <header class="top">
-    <div class="top-inner">
-      <div class="brand">
-        <div class="logo">🌙</div>
-        <div>
-          <div class="ttl">SleepTracker</div>
-          <div class="sub">実測連動スリープモニター</div>
-        </div>
-      </div>
-      <div class="mode-switch">
-        <button id="btnModePatient" class="btn btn-soft" style="background:#fff;" onclick="App.switchMode('patient')">患者モード</button>
-        <button id="btnModeDoctor" class="btn btn-soft" onclick="App.switchMode('doctor')">医師モード</button>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <div class="logo">🌙</div>
+      <div>
+        <div class="ttl">SleepTracker</div>
+        <div class="sub">実測連動スリープモニター v12-Safe</div>
       </div>
     </div>
-  </header>
+    <div class="mode-switch">
+      <button id="btnModePatient" class="btn btn-soft" style="background:#fff;" onclick="App.switchMode('patient')">患者モード</button>
+      <button id="btnModeDoctor" class="btn btn-soft" onclick="App.switchMode('doctor')">医師モード</button>
+    </div>
+  </div>
+</header>
 
-  <main class="container">
-    <section id="patientView" class="col">
-      <div class="tabs">
-        <button id="tab-measure" class="tab active" onclick="App.switchPatientTab('measure')">測定</button>
-        <button id="tab-history" class="tab" onclick="App.switchPatientTab('history')">履歴</button>
-        <button id="tab-share" class="tab" onclick="App.switchPatientTab('share')">共有</button>
+<main class="container">
+  <section id="patientView" class="col">
+    <div class="tabs">
+      <button id="tab-measure" class="tab active" onclick="App.switchPatientTab('measure')">測定</button>
+      <button id="tab-history" class="tab" onclick="App.switchPatientTab('history')">履歴</button>
+      <button id="tab-share" class="tab" onclick="App.switchPatientTab('share')">共有</button>
+    </div>
+
+    <!-- 測定タブ -->
+    <div id="panel-measure" class="col">
+
+      <!-- 自動復旧アラート（万が一のOS強制終了時に自動表示） -->
+      <div id="recoveryBanner" class="hidden">
+        <div>
+          <strong style="color:#b45309;font-size:13px;">前回の未完了セッションを復旧しました</strong>
+          <div class="muted" style="color:#92400e;">直前（最大1分前）までのログが保護されています。</div>
+        </div>
+        <button class="btn btn-primary" style="padding:6px 10px;font-size:12px;background:#d97706;" onclick="App.saveRecoveredSession()">確定保存</button>
       </div>
 
-      <!-- 測定タブ -->
-      <div id="panel-measure" class="col">
-        <div class="card col">
-          <div class="row" style="justify-content:space-between;">
-            <div>
-              <strong>就寝測定セッション</strong>
-              <div class="muted">マイクdB + 体動（スマホ時） + 相対閾値＆無呼吸疑い検知</div>
-            </div>
-            <span id="sessionBadge" class="badge b-gray">未測定</span>
-          </div>
-
-          <div id="motionPermBox" class="row hidden" style="justify-content:space-between;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px;">
-            <span style="font-size:12px;">⚠️ iOSはモーション許可が必要です</span>
-            <button class="btn btn-primary" style="padding:6px 10px;" onclick="App.requestMotionPermission()">許可</button>
-          </div>
-
-          <div class="row">
-            <button class="btn btn-soft" onclick="App.runPreflight()">① 接続チェック</button>
-            <button class="btn btn-soft" onclick="App.requestMotionPermission()">② モーション許可</button>
-            <button class="btn btn-soft" onclick="App.calibrateBaseline()">③ ベースライン計測 (3秒)</button>
-          </div>
-
-          <div class="row" style="justify-content:space-between;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:8px;">
-            <span id="baselineLabel" style="font-size:12px;font-weight:800;color:#065f46;">● ベースライン: -- dB</span>
-            <span id="deltaLabel" class="mono" style="font-size:12px;color:#1e3a8a;">ΔdB: --</span>
-          </div>
-
-          <div id="ruleText" class="rule"></div>
-
-          <div class="col" style="background:var(--ink2);border-radius:10px;padding:10px;">
-            <div class="row" style="justify-content:space-between;">
-              <span id="recState" style="font-size:12px;color:#cbd5e1;">● 待機中</span>
-              <span id="recTime" class="mono" style="font-size:18px;color:#fff;font-weight:900;">00:00:00</span>
-            </div>
-            <div id="realBars"></div>
-            <div class="kv">
-              <div class="tile"><div class="k">実測マイク音圧</div><div id="valDb" class="v" style="color:#6ee7b7;">-- dB</div></div>
-              <div class="tile"><div class="k">実測加速度・体動</div><div id="valG" class="v" style="color:#93c5fd;">— G (PC/未検出)</div></div>
-            </div>
-          </div>
-
-          <div class="row">
-            <button id="btnStart" class="btn btn-primary" style="flex:1;" onclick="App.startMeasurement()">睡眠測定を開始</button>
-            <button id="btnStop" class="btn btn-soft" style="flex:1;" onclick="App.stopMeasurement()" disabled>測定を終了</button>
-          </div>
-          <button id="btnBlackout" class="btn btn-soft" onclick="App.toggleBlackout(true)" disabled>🌙 画面暗転（就寝モード）</button>
-
-          <div id="debugPanel" class="dbg">debug booting...</div>
-        </div>
-      </div>
-
-      <!-- 履歴タブ -->
-      <div id="panel-history" class="hidden col">
-        <div class="card col">
-          <div class="row" style="justify-content:space-between;">
-            <strong style="font-size:15px;">測定セッション選択</strong>
-            <button class="btn btn-soft" style="padding:6px 10px;" onclick="App.clearAllData()">全履歴消去</button>
-          </div>
-          <select id="patientHistorySelect" onchange="App.onPatientHistoryChange(this.value)"></select>
-        </div>
-
-        <div id="historyDetailContent" class="col">
-          <div class="card col">
-            <strong>睡眠サマリー</strong>
-            <div class="summary-grid">
-              <div class="sum"><div class="k">実測時間</div><div id="detDur" class="v">--</div></div>
-              <div class="sum"><div class="k">いびき疑い</div><div id="detSnore" class="v">--</div></div>
-              <div class="sum"><div class="k">無呼吸疑い（目安）</div><div id="detApnea" class="v" style="color:var(--apnea);">-- 回</div></div>
-              <div class="sum"><div class="k">簡易AHI目安</div><div id="detAhi" class="v" style="color:var(--apnea);">-- /時</div></div>
-              <div class="sum"><div class="k">最大音量</div><div id="detMaxDb" class="v">-- dB</div></div>
-              <div class="sum"><div class="k">最大体動</div><div id="detMaxG" class="v">-- G</div></div>
-            </div>
-          </div>
-
-          <div class="card col">
-            <div class="row" style="justify-content:space-between;">
-              <strong>音量 ＆ 体動タイムライン</strong>
-              <div class="row" style="gap:12px;font-size:11px;">
-                <span style="color:#ef4444;">● ピークイベント</span>
-                <span style="color:var(--apnea);">● 無呼吸疑い</span>
-              </div>
-            </div>
-            <div class="muted">上部: 音量(dB) / 下部: 体動(G)（寝返り・体の傾きを青色で表示）</div>
-            <div style="width: 100%; height: 220px; background: #020617; border-radius: 8px; position: relative; overflow: hidden; border: 1px solid #1e293b;">
-              <canvas id="detailTimelineCanvas" style="width: 100%; height: 100%; display: block;"></canvas>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 共有タブ -->
-      <div id="panel-share" class="hidden col">
-        <div class="card col">
-          <strong>完全実測ログ出力 / 共有</strong>
-          <div class="muted">セッションを選択してJSONを生成し、ダウンロードまたは共有します。</div>
-
-          <select id="shareSessionSelect"></select>
-
-          <div class="share-grid">
-            <button id="btnExportLite" class="btn btn-primary" onclick="App.exportLiteLog()">解析用軽量ログ書き出し (.json)</button>
-            <button id="btnShareLite" class="btn btn-soft" onclick="App.shareLiteLog()">解析用軽量ログ共有</button>
-          </div>
-
-          <textarea id="sharePreview" rows="8" readonly placeholder="ログサマリープレビュー"></textarea>
-        </div>
-      </div>
-    </section>
-
-    <!-- 医師モード -->
-    <section id="doctorView" class="hidden col">
       <div class="card col">
         <div class="row" style="justify-content:space-between;">
-          <strong>医師モード（保存済みセッション閲覧）</strong>
-          <span class="badge b-green">実測ログ</span>
+          <div>
+            <strong>就寝測定セッション</strong>
+            <div class="muted">マイクdB + 体動（スマホ時） + 1分毎自動退避保護</div>
+          </div>
+          <span id="sessionBadge" class="badge b-gray">未測定</span>
         </div>
-        <select id="doctorSessionSelect" onchange="App.onDoctorSessionChange(this.value)"></select>
-      </div>
 
+        <div id="motionPermBox" class="row hidden" style="justify-content:space-between;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px;">
+          <span style="font-size:12px;">⚠️ iOSはモーション許可が必要です</span>
+          <button class="btn btn-primary" style="padding:6px 10px;" onclick="App.requestMotionPermission()">許可</button>
+        </div>
+
+        <div class="row">
+          <button class="btn btn-soft" onclick="App.runPreflight()">① 接続チェック</button>
+          <button class="btn btn-soft" onclick="App.requestMotionPermission()">② モーション許可</button>
+          <button class="btn btn-soft" onclick="App.calibrateBaseline()">③ ベースライン計測 (3秒)</button>
+        </div>
+
+        <div class="row" style="justify-content:space-between;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:8px;">
+          <span id="baselineLabel" style="font-size:12px;font-weight:800;color:#065f46;">● ベースライン: -- dB</span>
+          <span id="deltaLabel" class="mono" style="font-size:12px;color:#1e3a8a;">ΔdB: --</span>
+        </div>
+
+        <div id="ruleText" class="rule"></div>
+
+        <div class="col" style="background:var(--ink2);border-radius:10px;padding:10px;">
+          <div class="row" style="justify-content:space-between;">
+            <span id="recState" style="font-size:12px;color:#cbd5e1;">● 待機中</span>
+            <span id="recTime" class="mono" style="font-size:18px;color:#fff;font-weight:900;">00:00:00</span>
+          </div>
+          <div id="realBars"></div>
+          <div class="kv">
+            <div class="tile"><div class="k">実測マイク音圧</div><div id="valDb" class="v" style="color:#6ee7b7;">-- dB</div></div>
+            <div class="tile"><div class="k">実測加速度・体動</div><div id="valG" class="v" style="color:#93c5fd;">— G (PC/未検出)</div></div>
+          </div>
+        </div>
+
+        <div class="row">
+          <button id="btnStart" class="btn btn-primary" style="flex:1;" onclick="App.startMeasurement()">睡眠測定を開始</button>
+          <button id="btnStop" class="btn btn-soft" style="flex:1;" onclick="App.stopMeasurement()" disabled>測定を終了</button>
+        </div>
+        <button id="btnBlackout" class="btn btn-soft" onclick="App.toggleBlackout(true)" disabled>🌙 画面暗転（就寝モード）</button>
+
+        <div id="debugPanel" class="dbg">debug booting...</div>
+      </div>
+    </div>
+
+    <!-- 履歴タブ -->
+    <div id="panel-history" class="hidden col">
       <div class="card col">
-        <div class="summary-grid" style="grid-template-columns: repeat(3, 1fr);">
-          <div class="sum"><div class="k">就寝時間帯</div><div id="docTime" class="v">--:--〜--:--</div></div>
-          <div class="sum"><div class="k">実測時間</div><div id="docDur" class="v">--</div></div>
-          <div class="sum"><div class="k">ベースライン</div><div id="docBase" class="v">-- dB</div></div>
-          <div class="sum"><div class="k">歯ぎしり疑い</div><div id="docBrux" class="v">--件</div></div>
-          <div class="sum"><div class="k">いびき疑い</div><div id="docSnore" class="v">--</div></div>
-          <div class="sum"><div class="k">無呼吸疑い（目安）</div><div id="docApnea" class="v" style="color:var(--apnea);">-- 回</div></div>
-          <div class="sum"><div class="k">簡易AHI目安</div><div id="docAhi" class="v" style="color:var(--apnea);">-- /時</div></div>
-          <div class="sum"><div class="k">最大体動</div><div id="docMaxG" class="v">-- G</div></div>
-          <div class="sum"><div class="k">最大音量</div><div id="docMaxDb" class="v">-- dB</div></div>
+        <div class="row" style="justify-content:space-between;">
+          <strong style="font-size:15px;">測定セッション選択</strong>
+          <button class="btn btn-soft" style="padding:6px 10px;" onclick="App.clearAllData()">全履歴消去</button>
+        </div>
+        <select id="patientHistorySelect" onchange="App.onPatientHistoryChange(this.value)"></select>
+      </div>
+
+      <div id="historyDetailContent" class="col">
+        <div class="card col">
+          <strong>睡眠サマリー</strong>
+          <div class="summary-grid">
+            <div class="sum"><div class="k">実測時間</div><div id="detDur" class="v">--</div></div>
+            <div class="sum"><div class="k">いびき疑い</div><div id="detSnore" class="v">--</div></div>
+            <div class="sum"><div class="k">無呼吸疑い（目安）</div><div id="detApnea" class="v" style="color:var(--apnea);">-- 回</div></div>
+            <div class="sum"><div class="k">簡易AHI目安</div><div id="detAhi" class="v" style="color:var(--apnea);">-- /時</div></div>
+            <div class="sum"><div class="k">最大音量</div><div id="detMaxDb" class="v">-- dB</div></div>
+            <div class="sum"><div class="k">最大体動</div><div id="detMaxG" class="v">-- G</div></div>
+          </div>
         </div>
 
-        <div id="docNote" class="muted" style="margin-top:10px;">セッションを選択してください。</div>
-
-        <div style="width: 100%; height: 180px; background: rgba(0,0,0,0.8); border-radius: 8px; margin-top: 12px; margin-bottom: 16px; position: relative; overflow: hidden;">
-          <canvas id="timelineCanvas" style="width: 100%; height: 100%; display: block;"></canvas>
+        <div class="card col">
+          <div class="row" style="justify-content:space-between;">
+            <strong>音量 ＆ 体動タイムライン</strong>
+            <div class="row" style="gap:12px;font-size:11px;">
+              <span style="color:#ef4444;">● ピークイベント</span>
+              <span style="color:var(--apnea);">● 無呼吸疑い</span>
+            </div>
+          </div>
+          <div class="muted">上部: 音量(dB) / 下部: 体動(G)（寝返り・体の傾きを青色で表示）</div>
+          <div style="width: 100%; height: 220px; background: #020617; border-radius: 8px; position: relative; overflow: hidden; border: 1px solid #1e293b;">
+            <canvas id="detailTimelineCanvas" style="width: 100%; height: 100%; display: block;"></canvas>
+          </div>
         </div>
       </div>
-    </section>
-  </main>
+    </div>
 
-  <script>
-    // キャッシュ強制更新スクリプト
-    (function checkCacheBust() {
-      const CURRENT_APP_VERSION = "2026-09-11_v11_fix_syntax";
-      const savedVersion = localStorage.getItem("app_cache_version");
+    <!-- 共有タブ -->
+    <div id="panel-share" class="hidden col">
+      <div class="card col">
+        <strong>完全実測ログ出力 / 共有</strong>
+        <div class="muted">セッションを選択してJSONを生成し、ダウンロードまたは共有します。</div>
 
-      if (savedVersion !== CURRENT_APP_VERSION) {
-        localStorage.setItem("app_cache_version", CURRENT_APP_VERSION);
-        if ('caches' in window) {
-          caches.keys().then(names => {
-            for (let name of names) caches.delete(name);
-          });
-        }
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then(regs => {
-            for (let reg of regs) reg.unregister();
-          });
-        }
-        if (savedVersion) {
-          window.location.reload(true);
-        }
-      }
-    })();
+        <select id="shareSessionSelect"></select>
 
-    const App = (() => {
-      const DB_NAME = 'SleepTrackerDB';
-      const DB_VERSION = 1;
-      let db = null;
+        <div class="share-grid">
+          <button id="btnExportLite" class="btn btn-primary" onclick="App.exportLiteLog()">解析用軽量ログ書き出し (.json)</button>
+          <button id="btnShareLite" class="btn btn-soft" onclick="App.shareLiteLog()">解析用軽量ログ共有</button>
+        </div>
 
-      function initDB() {
-        return new Promise((resolve) => {
-          try {
-            const request = indexedDB.open(DB_NAME, DB_VERSION);
-            request.onerror = () => resolve(null);
-            request.onsuccess = (e) => { db = e.target.result; resolve(db); };
-            request.onupgradeneeded = (e) => {
-              const d = e.target.result;
-              if (!d.objectStoreNames.contains('sessions')) d.createObjectStore('sessions', { keyPath: 'id' });
-              if (!d.objectStoreNames.contains('peaks')) d.createObjectStore('peaks', { keyPath: 'id' });
-            };
-          } catch(err) {
-            resolve(null);
-          }
+        <textarea id="sharePreview" rows="8" readonly placeholder="ログサマリープレビュー"></textarea>
+      </div>
+    </div>
+  </section>
+
+  <!-- 医師モード -->
+  <section id="doctorView" class="hidden col">
+    <div class="card col">
+      <div class="row" style="justify-content:space-between;">
+        <strong>医師モード（保存済みセッション閲覧）</strong>
+        <span class="badge b-green">実測ログ</span>
+      </div>
+      <select id="doctorSessionSelect" onchange="App.onDoctorSessionChange(this.value)"></select>
+    </div>
+
+    <div class="card col">
+      <div class="summary-grid" style="grid-template-columns: repeat(3, 1fr);">
+        <div class="sum"><div class="k">就寝時間帯</div><div id="docTime" class="v">--:--〜--:--</div></div>
+        <div class="sum"><div class="k">実測時間</div><div id="docDur" class="v">--</div></div>
+        <div class="sum"><div class="k">ベースライン</div><div id="docBase" class="v">-- dB</div></div>
+        <div class="sum"><div class="k">歯ぎしり疑い</div><div id="docBrux" class="v">--件</div></div>
+        <div class="sum"><div class="k">いびき疑い</div><div id="docSnore" class="v">--</div></div>
+        <div class="sum"><div class="k">無呼吸疑い（目安）</div><div id="docApnea" class="v" style="color:var(--apnea);">-- 回</div></div>
+        <div class="sum"><div class="k">簡易AHI目安</div><div id="docAhi" class="v" style="color:var(--apnea);">-- /時</div></div>
+        <div class="sum"><div class="k">最大体動</div><div id="docMaxG" class="v">-- G</div></div>
+        <div class="sum"><div class="k">最大音量</div><div id="docMaxDb" class="v">-- dB</div></div>
+      </div>
+
+      <div id="docNote" class="muted" style="margin-top:10px;">セッションを選択してください。</div>
+
+      <div style="width: 100%; height: 180px; background: rgba(0,0,0,0.8); border-radius: 8px; margin-top: 12px; margin-bottom: 16px; position: relative; overflow: hidden;">
+        <canvas id="timelineCanvas" style="width: 100%; height: 100%; display: block;"></canvas>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- バックグラウンド動作維持用の不可視オーディオ（無音ループ再生） -->
+<audio id="silentBgAudio" loop playsinline src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="></audio>
+<script>
+  // キャッシュ強制更新スクリプト
+  (function checkCacheBust() {
+    const CURRENT_APP_VERSION = "2026-09-12_v12_crash_proof";
+    const savedVersion = localStorage.getItem("app_cache_version");
+
+    if (savedVersion !== CURRENT_APP_VERSION) {
+      localStorage.setItem("app_cache_version", CURRENT_APP_VERSION);
+      if ('caches' in window) {
+        caches.keys().then(names => {
+          for (let name of names) caches.delete(name);
         });
       }
-
-      async function saveSessionToDB(session) {
-        if (!db) await initDB();
-        if (!db) return;
-        return new Promise((resolve) => {
-          try {
-            const tx = db.transaction('sessions', 'readwrite');
-            tx.objectStore('sessions').put(session);
-            tx.oncomplete = () => resolve();
-            tx.onerror = () => resolve();
-          } catch(e) { resolve(); }
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          for (let reg of regs) reg.unregister();
         });
       }
-
-      async function getSessionsFromDB() {
-        if (!db) await initDB();
-        if (!db) return [];
-        return new Promise((resolve) => {
-          try {
-            const tx = db.transaction('sessions', 'readonly');
-            const req = tx.objectStore('sessions').getAll();
-            req.onsuccess = () => resolve((req.result || []).sort((a,b) => Number(b.id) - Number(a.id)));
-            req.onerror = () => resolve([]);
-          } catch(e) { resolve([]); }
-        });
+      if (savedVersion) {
+        window.location.reload(true);
       }
+    }
+  })();
 
-      async function clearDB() {
-        if (!db) await initDB();
-        if (!db) return;
-        return new Promise((resolve) => {
-          try {
-            const tx = db.transaction(['sessions', 'peaks'], 'readwrite');
-            tx.objectStore('sessions').clear();
-            tx.objectStore('peaks').clear();
-            tx.oncomplete = () => resolve();
-            tx.onerror = () => resolve();
-          } catch(e) { resolve(); }
-        });
-      }
+  const App = (() => {
+    const DB_NAME = 'SleepTrackerDB';
+    const DB_VERSION = 2; // リカバリ用ストア追加のため更新
+    let db = null;
 
-      let mode = "patient";
-      let patientTab = "measure";
-
-      let isRecording = false;
-      let recStart = null, recSec = 0, recTimer = null, sampleTimer = null, wakeLock = null;
-      let mediaStream = null;
-
-      let audioContext = null, analyser = null, timeBuf = null;
-
-      let motionBound = false, motionActive = false, gotMotion = false;
-      let gravity = { x: 0, y: 0, z: 0 };
-      let hasInitGravity = false;
-      let currentG = 0, maxG = 0;
-      let currentDb = 32.0, baselineDb = 32.0, dbWindow = [], gWindow = [];
-
-      let audioSamples = [], accelSamples = [], bruxCounter = 0, snoreMinutes = 0;
-      let apneaEventsCount = 0;
-      let eventLogs = [];
-      let preflight = {}, lastDecision = "待機", lastTrigger = "なし";
-      let currentSessionIdForRecording = "", lastSavedSessionId = "";
-
-      let hadRecentSnore = false;
-      let recentSnoreExpiry = 0;
-      let silenceStartSec = null;
-
-      const CFG = {
-        sampleMs: 120, peakDbDelta: 10, snoreDbMin: 6, snoreDbMax: 16, bruxDbMin: 14,
-        talkDbMin: 9, talkDbMax: 20,
-        gPeakOffset: 0.04, gMoveOffset: 0.02, gPeakFloor: 0.05, gPeakCeil: 0.20,
-        cooldownMs: 45000,
-        apneaSilenceMinSec: 10, apneaSilenceMaxSec: 45
-      };
-
-      function toast(msg){
-        const wrap = document.getElementById("toastWrap");
-        if(!wrap) return;
-        const t = document.createElement("div");
-        t.className = "toast";
-        t.textContent = msg;
-        wrap.appendChild(t);
-        setTimeout(() => {
-          t.style.opacity = "0";
-          t.style.transition = "opacity .25s";
-          setTimeout(() => t.remove(), 250);
-        }, 2100);
-      }
-
-      function esc(v){ return String(v).replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m])); }
-
-      function formatDurationFriendly(sec){
-        sec = Math.round(sec || 0);
-        if(sec < 60) return `${sec}秒`;
-        const m = Math.floor(sec / 60);
-        const s = sec % 60;
-        return s === 0 ? `${m}分` : `${m}分${s}秒`;
-      }
-
-      function formatMinutesFriendly(minVal){
-        if(!minVal || minVal < 0.1) return "0分";
-        if(minVal < 1) return `${Math.round(minVal * 60)}秒`;
-        return `${minVal.toFixed(1)}分`;
-      }
-
-      function formatHMS(sec){
-        const h = String(Math.floor(sec/3600)).padStart(2,"0");
-        const m = String(Math.floor((sec%3600)/60)).padStart(2,"0");
-        const s = String(sec%60).padStart(2,"0");
-        return `${h}:${m}:${s}`;
-      }
-      function formatHM(sec){
-        const h = String(Math.floor(sec/3600)).padStart(2,"0");
-        const m = String(Math.floor((sec%3600)/60)).padStart(2,"0");
-        return `${h}:${m}`;
-      }
-      function median(arr){
-        if(!arr.length) return 0;
-        const a = [...arr].sort((x,y)=>x-y);
-        const m = Math.floor(a.length/2);
-        return a.length % 2 ? a[m] : (a[m-1]+a[m])/2;
-      }
-      function pushWin(arr,v,max){ arr.push(v); if(arr.length>max) arr.shift(); }
-      function dynGPeakThreshold(){ return Math.min(CFG.gPeakCeil, Math.max(CFG.gPeakFloor, median(gWindow) + CFG.gPeakOffset)); }
-      function dynGMoveThreshold(){ return Math.max(0.025, median(gWindow) + CFG.gMoveOffset); }
-
-      async function toggleBlackout(on){
-        const b = document.getElementById("blackout");
-        if(!b) return;
-        if(on){
-          b.classList.add("active");
-          try { if(document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch(e){}
-        }else{
-          b.classList.remove("active");
-          try { if(document.fullscreenElement) await document.exitFullscreen(); } catch(e){}
-        }
-      }
-
-      function initBars(){
-        const c = document.getElementById("realBars");
-        if(!c) return;
-        c.innerHTML = "";
-        for(let i=0;i<30;i++){
-          const b = document.createElement("div");
-          b.id = `bar-${i}`;
-          b.style.cssText = "flex:1;min-height:4px;height:8px;background:#10b981;border-radius:2px;transition:height .08s linear;";
-          c.appendChild(b);
-        }
-      }
-
-      function drawBars(db){
-        for(let i=0;i<30;i++){
-          const b = document.getElementById(`bar-${i}`);
-          if(!b) continue;
-          const h = Math.min(52, Math.max(4, (db-22)*1.2 + Math.random()*5));
-          b.style.height = `${h}px`;
-          b.style.background = db >= baselineDb + CFG.peakDbDelta ? "#f59e0b" : "#10b981";
-        }
-      }
-
-      function updateRuleText(){
-        const el = document.getElementById("ruleText");
-        if(!el) return;
-        const txt = [
-          `peak: dB >= baseline + ${CFG.peakDbDelta} ${gotMotion ? ` OR G >= dyn(${dynGPeakThreshold().toFixed(2)})` : "(PC: 音圧のみ判定)"}`,
-          `apnea(無呼吸目安): いびき直後の静寂 ${CFG.apneaSilenceMinSec}〜${CFG.apneaSilenceMaxSec}秒後の呼吸再開`,
-          `snore: +${CFG.snoreDbMin}..+${CFG.snoreDbMax} dB ${gotMotion ? ` & G < move(${dynGMoveThreshold().toFixed(2)})` : ""}`,
-          `sample: ${CFG.sampleMs}ms`
-        ].join("\n");
-        el.textContent = txt;
-      }
-
-      function updateDebug(){
-        const ddb = (currentDb - baselineDb).toFixed(1);
-        const dl = document.getElementById("deltaLabel");
-        if(dl) dl.textContent = `ΔdB: ${ddb}`;
-        const dbgEl = document.getElementById("debugPanel");
-        if(!dbgEl) return;
-        const dbg = [
-          "[Preflight]",
-          `secure=${window.isSecureContext} getUserMedia=${!!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)}`,
-          `micPermission=${preflight.micPermissionState || "unknown"}`,
-          "",
-          "[Runtime]",
-          `recording=${isRecording} wakeLock=${!!wakeLock} gotMotion=${gotMotion}`,
-          `db=${currentDb.toFixed(1)} baseline=${baselineDb.toFixed(1)} dDb=+${ddb}`,
-          `g=${gotMotion ? currentG.toFixed(2) : "0.00(PC固定)"} apneaCount=${apneaEventsCount}`,
-          `silenceElapsed=${silenceStartSec ? (recSec - silenceStartSec) + "s" : "0s"}`,
-          "",
-          "[Decision]",
-          `lastDecision=${lastDecision}`,
-          `lastTrigger=${lastTrigger}`
-        ].join("\n");
-        dbgEl.textContent = dbg;
-      }
-
-      async function requestWakeLock(){
-        try{
-          if("wakeLock" in navigator){
-            wakeLock = await navigator.wakeLock.request("screen");
-            wakeLock.addEventListener("release", () => { wakeLock = null; updateDebug(); });
-          }
-        }catch{}
-      }
-
-      function releaseWakeLock(){
-        if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock = null; }
-      }
-
-      function setupMotionUI(){
-        const box = document.getElementById("motionPermBox");
-        if(typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function"){
-          box.classList.remove("hidden");
-        }else{
-          box.classList.add("hidden");
-          bindMotion();
-        }
-      }
-
-      function bindMotion(){
-        if(motionBound) return;
-        motionBound = true;
-        window.addEventListener("devicemotion", ev => {
-          const a = ev.accelerationIncludingGravity || ev.acceleration;
-          if(!a || a.x == null) return;
-          gotMotion = true;
-          motionActive = true;
-
-          const ax = a.x || 0;
-          const ay = a.y || 0;
-          const az = a.z || 0;
-
-          if (!hasInitGravity) {
-            gravity = { x: ax, y: ay, z: az };
-            hasInitGravity = true;
-            return;
-          }
-
-          const alpha = 0.82;
-          gravity.x = alpha * gravity.x + (1 - alpha) * ax;
-          gravity.y = alpha * gravity.y + (1 - alpha) * ay;
-          gravity.z = alpha * gravity.z + (1 - alpha) * az;
-
-          const lx = ax - gravity.x;
-          const ly = ay - gravity.y;
-          const lz = az - gravity.z;
-
-          const rawG = Math.sqrt(lx*lx + ly*ly + lz*lz) / 9.80665;
-          currentG = rawG < 0.005 ? 0 : rawG;
-
-          if(isRecording && currentG > maxG) maxG = currentG;
-          const vg = document.getElementById("valG");
-          if(vg) vg.textContent = `${currentG.toFixed(2)} G`;
-        }, { passive:true });
-      }
-
-      async function requestMotionPermission(){
-        try{
-          if(typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function"){
-            const r = await DeviceMotionEvent.requestPermission();
-            if(r !== "granted"){ toast("モーション許可が拒否されました"); return; }
-          }
-          bindMotion();
-          document.getElementById("motionPermBox").classList.add("hidden");
-          toast("モーション許可OK");
-        }catch{ toast("モーション許可でエラー"); }
-      }
-
-      async function ensureAudioAnalyserFromStream(stream){
-        if(audioContext) return;
-        const AC = window.AudioContext || window.webkitAudioContext;
-        audioContext = new AC();
-        if(audioContext.state === "suspended"){ try{ await audioContext.resume(); }catch{} }
-
-        const src = audioContext.createMediaStreamSource(stream);
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 1024;
-        src.connect(analyser);
-        timeBuf = new Float32Array(analyser.fftSize);
-      }
-
-      function calcDb(){
-        if(!analyser || !timeBuf) return 30 + Math.random()*2;
-        analyser.getFloatTimeDomainData(timeBuf);
-        let sum = 0;
-        for(let i=0;i<timeBuf.length;i++) sum += timeBuf[i]*timeBuf[i];
-        const rms = Math.sqrt(sum / timeBuf.length);
-        if(rms <= 1e-8) return 24;
-        return Math.min(95, Math.max(24, 20*Math.log10(rms) + 71));
-      }
-
-      async function runPreflight(){
-        const out = {};
-        out.isSecureContext = window.isSecureContext;
-        out.hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-        out.hasDeviceMotion = "DeviceMotionEvent" in window;
-        try{
-          if(navigator.permissions && navigator.permissions.query){
-            const mic = await navigator.permissions.query({ name:"microphone" });
-            out.micPermissionState = mic.state;
-          }else{ out.micPermissionState = "unknown"; }
-        }catch{ out.micPermissionState = "unknown"; }
-        preflight = out;
-
+    function initDB() {
+      return new Promise((resolve) => {
         try {
-          if(!mediaStream){
-            mediaStream = await navigator.mediaDevices.getUserMedia({ audio:true });
-            await ensureAudioAnalyserFromStream(mediaStream);
-            toast("マイク接続OK");
-          } else {
-            toast("マイクは既に接続されています");
-          }
-        } catch(e) {
-          toast("マイク接続エラー: " + (e.message || e.name));
-        }
-
-        updateDebug();
-      }
-
-      async function calibrateBaseline(){
-        if(!mediaStream){
-          toast("先に「① 接続チェック」を行ってください");
-          return;
-        }
-
-        toast("ベースライン計測中（3秒）");
-        const arr = [];
-        const t = setInterval(() => {
-          arr.push(calcDb());
-          if(arr.length > 140) arr.shift();
-        }, 20);
-
-        setTimeout(() => {
-          clearInterval(t);
-          if(arr.length){
-            baselineDb = median(arr);
-            const bl = document.getElementById("baselineLabel");
-            if(bl) bl.textContent = `● ベースライン: ${baselineDb.toFixed(1)} dB`;
-          }
-          updateRuleText();
-          updateDebug();
-          toast("ベースライン更新");
-        }, 3000);
-      }
-
-      function pushEventLog(type, db, g){
-        const hhmm = formatHM(recSec);
-        eventLogs.push({
-          type, time: formatHMS(recSec), hhmm,
-          db: +db.toFixed(1), g: +g.toFixed(2),
-          baseline: +baselineDb.toFixed(1), dDb: +(db-baselineDb).toFixed(1)
-        });
-      }
-
-      function processAudioTick(db){
-        const now = Date.now();
-        const dDb = db - baselineDb;
-        const gMove = dynGMoveThreshold();
-        const isLowMotion = gotMotion ? (currentG < gMove) : true;
-        const isVeryLowMotion = gotMotion ? (currentG < gMove * 0.9) : true;
-        const isTalkLowMotion = gotMotion ? (currentG < gMove * 0.8) : true;
-
-        if(dDb >= CFG.snoreDbMin && dDb <= CFG.snoreDbMax && isLowMotion){
-          snoreMinutes += (CFG.sampleMs / 1000 / 60);
-          pushEventLog("snore", db, currentG);
-          hadRecentSnore = true;
-          recentSnoreExpiry = now + 60000;
-        }
-        if(dDb >= CFG.bruxDbMin && isVeryLowMotion){
-          bruxCounter++;
-          pushEventLog("bruxism", db, currentG);
-        }
-        if(dDb >= CFG.talkDbMin && dDb <= CFG.talkDbMax && isTalkLowMotion){
-          pushEventLog("sleep_talk", db, currentG);
-        }
-
-        const isSilent = (dDb < 2.5);
-
-        if(hadRecentSnore && now > recentSnoreExpiry){
-          hadRecentSnore = false;
-        }
-
-        if(hadRecentSnore){
-          if(isSilent){
-            if(silenceStartSec === null) silenceStartSec = recSec;
-          }else{
-            if(silenceStartSec !== null){
-              const silenceDuration = recSec - silenceStartSec;
-              if(silenceDuration >= CFG.apneaSilenceMinSec && silenceDuration <= CFG.apneaSilenceMaxSec && dDb >= 8){
-                apneaEventsCount++;
-                pushEventLog("apnea", db, currentG);
-                toast(`無呼吸疑いを検知（静寂${silenceDuration}秒後）`);
-              }
-              silenceStartSec = null;
-            }
-          }
-        } else {
-          silenceStartSec = null;
-        }
-
-        const overDb = db >= (baselineDb + CFG.peakDbDelta);
-        const overG = gotMotion ? (currentG >= dynGPeakThreshold()) : false;
-
-        if(overDb || overG){
-          lastTrigger = `PEAK: db=${db.toFixed(1)} g=${currentG.toFixed(2)}`;
-          lastDecision = "PEAK_DETECTED";
-        }
-      }
-
-      async function startMeasurement(){
-        if(isRecording) return;
-        await initDB();
-
-        if(!mediaStream){
-          try{ mediaStream = await navigator.mediaDevices.getUserMedia({ audio:true }); }
-          catch(e){ alert("マイク権限エラー: " + (e.message || e.name)); return; }
-        }
-        try{ await ensureAudioAnalyserFromStream(mediaStream); }
-        catch(e){ alert("音声解析初期化エラー"); mediaStream = null; return; }
-
-        try{ if(typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") await DeviceMotionEvent.requestPermission(); }catch{}
-        bindMotion();
-        await requestWakeLock();
-
-        isRecording = true;
-        recStart = new Date();
-        recSec = 0;
-        currentSessionIdForRecording = String(Date.now());
-
-        audioSamples = []; accelSamples = []; bruxCounter = 0; snoreMinutes = 0; maxG = 0;
-        apneaEventsCount = 0; hadRecentSnore = false; silenceStartSec = null;
-        eventLogs = []; dbWindow = []; gWindow = [];
-        gotMotion = false; lastDecision = "測定開始"; lastTrigger = "なし";
-
-        document.getElementById("sessionBadge").textContent = "測定中";
-        document.getElementById("sessionBadge").className = "badge b-green";
-        document.getElementById("recState").textContent = "● センサー取得中";
-        document.getElementById("recState").style.color = "#ef4444";
-        document.getElementById("btnStart").disabled = true;
-        document.getElementById("btnStop").disabled = false;
-        document.getElementById("btnStop").className = "btn btn-danger";
-        document.getElementById("btnBlackout").disabled = false;
-
-        clearInterval(recTimer);
-        recTimer = setInterval(() => {
-          recSec++;
-          const h = String(Math.floor(recSec/3600)).padStart(2,"0");
-          const m = String(Math.floor((recSec%3600)/60)).padStart(2,"0");
-          const s = String(recSec%60).padStart(2,"0");
-          const rt = document.getElementById("recTime");
-          if(rt) rt.textContent = `${h}:${m}:${s}`;
-          const bc = document.getElementById("blackoutClock");
-          if(bc) bc.textContent = `${h}:${m}`;
-        }, 1000);
-
-        clearInterval(sampleTimer);
-        sampleTimer = setInterval(() => {
-          if(!isRecording) return;
-          currentDb = calcDb();
-
-          if(!gotMotion){
-            currentG = 0;
-            const vg = document.getElementById("valG");
-            if(vg) vg.textContent = "— G (PC/未検出)";
-          }
-
-          pushWin(dbWindow, currentDb, 140);
-          if(gotMotion) pushWin(gWindow, currentG, 140);
-
-          processAudioTick(currentDb);
-
-          if(audioSamples.length < 28800){
-            audioSamples.push(+currentDb.toFixed(1));
-            accelSamples.push(gotMotion ? +currentG.toFixed(2) : 0);
-          }
-          if(gotMotion && currentG > maxG) maxG = currentG;
-
-          const vd = document.getElementById("valDb");
-          if(vd) vd.textContent = `${currentDb.toFixed(1)} dB`;
-          drawBars(currentDb);
-          updateRuleText();
-          updateDebug();
-        }, CFG.sampleMs);
-
-        toast("測定開始");
-      }
-
-      async function stopMeasurement(){
-        if(!isRecording) return;
-        isRecording = false;
-
-        clearInterval(recTimer);
-        clearInterval(sampleTimer);
-
-        releaseWakeLock();
-        toggleBlackout(false);
-
-        const end = new Date();
-        const durationSec = recSec;
-        const id = currentSessionIdForRecording || String(Date.now());
-
-        const durationHours = durationSec / 3600;
-        const ahiEstimate = durationHours >= 0.1 ? Number((apneaEventsCount / durationHours).toFixed(1)) : 0;
-
-        const session = {
-          id,
-          dateStr: recStart ? recStart.toLocaleDateString("ja-JP") : new Date().toLocaleDateString("ja-JP"),
-          startTime: recStart ? recStart.toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}) : "--:--",
-          endTime: end.toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
-          durationSec,
-          baselineDb: +baselineDb.toFixed(1),
-          bruxismEvents: Math.round(bruxCounter / 5),
-          snoreMin: +snoreMinutes.toFixed(1),
-          apneaCount: apneaEventsCount,
-          ahiEstimate,
-          maxMotionG: gotMotion ? +maxG.toFixed(2) : 0,
-          audioSamples,
-          accelSamples,
-          eventLogs
-        };
-
-        await saveSessionToDB(session);
-        lastSavedSessionId = id;
-
-        document.getElementById("sessionBadge").textContent = "測定完了";
-        document.getElementById("sessionBadge").className = "badge b-gray";
-        document.getElementById("recState").textContent = "● 待機中";
-        document.getElementById("recState").style.color = "#cbd5e1";
-        document.getElementById("btnStart").disabled = false;
-        document.getElementById("btnStop").disabled = true;
-        document.getElementById("btnStop").className = "btn btn-soft";
-        document.getElementById("btnBlackout").disabled = true;
-
-        lastDecision = "測定終了・保存";
-        updateDebug();
-
-        await loadPatientHistorySelect();
-        await loadShareSelect();
-        await loadDoctorSelect();
-
-        toast("保存完了");
-      }
-
-      async function clearAllData(){
-        if(!confirm("すべての測定履歴を消去しますか？")) return;
-        await clearDB();
-        toast("全データを消去しました");
-        const prev = document.getElementById("sharePreview");
-        if(prev) prev.value = "";
-        clearDoctorSummary();
-        await loadPatientHistorySelect();
-        await loadShareSelect();
-        await loadDoctorSelect();
-      }
-
-      function switchMode(m){
-        mode = m;
-        const bp = document.getElementById("btnModePatient");
-        const bd = document.getElementById("btnModeDoctor");
-        if(bp) bp.style.background = m==="patient" ? "#fff" : "transparent";
-        if(bd) bd.style.background = m==="doctor" ? "#fff" : "transparent";
-        const pv = document.getElementById("patientView");
-        const dv = document.getElementById("doctorView");
-        if(pv) pv.classList.toggle("hidden", m!=="patient");
-        if(dv) dv.classList.toggle("hidden", m!=="doctor");
-        if(m==="doctor") loadDoctorSelect();
-      }
-
-      function switchPatientTab(t){
-        patientTab = t;
-        ["measure","history","share"].forEach(x => {
-          const tabEl = document.getElementById(`tab-${x}`);
-          const panEl = document.getElementById(`panel-${x}`);
-          if(tabEl) tabEl.classList.toggle("active", x===t);
-          if(panEl) panEl.classList.toggle("hidden", x!==t);
-        });
-        if(t==="history") loadPatientHistorySelect();
-        if(t==="share") loadShareSelect();
-      }
-
-      async function loadPatientHistorySelect(){
-        const sel = document.getElementById("patientHistorySelect");
-        if(!sel) return;
-        const sessions = await getSessionsFromDB();
-        sel.innerHTML = "";
-        const detWrap = document.getElementById("historyDetailContent");
-
-        if(!sessions.length){
-          sel.innerHTML = `<option value="">保存済みセッションなし</option>`;
-          if(detWrap) detWrap.classList.add("hidden");
-          return;
-        }
-
-        if(detWrap) detWrap.classList.remove("hidden");
-        sessions.forEach(s => {
-          const op = document.createElement("option");
-          op.value = s.id;
-          const maxDb = s.audioSamples && s.audioSamples.length ? Math.max(...s.audioSamples) : 0;
-          const apnea = s.apneaCount || 0;
-          op.textContent = `${s.dateStr} ${s.startTime}〜${s.endTime} （実測: ${formatDurationFriendly(s.durationSec)} / 無呼吸目安: ${apnea}回 / 最大: ${maxDb.toFixed(1)}dB）`;
-          sel.appendChild(op);
-        });
-
-        const targetId = lastSavedSessionId || sessions[0].id;
-        sel.value = targetId;
-        await showHistoryDetail(targetId);
-      }
-
-      async function onPatientHistoryChange(sessionId){
-        await showHistoryDetail(sessionId);
-      }
-
-      async function showHistoryDetail(sessionId) {
-        const sessions = await getSessionsFromDB();
-        const s = sessions.find(x => String(x.id) === String(sessionId)) || sessions[0];
-        if(!s) return;
-
-        const elDur = document.getElementById("detDur");
-        const elSnore = document.getElementById("detSnore");
-        const elApnea = document.getElementById("detApnea");
-        const elAhi = document.getElementById("detAhi");
-        const elMaxDb = document.getElementById("detMaxDb");
-        const elMaxG = document.getElementById("detMaxG");
-
-        if(elDur) elDur.textContent = formatDurationFriendly(s.durationSec);
-        if(elSnore) elSnore.textContent = formatMinutesFriendly(s.snoreMin);
-        
-        const apnea = s.apneaCount || 0;
-        if(elApnea) elApnea.textContent = `${apnea} 回`;
-        const ahi = s.ahiEstimate != null ? `${s.ahiEstimate} /時` : "-- /時";
-        if(elAhi) elAhi.textContent = ahi;
-
-        const maxDb = s.audioSamples && s.audioSamples.length ? Math.max(...s.audioSamples) : 0;
-        if(elMaxDb) elMaxDb.textContent = `${maxDb.toFixed(1)} dB`;
-        
-        const valG = Number(s.maxMotionG || 0);
-        if(elMaxG) elMaxG.textContent = valG > 0 ? `${valG.toFixed(2)} G` : "0.00 G (PC)";
-
-        const apneaLogs = (s.eventLogs || []).filter(e => e.type === "apnea");
-
-        setTimeout(() => {
-          const canvas = document.getElementById('detailTimelineCanvas');
-          if(canvas) drawTimelineChart(canvas, s.audioSamples, s.accelSamples, s.baselineDb, s.durationSec, apneaLogs);
-        }, 50);
-      }
-
-      async function buildLiteLog(session){
-        return {
-          meta: { app: "SleepTracker", version: "v11_stable", exportedAt: new Date().toISOString(), locale: "ja-JP" },
-          session: {
-            id: session.id,
-            dateStr: session.dateStr,
-            startTime: session.startTime,
-            endTime: session.endTime,
-            durationSec: session.durationSec,
-            baselineDb: session.baselineDb,
-            bruxismEvents: session.bruxismEvents,
-            snoreMin: session.snoreMin,
-            apneaCount: session.apneaCount,
-            ahiEstimate: session.ahiEstimate,
-            maxMotionG: session.maxMotionG,
-            audioSamples: session.audioSamples,
-            accelSamples: session.accelSamples,
-            eventLogs: session.eventLogs
-          }
-        };
-      }
-
-      async function getSelectedShareSession(){
-        const sessions = await getSessionsFromDB();
-        const sel = document.getElementById("shareSessionSelect");
-        const selId = sel ? sel.value : "";
-        return sessions.find(s => String(s.id) === String(selId)) || sessions[0] || null;
-      }
-
-      function downloadJSON(obj, filename){
-        const blob = new Blob([JSON.stringify(obj, null, 2)], { type:"application/json;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
-      }
-
-      async function loadShareSelect(){
-        const sel = document.getElementById("shareSessionSelect");
-        if(!sel) return;
-        const sessions = await getSessionsFromDB();
-        sel.innerHTML = "";
-        const prev = document.getElementById("sharePreview");
-        if(!sessions.length){
-          sel.innerHTML = `<option value="">保存済みセッションなし</option>`;
-          if(prev) prev.value = "";
-          return;
-        }
-        sessions.forEach(s => {
-          const op = document.createElement("option");
-          op.value = s.id;
-          const apnea = s.apneaCount || 0;
-          op.textContent = `${s.dateStr} ${s.startTime}〜${s.endTime} / 無呼吸目安:${apnea}回 / baseline ${Number(s.baselineDb).toFixed(1)}dB`;
-          sel.appendChild(op);
-        });
-        sel.onchange = () => updateSharePreview();
-        updateSharePreview();
-      }
-
-      async function updateSharePreview(){
-        const s = await getSelectedShareSession();
-        const ta = document.getElementById("sharePreview");
-        if(!ta) return;
-        if(!s){ ta.value = ""; return; }
-        const previewObj = {
-          date: s.dateStr,
-          time: `${s.startTime}〜${s.endTime}`,
-          durationSec: s.durationSec,
-          apneaCount: s.apneaCount,
-          ahiEstimate: s.ahiEstimate,
-          maxDb: Math.max(...(s.audioSamples||[0])),
-          maxG: s.maxMotionG,
-          totalEventLogs: (s.eventLogs || []).length
-        };
-        ta.value = JSON.stringify(previewObj, null, 2);
-      }
-
-      async function exportLiteLog(){
-        const s = await getSelectedShareSession();
-        if(!s){ toast("セッションがありません"); return; }
-        const lite = await buildLiteLog(s);
-        const name = `SleepTracker_${s.dateStr.replaceAll("/","-")}_${String(s.startTime).replace(":","")}.json`;
-        downloadJSON(lite, name);
-        toast("ログを書き出しました");
-      }
-
-      async function shareLiteLog(){
-        const s = await getSelectedShareSession();
-        if(!s){ toast("セッションがありません"); return; }
-        const lite = await buildLiteLog(s);
-        const content = JSON.stringify(lite, null, 2);
-        const blob = new Blob([content], { type:"application/json;charset=utf-8" });
-        const name = `SleepTracker_${s.dateStr.replaceAll("/","-")}_${String(s.startTime).replace(":","")}.json`;
-        const file = new File([blob], name, { type:"application/json" });
-        if(navigator.share && navigator.canShare && navigator.canShare({ files:[file] })){
-          try{
-            await navigator.share({ title:"SleepTracker 実測ログ", text:"睡眠測定ログ", files:[file] });
-            toast("共有しました");
-            return;
-          }catch{
-            toast("共有をキャンセルしました");
-            return;
-          }
-        }
-        downloadJSON(lite, name);
-        toast("ダウンロードしました");
-      }
-
-      function drawTimelineChart(canvas, audioData, accelData, baselineDb, durationSec, apneaLogs) {
-        if(!canvas || !canvas.parentElement) return;
-        const ctx = canvas.getContext('2d');
-        const width = canvas.parentElement.clientWidth;
-        const height = canvas.parentElement.clientHeight;
-        canvas.width = width;
-        canvas.height = height;
-
-        ctx.clearRect(0, 0, width, height);
-        if (!audioData || audioData.length === 0) return;
-
-        const len = audioData.length;
-        const stride = Math.max(1, Math.floor(len / width));
-        const drawLen = Math.ceil(len / stride);
-        const step = width / drawLen;
-
-        const audioHeight = height * 0.7;
-        const maxDeltaDb = 40;
-        const base = baselineDb || 24;
-
-        for (let i = 0; i < drawLen; i++) {
-          const srcIdxStart = i * stride;
-          const srcIdxEnd = Math.min(len, srcIdxStart + stride);
-
-          let peakDb = audioData[srcIdxStart] || base;
-          for (let k = srcIdxStart + 1; k < srcIdxEnd; k++) {
-            if ((audioData[k] || 0) > peakDb) peakDb = audioData[k];
-          }
-
-          const x = i * step;
-          const deltaDb = Math.max(0, peakDb - base);
-          let h = (deltaDb / maxDeltaDb) * audioHeight;
-          h = Math.min(h, audioHeight);
-          h = Math.max(h, 2);
-          const y = audioHeight - h;
-
-          if (peakDb > 60) ctx.fillStyle = '#ef4444';
-          else if (peakDb > base + 10) ctx.fillStyle = '#f59e0b';
-          else ctx.fillStyle = '#10b981';
-
-          ctx.fillRect(x, y, Math.max(1, step), h);
-        }
-
-        const accelHeight = height * 0.35;
-        const accelYOffset = height;
-        ctx.beginPath();
-        ctx.moveTo(0, accelYOffset);
-
-        for (let i = 0; i < drawLen; i++) {
-          const srcIdx = Math.min(len - 1, i * stride);
-          const g = accelData ? (accelData[srcIdx] || 0) : 0;
-          const x = i * step;
-          const h = Math.min(1, g / 0.15) * accelHeight;
-          ctx.lineTo(x, accelYOffset - h);
-        }
-        ctx.lineTo(width, accelYOffset);
-        ctx.fillStyle = 'rgba(59, 130, 246, 0.6)';
-        ctx.fill();
-
-        if(apneaLogs && apneaLogs.length > 0 && durationSec > 0){
-          apneaLogs.forEach(a => {
-            const parts = (a.time || "").split(':');
-            let sec = 0;
-            if(parts.length === 3) sec = parseInt(parts[0])*3600 + parseInt(parts[1])*60 + parseInt(parts[2]);
-            const x = (sec / durationSec) * width;
-
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, audioHeight);
-            ctx.strokeStyle = 'rgba(168, 85, 247, 0.85)';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.arc(x, 6, 4, 0, Math.PI * 2);
-            ctx.fillStyle = '#a855f7';
-            ctx.fill();
-          });
-        }
-      }
-
-      async function loadDoctorSelect(){
-        const sel = document.getElementById("doctorSessionSelect");
-        if(!sel) return;
-        const sessions = await getSessionsFromDB();
-        sel.innerHTML = "";
-        if(!sessions.length){
-          sel.innerHTML = `<option value="">保存済みセッションなし</option>`;
-          clearDoctorSummary();
-          return;
-        }
-        sessions.forEach(s => {
-          const op = document.createElement("option");
-          op.value = s.id;
-          const apnea = s.apneaCount || 0;
-          op.textContent = `${s.dateStr} ${s.startTime}〜${s.endTime} (無呼吸目安:${apnea}回)`;
-          sel.appendChild(op);
-        });
-        onDoctorSessionChange(sessions[0].id);
-      }
-
-      function clearDoctorSummary(){
-        const dt = document.getElementById("docTime");
-        const dd = document.getElementById("docDur");
-        const db = document.getElementById("docBase");
-        const dbx = document.getElementById("docBrux");
-        const ds = document.getElementById("docSnore");
-        const da = document.getElementById("docApnea");
-        const dah = document.getElementById("docAhi");
-        const dmg = document.getElementById("docMaxG");
-        const dmd = document.getElementById("docMaxDb");
-        const dn = document.getElementById("docNote");
-
-        if(dt) dt.textContent = "--:--〜--:--";
-        if(dd) dd.textContent = "--";
-        if(db) db.textContent = "-- dB";
-        if(dbx) dbx.textContent = "--件";
-        if(ds) ds.textContent = "--";
-        if(da) da.textContent = "-- 回";
-        if(dah) dah.textContent = "-- /時";
-        if(dmg) dmg.textContent = "-- G";
-        if(dmd) dmd.textContent = "-- dB";
-        if(dn) dn.textContent = "セッションを選択してください。";
-
-        const canvas = document.getElementById('timelineCanvas');
-        if(canvas) {
-          const ctx = canvas.getContext('2d');
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
-      }
-
-      async function onDoctorSessionChange(sessionId){
-        const sessions = await getSessionsFromDB();
-        const s = sessions.find(x => String(x.id) === String(sessionId)) || sessions[0];
-        if(!s){
-          clearDoctorSummary();
-          return;
-        }
-
-        const dt = document.getElementById("docTime");
-        const dd = document.getElementById("docDur");
-        const db = document.getElementById("docBase");
-        const dbx = document.getElementById("docBrux");
-        const ds = document.getElementById("docSnore");
-        const da = document.getElementById("docApnea");
-        const dah = document.getElementById("docAhi");
-        const dmg = document.getElementById("docMaxG");
-        const dmd = document.getElementById("docMaxDb");
-        const dn = document.getElementById("docNote");
-
-        if(dt) dt.textContent = `${s.startTime}〜${s.endTime}`;
-        if(dd) dd.textContent = formatDurationFriendly(s.durationSec);
-        if(db) db.textContent = `${Number(s.baselineDb||0).toFixed(1)} dB`;
-        if(dbx) dbx.textContent = `${s.bruxismEvents||0}件`;
-        if(ds) ds.textContent = formatMinutesFriendly(s.snoreMin);
-        
-        const apnea = s.apneaCount || 0;
-        if(da) da.textContent = `${apnea} 回`;
-        const ahi = s.ahiEstimate != null ? `${s.ahiEstimate} /時` : "-- /時";
-        if(dah) dah.textContent = ahi;
-
-        const maxDb = s.audioSamples && s.audioSamples.length ? Math.max(...s.audioSamples) : 0;
-        if(dmd) dmd.textContent = `${maxDb.toFixed(1)} dB`;
-
-        const valG = Number(s.maxMotionG || 0);
-        if(dmg) dmg.textContent = valG > 0 ? `${valG.toFixed(2)} G` : "0.00 G (PC)";
-
-        const logs = s.eventLogs || [];
-        if(dn){
-          if(logs.length){
-            const tail = logs.slice(-12).map(ev => {
-              const ja = ev.type === "snore" ? "いびき" : ev.type === "bruxism" ? "歯ぎしり" : ev.type === "apnea" ? "無呼吸疑い" : ev.type === "sleep_talk" ? "寝言" : ev.type;
-              return `${ev.hhmm} ${ja}(+${ev.dDb}dB)`;
-            }).join(" / ");
-            dn.innerHTML = `睡眠実測時間: <strong>${formatDurationFriendly(s.durationSec)}</strong><br>無呼吸疑い: <strong>${apnea}回（簡易AHI目安: ${ahi}）</strong><br><span style="font-size:12px;color:#475569;">※本指標は医療診断用ではなく、音響検知による目安です。<br>${esc(tail)}</span>`;
-          }else{
-            dn.innerHTML = `睡眠実測時間: <strong>${formatDurationFriendly
-(s.durationSec)}</strong><br>イベント記録なし`;
-          }
-        }
-
-        const apneaLogs = (s.eventLogs || []).filter(e => e.type === "apnea");
-
-        setTimeout(() => {
-          const canvas = document.getElementById('timelineCanvas');
-          if(canvas) drawTimelineChart(canvas, s.audioSamples, s.accelSamples, s.baselineDb, s.durationSec, apneaLogs);
-        }, 50);
-      }
-
-      function bindStartButton(){
-        const btn = document.getElementById("btnStart");
-        if(btn){
-          btn.onclick = async (e) => {
-            e.preventDefault();
-            await startMeasurement();
+          const request = indexedDB.open(DB_NAME, DB_VERSION);
+          request.onerror = () => resolve(null);
+          request.onsuccess = (e) => { db = e.target.result; resolve(db); };
+          request.onupgradeneeded = (e) => {
+            const d = e.target.result;
+            if (!d.objectStoreNames.contains('sessions')) d.createObjectStore('sessions', { keyPath: 'id' });
+            if (!d.objectStoreNames.contains('peaks')) d.createObjectStore('peaks', { keyPath: 'id' });
+            // 1分ごとの未完了セッション自動退避用
+            if (!d.objectStoreNames.contains('active_recovery')) d.createObjectStore('active_recovery', { keyPath: 'recoveryKey' });
           };
+        } catch(err) {
+          resolve(null);
+        }
+      });
+    }
+
+    async function saveSessionToDB(session) {
+      if (!db) await initDB();
+      if (!db) return;
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction('sessions', 'readwrite');
+          tx.objectStore('sessions').put(session);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+        } catch(e) { resolve(); }
+      });
+    }
+
+    // 1分ごとのインクリメンタル退避（クラッシュ対策）
+    async function saveActiveRecovery(session) {
+      if (!db) await initDB();
+      if (!db) return;
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction('active_recovery', 'readwrite');
+          const dataToSave = { ...session, recoveryKey: 'latest_active_session', updatedAt: Date.now() };
+          tx.objectStore('active_recovery').put(dataToSave);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+        } catch(e) { resolve(); }
+      });
+    }
+
+    async function clearActiveRecovery() {
+      if (!db) await initDB();
+      if (!db) return;
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction('active_recovery', 'readwrite');
+          tx.objectStore('active_recovery').clear();
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+        } catch(e) { resolve(); }
+      });
+    }
+
+    async function checkActiveRecovery() {
+      if (!db) await initDB();
+      if (!db) return;
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction('active_recovery', 'readonly');
+          const req = tx.objectStore('active_recovery').get('latest_active_session');
+          req.onsuccess = () => {
+            const rec = req.result;
+            if (rec && rec.durationSec >= 30) {
+              const banner = document.getElementById("recoveryBanner");
+              if (banner) banner.classList.remove("hidden");
+            }
+            resolve(rec);
+          };
+          req.onerror = () => resolve(null);
+        } catch(e) { resolve(null); }
+      });
+    }
+
+    async function saveRecoveredSession() {
+      if (!db) await initDB();
+      const tx = db.transaction('active_recovery', 'readonly');
+      const req = tx.objectStore('active_recovery').get('latest_active_session');
+      req.onsuccess = async () => {
+        const rec = req.result;
+        if (rec) {
+          delete rec.recoveryKey;
+          delete rec.updatedAt;
+          await saveSessionToDB(rec);
+          await clearActiveRecovery();
+          const banner = document.getElementById("recoveryBanner");
+          if (banner) banner.classList.add("hidden");
+          toast("未完了セッションを確定保存しました");
+          await loadPatientHistorySelect();
+          await loadShareSelect();
+          await loadDoctorSelect();
+        }
+      };
+    }
+
+    async function getSessionsFromDB() {
+      if (!db) await initDB();
+      if (!db) return [];
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction('sessions', 'readonly');
+          const req = tx.objectStore('sessions').getAll();
+          req.onsuccess = () => resolve((req.result || []).sort((a,b) => Number(b.id) - Number(a.id)));
+          req.onerror = () => resolve([]);
+        } catch(e) { resolve([]); }
+      });
+    }
+
+    async function clearDB() {
+      if (!db) await initDB();
+      if (!db) return;
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction(['sessions', 'peaks', 'active_recovery'], 'readwrite');
+          tx.objectStore('sessions').clear();
+          tx.objectStore('peaks').clear();
+          tx.objectStore('active_recovery').clear();
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+        } catch(e) { resolve(); }
+      });
+    }
+
+    let mode = "patient";
+    let patientTab = "measure";
+
+    let isRecording = false;
+    let recStart = null, recSec = 0, recTimer = null, sampleTimer = null, wakeLock = null;
+    let mediaStream = null;
+
+    let audioContext = null, analyser = null, timeBuf = null;
+
+    let motionBound = false, motionActive = false, gotMotion = false;
+    let gravity = { x: 0, y: 0, z: 0 };
+    let hasInitGravity = false;
+    let currentG = 0, maxG = 0;
+    let currentDb = 32.0, baselineDb = 32.0, dbWindow = [], gWindow = [];
+
+    let audioSamples = [], accelSamples = [], bruxCounter = 0, snoreMinutes = 0;
+    let apneaEventsCount = 0;
+    let eventLogs = [];
+    let preflight = {}, lastDecision = "待機", lastTrigger = "なし";
+    let currentSessionIdForRecording = "", lastSavedSessionId = "";
+
+    let hadRecentSnore = false;
+    let recentSnoreExpiry = 0;
+    let silenceStartSec = null;
+
+    // 1秒ごとのダウンサンプリング集計用（メモリ暴走防止）
+    let secDbSum = 0, secDbCount = 0;
+    let secGMax = 0;
+
+    const CFG = {
+      sampleMs: 120, peakDbDelta: 10, snoreDbMin: 6, snoreDbMax: 16, bruxDbMin: 14,
+      talkDbMin: 9, talkDbMax: 20,
+      gPeakOffset: 0.04, gMoveOffset: 0.02, gPeakFloor: 0.05, gPeakCeil: 0.20,
+      cooldownMs: 45000,
+      apneaSilenceMinSec: 15, // 10秒から15秒に厳格化（過剰検知防止）
+      apneaSilenceMaxSec: 60
+    };
+
+    function toast(msg){
+      const wrap = document.getElementById("toastWrap");
+      if(!wrap) return;
+      const t = document.createElement("div");
+      t.className = "toast";
+      t.textContent = msg;
+      wrap.appendChild(t);
+      setTimeout(() => {
+        t.style.opacity = "0";
+        t.style.transition = "opacity .25s";
+        setTimeout(() => t.remove(), 250);
+      }, 2100);
+    }
+
+    function esc(v){ return String(v).replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m])); }
+
+    function formatDurationFriendly(sec){
+      sec = Math.round(sec || 0);
+      if(sec < 60) return `${sec}秒`;
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return s === 0 ? `${m}分` : `${m}分${s}秒`;
+    }
+
+    function formatMinutesFriendly(minVal){
+      if(!minVal || minVal < 0.1) return "0分";
+      if(minVal < 1) return `${Math.round(minVal * 60)}秒`;
+      return `${minVal.toFixed(1)}分`;
+    }
+
+    function formatHMS(sec){
+      const h = String(Math.floor(sec/3600)).padStart(2,"0");
+      const m = String(Math.floor((sec%3600)/60)).padStart(2,"0");
+      const s = String(sec%60).padStart(2,"0");
+      return `${h}:${m}:${s}`;
+    }
+    function formatHM(sec){
+      const h = String(Math.floor(sec/3600)).padStart(2,"0");
+      const m = String(Math.floor((sec%3600)/60)).padStart(2,"0");
+      return `${h}:${m}`;
+    }
+    function median(arr){
+      if(!arr.length) return 0;
+      const a = [...arr].sort((x,y)=>x-y);
+      const m = Math.floor(a.length/2);
+      return a.length % 2 ? a[m] : (a[m-1]+a[m])/2;
+    }
+    function pushWin(arr,v,max){ arr.push(v); if(arr.length>max) arr.shift(); }
+    function dynGPeakThreshold(){ return Math.min(CFG.gPeakCeil, Math.max(CFG.gPeakFloor, median(gWindow) + CFG.gPeakOffset)); }
+    function dynGMoveThreshold(){ return Math.max(0.025, median(gWindow) + CFG.gMoveOffset); }
+
+    async function toggleBlackout(on){
+      const b = document.getElementById("blackout");
+      if(!b) return;
+      if(on){
+        b.classList.add("active");
+        try { if(document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch(e){}
+      }else{
+        b.classList.remove("active");
+        try { if(document.fullscreenElement) await document.exitFullscreen(); } catch(e){}
+      }
+    }
+
+    function initBars(){
+      const c = document.getElementById("realBars");
+      if(!c) return;
+      c.innerHTML = "";
+      for(let i=0;i<30;i++){
+        const b = document.createElement("div");
+        b.id = `bar-${i}`;
+        b.style.cssText = "flex:1;min-height:4px;height:8px;background:#10b981;border-radius:2px;transition:height .08s linear;";
+        c.appendChild(b);
+      }
+    }
+
+    function drawBars(db){
+      for(let i=0;i<30;i++){
+        const b = document.getElementById(`bar-${i}`);
+        if(!b) continue;
+        const h = Math.min(52, Math.max(4, (db-22)*1.2 + Math.random()*5));
+        b.style.height = `${h}px`;
+        b.style.background = db >= baselineDb + CFG.peakDbDelta ? "#f59e0b" : "#10b981";
+      }
+    }
+
+    function updateRuleText(){
+      const el = document.getElementById("ruleText");
+      if(!el) return;
+      const txt = [
+        `peak: dB >= baseline + ${CFG.peakDbDelta} ${gotMotion ? ` OR G >= dyn(${dynGPeakThreshold().toFixed(2)})` : "(PC: 音圧のみ判定)"}`,
+        `apnea(無呼吸目安): いびき直後の持続静寂 ${CFG.apneaSilenceMinSec}秒〜 ＋ 覚醒/再開音`,
+        `snore: +${CFG.snoreDbMin}..+${CFG.snoreDbMax} dB ${gotMotion ? ` & G < move(${dynGMoveThreshold().toFixed(2)})` : ""}`,
+        `autoSave: 1分毎にIndexedDBへ自動退避 (OS強制終了から保護)`
+      ].join("\n");
+      el.textContent = txt;
+    }
+
+    function updateDebug(){
+      const ddb = (currentDb - baselineDb).toFixed(1);
+      const dl = document.getElementById("deltaLabel");
+      if(dl) dl.textContent = `ΔdB: ${ddb}`;
+      const dbgEl = document.getElementById("debugPanel");
+      if(!dbgEl) return;
+      const dbg = [
+        "[Preflight]",
+        `secure=${window.isSecureContext} getUserMedia=${!!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)}`,
+        `micPermission=${preflight.micPermissionState || "unknown"}`,
+        "",
+        "[Runtime (Crash-Proof v12)]",
+        `recording=${isRecording} wakeLock=${!!wakeLock} gotMotion=${gotMotion}`,
+        `db=${currentDb.toFixed(1)} baseline=${baselineDb.toFixed(1)} dDb=+${ddb}`,
+        `g=${gotMotion ? currentG.toFixed(2) : "0.00(PC固定)"} apneaCount=${apneaEventsCount}`,
+        `silenceElapsed=${silenceStartSec ? (recSec - silenceStartSec) + "s" : "0s"}`,
+        `samplesBuffered=${audioSamples.length} (1s単位軽量保存)`,
+        "",
+        "[Decision]",
+        `lastDecision=${lastDecision}`,
+        `lastTrigger=${lastTrigger}`
+      ].join("\n");
+      dbgEl.textContent = dbg;
+    }
+
+    async function requestWakeLock(){
+      try{
+        if("wakeLock" in navigator){
+          wakeLock = await navigator.wakeLock.request("screen");
+          wakeLock.addEventListener("release", () => { wakeLock = null; updateDebug(); });
+        }
+      }catch{}
+    }
+
+    function releaseWakeLock(){
+      if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock = null; }
+    }
+
+    function playSilentAudio(on) {
+      const audio = document.getElementById("silentBgAudio");
+      if(!audio) return;
+      if(on) {
+        audio.play().catch(e => console.log("Silent audio autoplay blocked:", e));
+      } else {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+    }
+
+    function setupMotionUI(){
+      const box = document.getElementById("motionPermBox");
+      if(typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function"){
+        box.classList.remove("hidden");
+      }else{
+        box.classList.add("hidden");
+        bindMotion();
+      }
+    }
+
+    function bindMotion(){
+      if(motionBound) return;
+      motionBound = true;
+      window.addEventListener("devicemotion", ev => {
+        const a = ev.accelerationIncludingGravity || ev.acceleration;
+        if(!a || a.x == null) return;
+        gotMotion = true;
+        motionActive = true;
+
+        const ax = a.x || 0;
+        const ay = a.y || 0;
+        const az = a.z || 0;
+
+        if (!hasInitGravity) {
+          gravity = { x: ax, y: ay, z: az };
+          hasInitGravity = true;
+          return;
+        }
+
+        const alpha = 0.82;
+        gravity.x = alpha * gravity.x + (1 - alpha) * ax;
+        gravity.y = alpha * gravity.y + (1 - alpha) * ay;
+        gravity.z = alpha * gravity.z + (1 - alpha) * az;
+
+        const lx = ax - gravity.x;
+        const ly = ay - gravity.y;
+        const lz = az - gravity.z;
+
+        const rawG = Math.sqrt(lx*lx + ly*ly + lz*lz) / 9.80665;
+        currentG = rawG < 0.005 ? 0 : rawG;
+
+        if(currentG > secGMax) secGMax = currentG;
+        if(isRecording && currentG > maxG) maxG = currentG;
+        const vg = document.getElementById("valG");
+        if(vg) vg.textContent = `${currentG.toFixed(2)} G`;
+      }, { passive:true });
+    }
+
+    async function requestMotionPermission(){
+      try{
+        if(typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function"){
+          const r = await DeviceMotionEvent.requestPermission();
+          if(r !== "granted"){ toast("モーション許可が拒否されました"); return; }
+        }
+        bindMotion();
+        document.getElementById("motionPermBox").classList.add("hidden");
+        toast("モーション許可OK");
+      }catch{ toast("モーション許可でエラー"); }
+    }
+
+    async function ensureAudioAnalyserFromStream(stream){
+      if(audioContext) return;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      audioContext = new AC();
+      if(audioContext.state === "suspended"){ try{ await audioContext.resume(); }catch{} }
+
+      const src = audioContext.createMediaStreamSource(stream);
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 1024;
+      src.connect(analyser);
+      timeBuf = new Float32Array(analyser.fftSize);
+    }
+
+    function calcDb(){
+      if(!analyser || !timeBuf) return 30 + Math.random()*2;
+      analyser.getFloatTimeDomainData(timeBuf);
+      let sum = 0;
+      for(let i=0;i<timeBuf.length;i++) sum += timeBuf[i]*timeBuf[i];
+      const rms = Math.sqrt(sum / timeBuf.length);
+      if(rms <= 1e-8) return 24;
+      return Math.min(95, Math.max(24, 20*Math.log10(rms) + 71));
+    }
+
+    async function runPreflight(){
+      const out = {};
+      out.isSecureContext = window.isSecureContext;
+      out.hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+      out.hasDeviceMotion = "DeviceMotionEvent" in window;
+      try{
+        if(navigator.permissions && navigator.permissions.query){
+          const mic = await navigator.permissions.query({ name:"microphone" });
+          out.micPermissionState = mic.state;
+        }else{ out.micPermissionState = "unknown"; }
+      }catch{ out.micPermissionState = "unknown"; }
+      preflight = out;
+
+      try {
+        if(!mediaStream){
+          mediaStream = await navigator.mediaDevices.getUserMedia({ audio:true });
+          await ensureAudioAnalyserFromStream(mediaStream);
+          toast("マイク接続OK");
+        } else {
+          toast("マイクは既に接続されています");
+        }
+      } catch(e) {
+        toast("マイク接続エラー: " + (e.message || e.name));
+      }
+
+      updateDebug();
+    }
+
+    async function calibrateBaseline(){
+      if(!mediaStream){
+        toast("先に「① 接続チェック」を行ってください");
+        return;
+      }
+
+      toast("ベースライン計測中（3秒）");
+      const arr = [];
+      const t = setInterval(() => {
+        arr.push(calcDb());
+        if(arr.length > 140) arr.shift();
+      }, 20);
+
+      setTimeout(() => {
+        clearInterval(t);
+        if(arr.length){
+          baselineDb = median(arr);
+          const bl = document.getElementById("baselineLabel");
+          if(bl) bl.textContent = `● ベースライン: ${baselineDb.toFixed(1)} dB`;
+        }
+        updateRuleText();
+        updateDebug();
+        toast("ベースライン更新");
+      }, 3000);
+    }
+
+    function pushEventLog(type, db, g){
+      const hhmm = formatHM(recSec);
+      eventLogs.push({
+        type, time: formatHMS(recSec), hhmm,
+        db: +db.toFixed(1), g: +g.toFixed(2),
+        baseline: +baselineDb.toFixed(1), dDb: +(db-baselineDb).toFixed(1)
+      });
+    }
+
+    function processAudioTick(db){
+      const now = Date.now();
+      const dDb = db - baselineDb;
+      const gMove = dynGMoveThreshold();
+      const isLowMotion = gotMotion ? (currentG < gMove) : true;
+      const isVeryLowMotion = gotMotion ? (currentG < gMove * 0.9) : true;
+      const isTalkLowMotion = gotMotion ? (currentG < gMove * 0.8) : true;
+
+      if(dDb >= CFG.snoreDbMin && dDb <= CFG.snoreDbMax && isLowMotion){
+        snoreMinutes += (CFG.sampleMs / 1000 / 60);
+        pushEventLog("snore", db, currentG);
+        hadRecentSnore = true;
+        recentSnoreExpiry = now + 60000;
+      }
+      if(dDb >= CFG.bruxDbMin && isVeryLowMotion){
+        bruxCounter++;
+        pushEventLog("bruxism", db, currentG);
+      }
+      if(dDb >= CFG.talkDbMin && dDb <= CFG.talkDbMax && isTalkLowMotion){
+        pushEventLog("sleep_talk", db, currentG);
+      }
+
+      const isSilent = (dDb < 2.5);
+
+      if(hadRecentSnore && now > recentSnoreExpiry){
+        hadRecentSnore = false;
+      }
+
+      if(hadRecentSnore){
+        if(isSilent){
+          if(silenceStartSec === null) silenceStartSec = recSec;
+        }else{
+          if(silenceStartSec !== null){
+            const silenceDuration = recSec - silenceStartSec;
+            // 15秒以上持続し、直後に+10dB以上の再開音があった場合のみ無呼吸として確定
+            if(silenceDuration >= CFG.apneaSilenceMinSec && silenceDuration <= CFG.apneaSilenceMaxSec && dDb >= 10){
+              apneaEventsCount++;
+              pushEventLog("apnea", db, currentG);
+              toast(`無呼吸疑いを検知（静寂${silenceDuration}秒後）`);
+            }
+            silenceStartSec = null;
+          }
+        }
+      } else {
+        silenceStartSec = null;
+      }
+
+      const overDb = db >= (baselineDb + CFG.peakDbDelta);
+      const overG = gotMotion ? (currentG >= dynGPeakThreshold()) : false;
+
+      if(overDb || overG){
+        lastTrigger = `PEAK: db=${db.toFixed(1)} g=${currentG.toFixed(2)}`;
+        lastDecision = "PEAK_DETECTED";
+      }
+    }
+
+    async function startMeasurement(){
+      if(isRecording) return;
+      await initDB();
+
+      if(!mediaStream){
+        try{ mediaStream = await navigator.mediaDevices.getUserMedia({ audio:true }); }
+        catch(e){ alert("マイク権限エラー: " + (e.message || e.name)); return; }
+      }
+      try{ await ensureAudioAnalyserFromStream(mediaStream); }
+      catch(e){ alert("音声解析初期化エラー"); mediaStream = null; return; }
+
+      try{ if(typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") await DeviceMotionEvent.requestPermission(); }catch{}
+      bindMotion();
+      await requestWakeLock();
+      playSilentAudio(true); // バックグラウンド維持オーディオ再生
+
+      isRecording = true;
+      recStart = new Date();
+      recSec = 0;
+      currentSessionIdForRecording = String(Date.now());
+
+      audioSamples = []; accelSamples = []; bruxCounter = 0; snoreMinutes = 0; maxG = 0;
+      apneaEventsCount = 0; hadRecentSnore = false; silenceStartSec = null;
+      eventLogs = []; dbWindow = []; gWindow = [];
+      secDbSum = 0; secDbCount = 0; secGMax = 0;
+      gotMotion = false; lastDecision = "測定開始"; lastTrigger = "なし";
+
+      document.getElementById("sessionBadge").textContent = "測定中";
+      document.getElementById("sessionBadge").className = "badge b-green";
+      document.getElementById("recState").textContent = "● センサー取得中";
+      document.getElementById("recState").style.color = "#ef4444";
+      document.getElementById("btnStart").disabled = true;
+      document.getElementById("btnStop").disabled = false;
+      document.getElementById("btnStop").className = "btn btn-danger";
+      document.getElementById("btnBlackout").disabled = false;
+
+      // 1秒ごとのクロック & メモリ集計 & 1分ごとのIndexedDB退避
+      clearInterval(recTimer);
+      recTimer = setInterval(async () => {
+        recSec++;
+        const h = String(Math.floor(recSec/3600)).padStart(2,"0");
+        const m = String(Math.floor((recSec%3600)/60)).padStart(2,"0");
+        const s = String(recSec%60).padStart(2,"0");
+        const rt = document.getElementById("recTime");
+        if(rt) rt.textContent = `${h}:${m}:${s}`;
+        const bc = document.getElementById("blackoutClock");
+        if(bc) bc.textContent = `${h}:${m}`;
+
+        // 1秒ごとのダウンサンプリング保存（120ms生配列を溜め込まずメモリ肥大化を完全防止）
+        const avgDbForSec = secDbCount > 0 ? (secDbSum / secDbCount) : currentDb;
+        audioSamples.push(+avgDbForSec.toFixed(1));
+        accelSamples.push(gotMotion ? +secGMax.toFixed(2) : 0);
+        secDbSum = 0; secDbCount = 0; secGMax = 0;
+
+        // 1分(60秒)ごとにIndexedDBへリアルタイム自動退避
+        if(recSec % 60 === 0) {
+          const durationHours = recSec / 3600;
+          const ahiEstimate = durationHours >= 0.1 ? Number((apneaEventsCount / durationHours).toFixed(1)) : 0;
+          const activeSession = {
+            id: currentSessionIdForRecording,
+            dateStr: recStart ? recStart.toLocaleDateString("ja-JP") : new Date().toLocaleDateString("ja-JP"),
+            startTime: recStart ? recStart.toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}) : "--:--",
+            endTime: new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
+            durationSec: recSec,
+            baselineDb: +baselineDb.toFixed(1),
+            bruxismEvents: Math.round(bruxCounter / 5),
+            snoreMin: +snoreMinutes.toFixed(1),
+            apneaCount: apneaEventsCount,
+            ahiEstimate,
+            maxMotionG: gotMotion ? +maxG.toFixed(2) : 0,
+            audioSamples,
+            accelSamples,
+            eventLogs
+          };
+          await saveActiveRecovery(activeSession);
+        }
+      }, 1000);
+
+      // 120msごとのサンプリング解析
+      clearInterval(sampleTimer);
+      sampleTimer = setInterval(() => {
+        if(!isRecording) return;
+        currentDb = calcDb();
+
+        secDbSum += currentDb;
+        secDbCount++;
+
+        if(!gotMotion){
+          currentG = 0;
+          const vg = document.getElementById("valG");
+          if(vg) vg.textContent = "— G (PC/未検出)";
+        }
+
+        pushWin(dbWindow, currentDb, 140);
+        if(gotMotion) pushWin(gWindow, currentG, 140);
+
+        processAudioTick(currentDb);
+
+        if(gotMotion && currentG > maxG) maxG = currentG;
+
+        const vd = document.getElementById("valDb");
+        if(vd) vd.textContent = `${currentDb.toFixed(1)} dB`;
+        drawBars(currentDb);
+        updateRuleText();
+        updateDebug();
+      }, CFG.sampleMs);
+
+      toast("測定開始 (バックグラウンド保護ON)");
+    }
+
+    async function stopMeasurement(){
+      if(!isRecording) return;
+      isRecording = false;
+
+      clearInterval(recTimer);
+      clearInterval(sampleTimer);
+
+      releaseWakeLock();
+      playSilentAudio(false);
+      toggleBlackout(false);
+
+      const end = new Date();
+      const durationSec = recSec;
+      const id = currentSessionIdForRecording || String(Date.now());
+
+      const durationHours = durationSec / 3600;
+      const ahiEstimate = durationHours >= 0.1 ? Number((apneaEventsCount / durationHours).toFixed(1)) : 0;
+
+      const session = {
+        id,
+        dateStr: recStart ? recStart.toLocaleDateString("ja-JP") : new Date().toLocaleDateString("ja-JP"),
+        startTime: recStart ? recStart.toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}) : "--:--",
+        endTime: end.toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
+        durationSec,
+        baselineDb: +baselineDb.toFixed(1),
+        bruxismEvents: Math.round(bruxCounter / 5),
+        snoreMin: +snoreMinutes.toFixed(1),
+        apneaCount: apneaEventsCount,
+        ahiEstimate,
+        maxMotionG: gotMotion ? +maxG.toFixed(2) : 0,
+        audioSamples,
+        accelSamples,
+        eventLogs
+      };
+
+      await saveSessionToDB(session);
+      await clearActiveRecovery(); // 正常完了したので退避領域をクリア
+      lastSavedSessionId = id;
+
+      document.getElementById("sessionBadge").textContent = "測定完了";
+      document.getElementById("sessionBadge").className = "badge b-gray";
+      document.getElementById("recState").textContent = "● 待機中";
+      document.getElementById("recState").style.color = "#cbd5e1";
+      document.getElementById("btnStart").disabled = false;
+      document.getElementById("btnStop").disabled = true;
+      document.getElementById("btnStop").className = "btn btn-soft";
+      document.getElementById("btnBlackout").disabled = true;
+
+      lastDecision = "測定終了・保存";
+      updateDebug();
+
+      await loadPatientHistorySelect();
+      await loadShareSelect();
+      await loadDoctorSelect();
+
+      toast("保存完了");
+    }
+
+    async function clearAllData(){
+      if(!confirm("すべての測定履歴を消去しますか？")) return;
+      await clearDB();
+      toast("全データを消去しました");
+      const prev = document.getElementById("sharePreview");
+      if(prev) prev.value = "";
+      clearDoctorSummary();
+      await loadPatientHistorySelect();
+      await loadShareSelect();
+      await loadDoctorSelect();
+    }
+
+    function switchMode(m){
+      mode = m;
+      const bp = document.getElementById("btnModePatient");
+      const bd = document.getElementById("btnModeDoctor");
+      if(bp) bp.style.background = m==="patient" ? "#fff" : "transparent";
+      if(bd) bd.style.background = m==="doctor" ? "#fff" : "transparent";
+      const pv = document.getElementById("patientView");
+      const dv = document.getElementById("doctorView");
+      if(pv) pv.classList.toggle("hidden", m!=="patient");
+      if(dv) dv.classList.toggle("hidden", m!=="doctor");
+      if(m==="doctor") loadDoctorSelect();
+    }
+
+    function switchPatientTab(t){
+      patientTab = t;
+      ["measure","history","share"].forEach(x => {
+        const tabEl = document.getElementById(`tab-${x}`);
+        const panEl = document.getElementById(`panel-${x}`);
+        if(tabEl) tabEl.classList.toggle("active", x===t);
+        if(panEl) panEl.classList.toggle("hidden", x!==t);
+      });
+      if(t==="history") loadPatientHistorySelect();
+      if(t==="share") loadShareSelect();
+    }
+
+    async function loadPatientHistorySelect(){
+      const sel = document.getElementById("patientHistorySelect");
+      if(!sel) return;
+      const sessions = await getSessionsFromDB();
+      sel.innerHTML = "";
+      const detWrap = document.getElementById("historyDetailContent");
+
+      if(!sessions.length){
+        sel.innerHTML = `<option value="">保存済みセッションなし</option>`;
+        if(detWrap) detWrap.classList.add("hidden");
+        return;
+      }
+
+      if(detWrap) detWrap.classList.remove("hidden");
+      sessions.forEach(s => {
+        const op = document.createElement("option");
+        op.value = s.id;
+        const maxDb = s.audioSamples && s.audioSamples.length ? Math.max(...s.audioSamples) : 0;
+        const apnea = s.apneaCount || 0;
+        op.textContent = `${s.dateStr} ${s.startTime}〜${s.endTime} （実測: ${formatDurationFriendly(s.durationSec)} / 無呼吸目安: ${apnea}回 / 最大: ${maxDb.toFixed(1)}dB）`;
+        sel.appendChild(op);
+      });
+
+      const targetId = lastSavedSessionId || sessions[0].id;
+      sel.value = targetId;
+      await showHistoryDetail(targetId);
+    }
+
+    async function onPatientHistoryChange(sessionId){
+      await showHistoryDetail(sessionId);
+    }
+
+    async function showHistoryDetail(sessionId) {
+      const sessions = await getSessionsFromDB();
+      const s = sessions.find(x => String(x.id) === String(sessionId)) || sessions[0];
+      if(!s) return;
+
+      const elDur = document.getElementById("detDur");
+      const elSnore = document.getElementById("detSnore");
+      const elApnea = document.getElementById("detApnea");
+      const elAhi = document.getElementById("detAhi");
+      const elMaxDb = document.getElementById("detMaxDb");
+      const elMaxG = document.getElementById("detMaxG");
+
+      if(elDur) elDur.textContent = formatDurationFriendly(s.durationSec);
+      if(elSnore) elSnore.textContent = formatMinutesFriendly(s.snoreMin);
+      
+      const apnea = s.apneaCount || 0;
+      if(elApnea) elApnea.textContent = `${apnea} 回`;
+      const ahi = s.ahiEstimate != null ? `${s.ahiEstimate} /時` : "-- /時";
+      if(elAhi) elAhi.textContent = ahi;
+
+      const maxDb = s.audioSamples && s.audioSamples.length ? Math.max(...s.audioSamples) : 0;
+      if(elMaxDb) elMaxDb.textContent = `${maxDb.toFixed(1)} dB`;
+      
+      const valG = Number(s.maxMotionG || 0);
+      if(elMaxG) elMaxG.textContent = valG > 0 ? `${valG.toFixed(2)} G` : "0.00 G (PC)";
+
+      const apneaLogs = (s.eventLogs || []).filter(e => e.type === "apnea");
+
+      setTimeout(() => {
+        const canvas = document.getElementById('detailTimelineCanvas');
+        if(canvas) drawTimelineChart(canvas, s.audioSamples, s.accelSamples, s.baselineDb, s.durationSec, apneaLogs);
+      }, 50);
+    }
+
+    async function buildLiteLog(session){
+      return {
+        meta: { app: "SleepTracker", version: "v12_crash_proof", exportedAt: new Date().toISOString(), locale: "ja-JP" },
+        session: {
+          id: session.id,
+          dateStr: session.dateStr,
+          startTime: session.startTime,
+          endTime: session.endTime,
+          durationSec: session.durationSec,
+          baselineDb: session.baselineDb,
+          bruxismEvents: session.bruxismEvents,
+          snoreMin: session.snoreMin,
+          apneaCount: session.apneaCount,
+          ahiEstimate: session.ahiEstimate,
+          maxMotionG: session.maxMotionG,
+          audioSamples: session.audioSamples,
+          accelSamples: session.accelSamples,
+          eventLogs: session.eventLogs
+        }
+      };
+    }
+
+    async function getSelectedShareSession(){
+      const sessions = await getSessionsFromDB();
+      const sel = document.getElementById("shareSessionSelect");
+      const selId = sel ? sel.value : "";
+      return sessions.find(s => String(s.id) === String(selId)) || sessions[0] || null;
+    }
+
+    function downloadJSON(obj, filename){
+      const blob = new Blob([JSON.stringify(obj, null, 2)], { type:"application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+    }
+
+    async function loadShareSelect(){
+      const sel = document.getElementById("shareSessionSelect");
+      if(!sel) return;
+      const sessions = await getSessionsFromDB();
+      sel.innerHTML = "";
+      const prev = document.getElementById("sharePreview");
+      if(!sessions.length){
+        sel.innerHTML = `<option value="">保存済みセッションなし</option>`;
+        if(prev) prev.value = "";
+        return;
+      }
+      sessions.forEach(s => {
+        const op = document.createElement("option");
+        op.value = s.id;
+        const apnea = s.apneaCount || 0;
+        op.textContent = `${s.dateStr} ${s.startTime}〜${s.endTime} / 無呼吸目安:${apnea}回 / baseline ${Number(s.baselineDb).toFixed(1)}dB`;
+        sel.appendChild(op);
+      });
+      sel.onchange = () => updateSharePreview();
+      updateSharePreview();
+    }
+
+    async function updateSharePreview(){
+      const s = await getSelectedShareSession();
+      const ta = document.getElementById("sharePreview");
+      if(!ta) return;
+      if(!s){ ta.value = ""; return; }
+      const previewObj = {
+        date: s.dateStr,
+        time: `${s.startTime}〜${s.endTime}`,
+        durationSec: s.durationSec,
+        apneaCount: s.apneaCount,
+        ahiEstimate: s.ahiEstimate,
+        maxDb: Math.max(...(s.audioSamples||[0])),
+        maxG: s.maxMotionG,
+        totalEventLogs: (s.eventLogs || []).length
+      };
+      ta.value = JSON.stringify(previewObj, null, 2);
+    }
+
+    async function exportLiteLog(){
+      const s = await getSelectedShareSession();
+      if(!s){ toast("セッションがありません"); return; }
+      const lite = await buildLiteLog(s);
+      const name = `SleepTracker_${s.dateStr.replaceAll("/","-")}_${String(s.startTime).replace(":","")}.json`;
+      downloadJSON(lite, name);
+      toast("ログを書き出しました");
+    }
+
+    async function shareLiteLog(){
+      const s = await getSelectedShareSession();
+      if(!s){ toast("セッションがありません"); return; }
+      const lite = await buildLiteLog(s);
+      const content = JSON.stringify(lite, null, 2);
+      const blob = new Blob([content], { type:"application/json;charset=utf-8" });
+      const name = `SleepTracker_${s.dateStr.replaceAll("/","-")}_${String(s.startTime).replace(":","")}.json`;
+      const file = new File([blob], name, { type:"application/json" });
+      if(navigator.share && navigator.canShare && navigator.canShare({ files:[file] })){
+        try{
+          await navigator.share({ title:"SleepTracker 実測ログ", text:"睡眠測定ログ", files:[file] });
+          toast("共有しました");
+          return;
+        }catch{
+          toast("共有をキャンセルしました");
+          return;
+        }
+      }
+      downloadJSON(lite, name);
+      toast("ダウンロードしました");
+    }
+
+    function drawTimelineChart(canvas, audioData, accelData, baselineDb, durationSec, apneaLogs) {
+      if(!canvas || !canvas.parentElement) return;
+      const ctx = canvas.getContext('2d');
+      const width = canvas.parentElement.clientWidth;
+      const height = canvas.parentElement.clientHeight;
+      canvas.width = width;
+      canvas.height = height;
+
+      ctx.clearRect(0, 0, width, height);
+      if (!audioData || audioData.length === 0) return;
+
+      const len = audioData.length;
+      const stride = Math.max(1, Math.floor(len / width));
+      const drawLen = Math.ceil(len / stride);
+      const step = width / drawLen;
+
+      const audioHeight = height * 0.7;
+      const maxDeltaDb = 40;
+      const base = baselineDb || 24;
+
+      for (let i = 0; i < drawLen; i++) {
+        const srcIdxStart = i * stride;
+        const srcIdxEnd = Math.min(len, srcIdxStart + stride);
+
+        let peakDb = audioData[srcIdxStart] || base;
+        for (let k = srcIdxStart + 1; k < srcIdxEnd; k++) {
+          if ((audioData[k] || 0) > peakDb) peakDb = audioData[k];
+        }
+
+        const x = i * step;
+        const deltaDb = Math.max(0, peakDb - base);
+        let h = (deltaDb / maxDeltaDb) * audioHeight;
+        h = Math.min(h, audioHeight);
+        h = Math.max(h, 2);
+        const y = audioHeight - h;
+
+        if (peakDb > 60) ctx.fillStyle = '#ef4444';
+        else if (peakDb > base + 10) ctx.fillStyle = '#f59e0b';
+        else ctx.fillStyle = '#10b981';
+
+        ctx.fillRect(x, y, Math.max(1, step), h);
+      }
+
+      const accelHeight = height * 0.35;
+      const accelYOffset = height;
+      ctx.beginPath();
+      ctx.moveTo(0, accelYOffset);
+
+      for (let i = 0; i < drawLen; i++) {
+        const srcIdx = Math.min(len - 1, i * stride);
+        const g = accelData ? (accelData[srcIdx] || 0) : 0;
+        const x = i * step;
+        const h = Math.min(1, g / 0.15) * accelHeight;
+        ctx.lineTo(x, accelYOffset - h);
+      }
+      ctx.lineTo(width, accelYOffset);
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.6)';
+      ctx.fill();
+
+      if(apneaLogs && apneaLogs.length > 0 && durationSec > 0){
+        apneaLogs.forEach(a => {
+          const parts = (a.time || "").split(':');
+          let sec = 0;
+          if(parts.length === 3) sec = parseInt(parts[0])*3600 + parseInt(parts[1])*60 + parseInt(parts[2]);
+          const x = (sec / durationSec) * width;
+
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, audioHeight);
+          ctx.strokeStyle = 'rgba(168, 85, 247, 0.85)';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(x, 6, 4, 0, Math.PI * 2);
+          ctx.fillStyle = '#a855f7';
+          ctx.fill();
+        });
+      }
+    }
+
+    async function loadDoctorSelect(){
+      const sel = document.getElementById("doctorSessionSelect");
+      if(!sel) return;
+      const sessions = await getSessionsFromDB();
+      sel.innerHTML = "";
+      if(!sessions.length){
+        sel.innerHTML = `<option value="">保存済みセッションなし</option>`;
+        clearDoctorSummary();
+        return;
+      }
+      sessions.forEach(s => {
+        const op = document.createElement("option");
+        op.value = s.id;
+        const apnea = s.apneaCount || 0;
+        op.textContent = `${s.dateStr} ${s.startTime}〜${s.endTime} (無呼吸目安:${apnea}回)`;
+        sel.appendChild(op);
+      });
+      onDoctorSessionChange(sessions[0].id);
+    }
+
+    function clearDoctorSummary(){
+      const dt = document.getElementById("docTime");
+      const dd = document.getElementById("docDur");
+      const db = document.getElementById("docBase");
+      const dbx = document.getElementById("docBrux");
+      const ds = document.getElementById("docSnore");
+      const da = document.getElementById("docApnea");
+      const dah = document.getElementById("docAhi");
+      const dmg = document.getElementById("docMaxG");
+      const dmd = document.getElementById("docMaxDb");
+      const dn = document.getElementById("docNote");
+
+      if(dt) dt.textContent = "--:--〜--:--";
+      if(dd) dd.textContent = "--";
+      if(db) db.textContent = "-- dB";
+      if(dbx) dbx.textContent = "--件";
+      if(ds) ds.textContent = "--";
+      if(da) da.textContent = "-- 回";
+      if(dah) dah.textContent = "-- /時";
+      if(dmg) dmg.textContent = "-- G";
+      if(dmd) dmd.textContent = "-- dB";
+      if(dn) dn.textContent = "セッションを選択してください。";
+
+      const canvas = document.getElementById('timelineCanvas');
+      if(canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    async function onDoctorSessionChange(sessionId){
+      const sessions = await getSessionsFromDB();
+      const s = sessions.find(x => String(x.id) === String(sessionId)) || sessions[0];
+      if(!s){
+        clearDoctorSummary();
+        return;
+      }
+
+      const dt = document.getElementById("docTime");
+      const dd = document.getElementById("docDur");
+      const db = document.getElementById("docBase");
+      const dbx = document.getElementById("docBrux");
+      const ds = document.getElementById("docSnore");
+      const da = document.getElementById("docApnea");
+      const dah = document.getElementById("docAhi");
+      const dmg = document.getElementById("docMaxG");
+      const dmd = document.getElementById("docMaxDb");
+      const dn = document.getElementById("docNote");
+
+      if(dt) dt.textContent = `${s.startTime}〜${s.endTime}`;
+      if(dd) dd.textContent = formatDurationFriendly(s.durationSec);
+      if(db) db.textContent = `${Number(s.baselineDb||0).toFixed(1)} dB`;
+      if(dbx) dbx.textContent = `${s.bruxismEvents||0}件`;
+      if(ds) ds.textContent = formatMinutesFriendly(s.snoreMin);
+      
+      const apnea = s.apneaCount || 0;
+      if(da) da.textContent = `${apnea} 回`;
+      const ahi = s.ahiEstimate != null ? `${s.ahiEstimate} /時` : "-- /時";
+      if(dah) dah.textContent = ahi;
+
+      const maxDb = s.audioSamples && s.audioSamples.length ? Math.max(...s.audioSamples) : 0;
+      if(dmd) dmd.textContent = `${maxDb.toFixed(1)} dB`;
+
+      const valG = Number(s.maxMotionG || 0);
+      if(dmg) dmg.textContent = valG > 0 ? `${valG.toFixed(2)} G` : "0.00 G (PC)";
+
+      const logs = s.eventLogs || [];
+      if(dn){
+        if(logs.length){
+          const tail = logs.slice(-12).map(ev => {
+            const ja = ev.type === "snore" ? "いびき" : ev.type === "bruxism" ? "歯ぎしり" : ev.type === "apnea" ? "無呼吸疑い" : ev.type === "sleep_talk" ? "寝言" : ev.type;
+            return `${ev.hhmm} ${ja}(+${ev.dDb}dB)`;
+          }).join(" / ");
+          dn.innerHTML = `睡眠実測時間: <strong>${formatDurationFriendly(s.durationSec)}</strong><br>無呼吸疑い: <strong>${apnea}回（簡易AHI目安: ${ahi}）</strong><br><span style="font-size:12px;color:#475569;">※本指標は医療診断用ではなく、音響検知による目安です。<br>${esc(tail)}</span>`;
+        }else{
+          dn.innerHTML = `睡眠実測時間: <strong>${formatDurationFriendly(s.durationSec)}</strong><br>イベント記録なし`;
         }
       }
 
-      async function init(){
-        initBars();
-        bindStartButton();
-        setupMotionUI();
-        try { await initDB(); } catch(e){}
-        try { await loadPatientHistorySelect(); } catch(e){}
-        try { await loadShareSelect(); } catch(e){}
-        try { await loadDoctorSelect(); } catch(e){}
+      const apneaLogs = (s.eventLogs || []).filter(e => e.type === "apnea");
 
-        updateRuleText();
-        const bl = document.getElementById("baselineLabel");
-        if(bl) bl.textContent = `● ベースライン: ${baselineDb.toFixed(1)} dB`;
-        updateDebug();
+      setTimeout(() => {
+        const canvas = document.getElementById('timelineCanvas');
+        if(canvas) drawTimelineChart(canvas, s.audioSamples, s.accelSamples, s.baselineDb, s.durationSec, apneaLogs);
+      }, 50);
+    }
+
+    function bindStartButton(){
+      const btn = document.getElementById("btnStart");
+      if(btn){
+        btn.onclick = async (e) => {
+          e.preventDefault();
+          await startMeasurement();
+        };
       }
+    }
 
-      return {
-        init, runPreflight, requestMotionPermission, calibrateBaseline,
-        startMeasurement, stopMeasurement, toggleBlackout, switchMode, switchPatientTab,
-        clearAllData, onPatientHistoryChange, exportLiteLog, shareLiteLog,
-        onDoctorSessionChange
-      };
-    })();
+    async function init(){
+      initBars();
+      bindStartButton();
+      setupMotionUI();
+      try { await initDB(); } catch(e){}
+      try { await checkActiveRecovery(); } catch(e){}
+      try { await loadPatientHistorySelect(); } catch(e){}
+      try { await loadShareSelect(); } catch(e){}
+      try { await loadDoctorSelect(); } catch(e){}
 
-    window.addEventListener("DOMContentLoaded", () => {
-      App.init();
-    });
+      updateRuleText();
+      const bl = document.getElementById("baselineLabel");
+      if(bl) bl.textContent = `● ベースライン: ${baselineDb.toFixed(1)} dB`;
+      updateDebug();
+    }
 
-    window.addEventListener('error', (e) => {
-      console.error('JS Error:', e.message, e.filename, e.lineno);
-    });
-    window.addEventListener('unhandledrejection', (e) => {
-      console.error('Promise Error:', e.reason);
-    });
-  </script>
+    return {
+      init, runPreflight, requestMotionPermission, calibrateBaseline,
+      startMeasurement, stopMeasurement, toggleBlackout, switchMode, switchPatientTab,
+      clearAllData, onPatientHistoryChange, exportLiteLog, shareLiteLog,
+      onDoctorSessionChange, saveRecoveredSession
+    };
+  })();
+
+  window.addEventListener("DOMContentLoaded", () => {
+    App.init();
+  });
+
+  window.addEventListener('error', (e) => {
+    console.error('JS Error:', e.message, e.filename, e.lineno);
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    console.error('Promise Error:', e.reason);
+  });
+</script>
 </body>
 </html>
