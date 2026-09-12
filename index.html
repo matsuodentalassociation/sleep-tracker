@@ -6,13 +6,13 @@
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-<title>SleepTracker AI (GitHub Auto-Loader)</title>
+<title>SleepTracker AI (Motion + Audio AI)</title>
 <meta name="theme-color" content="#090d16">
 <style>
   :root{
     --bg:#090d16; --card:#131b2e; --card-hover:#1a253f; --line:#1e293b; --text:#f1f5f9; --muted:#94a3b8;
     --snore:#38bdf8; --brux:#f59e0b; --talk:#a855f7; --fart:#10b981; --env:#64748b;
-    --primary:#6366f1; --danger:#ef4444; --github:#2ea44f;
+    --primary:#6366f1; --danger:#ef4444; --motion:#ec4899;
   }
   *{ box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; -webkit-tap-highlight-color:transparent; }
   body{ background:var(--bg); color:var(--text); line-height:1.4; padding-bottom:80px; }
@@ -31,10 +31,10 @@
   .btn-primary{ background:var(--primary); color:#fff; }
   .btn-danger{ background:var(--danger); color:#fff; }
   .btn-soft{ background:#1e293b; border-color:#334155; color:#cbd5e1; }
+  .btn-motion{ background:#831843; border-color:var(--motion); color:#fbcfe8; }
   .badge{ display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:800; }
   .b-gray{ background:#334155; color:#cbd5e1; }
   .b-green{ background:#064e3b; color:#34d399; }
-  .b-gh{ background:#164e63; color:#38bdf8; border:1px solid #0284c7; }
   .tabs{ display:flex; border-bottom:1px solid var(--line); gap:8px; margin-bottom:4px; }
   .tab{ border:none; background:transparent; padding:12px 16px; color:var(--muted); font-size:13px; font-weight:700; border-bottom:2px solid transparent; cursor:pointer; }
   .tab.active{ color:#fff; border-bottom-color:var(--primary); }
@@ -50,6 +50,7 @@
   .tag-brux{ background:#b4530933; color:var(--brux); border:1px solid #d9770655; }
   .tag-talk{ background:#6b21a833; color:var(--talk); border:1px solid #9333ea55; }
   .tag-fart{ background:#065f4633; color:var(--fart); border:1px solid #05966955; }
+  .tag-roll{ background:#83184333; color:var(--motion); border:1px solid #db277755; }
   .tag-env{ background:#33415544; color:var(--env); border:1px solid #47556955; }
 
   .clip-item{ background:#101726; border:1px solid var(--line); border-radius:12px; padding:12px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
@@ -76,19 +77,28 @@
 
 <header class="top">
   <div class="top-inner">
-    <div class="brand">🌙 SleepTracker <span>Auto-Sync</span></div>
+    <div class="brand">🌙 SleepTracker <span>Motion+Sound AI</span></div>
     <div id="statusBadge" class="badge b-gray">待機中</div>
   </div>
 </header>
 
 <main class="container">
-  <!-- GitHub 動的ロードステータス -->
+  <!-- GitHub 同期ステータス -->
   <div class="gh-bar">
     <div class="gh-status">
       <div id="ghDot" class="gh-dot"></div>
       <span id="ghStatusText" style="color:#cbd5e1;">GitHubコード同期: 初期化中...</span>
     </div>
     <button class="btn btn-soft" style="padding:4px 8px; font-size:10px;" onclick="GitHubLoader.forceReload()">強制再読込</button>
+  </div>
+
+  <!-- iPhone モーションセンサー認証バナー（iOSで未許可時のみ自動表示） -->
+  <div id="iosMotionBanner" class="card hidden row" style="background:#3b0764; border-color:#a855f7; justify-content:space-between;">
+    <div style="font-size:12px; color:#f3e8ff;">
+      <strong>📱 iPhoneの体動センサー許可が必要です</strong>
+      <div style="font-size:11px; color:#d8b4fe;">寝返り・体動を記録するため、右のボタンを押して許可してください</div>
+    </div>
+    <button class="btn btn-motion" style="padding:8px 14px; font-size:12px;" onclick="App.requestIosMotionPermission()">センサー許可</button>
   </div>
 
   <div class="tabs">
@@ -99,19 +109,25 @@
   <!-- 1. 測定画面 -->
   <section id="panel-rec" class="col">
     <div class="card col" style="text-align:center; padding:22px 16px;">
-      <div class="stat-k">経過時間（周波数分類＆低発熱モード稼働中）</div>
+      <div class="stat-k">経過時間（体動監視 & 周波数分類稼働中）</div>
       <div id="timerText" style="font-size:36px; font-weight:900; margin:4px 0 14px; font-family:ui-monospace,monospace;">00:00:00</div>
 
-      <div class="col" style="max-width:320px; margin:0 auto; width:100%; gap:6px;">
+      <!-- 音量メーター -->
+      <div class="col" style="max-width:320px; margin:0 auto; width:100%; gap:4px;">
         <div class="row" style="justify-content:space-between; font-size:11px; color:var(--muted);">
           <span>入力音量: <b id="dbText" style="color:#fff;">-- dB</b></span>
           <span>直近判定: <b id="liveClassText" style="color:var(--primary);">待機中</b></span>
         </div>
         <div class="meter-bar"><div id="meterFill" class="meter-fill"></div></div>
-        <div class="row" style="justify-content:space-between; font-size:10px; color:var(--muted);">
-          <span>周波数重心: <span id="specCentroidText">-- Hz</span></span>
+      </div>
+
+      <!-- 体動（加速度）メーター -->
+      <div class="col" style="max-width:320px; margin:10px auto 0; width:100%; gap:4px;">
+        <div class="row" style="justify-content:space-between; font-size:11px; color:var(--muted);">
+          <span>体動強度 (加速度): <b id="motionText" style="color:var(--motion);">0.00 G</b></span>
           <span>寝室底面: <span id="baseText">-- dB</span></span>
         </div>
+        <div class="meter-bar"><div id="meterMotionFill" class="meter-fill" style="background:var(--motion);"></div></div>
       </div>
 
       <div class="row" style="margin-top:20px; justify-content:center;">
@@ -120,11 +136,15 @@
       </div>
     </div>
 
-    <!-- カテゴリ別集計グリッド -->
+    <!-- カテゴリ別集計グリッド（体動・寝返りを追加） -->
     <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px;">
       <div class="card col" style="padding:10px; text-align:center;">
         <div class="stat-k">😴 いびき</div>
         <div id="count-snore" class="stat-val" style="color:var(--snore);">0</div>
+      </div>
+      <div class="card col" style="padding:10px; text-align:center;">
+        <div class="stat-k">🔄 寝返り (体動)</div>
+        <div id="count-roll" class="stat-val" style="color:var(--motion);">0</div>
       </div>
       <div class="card col" style="padding:10px; text-align:center;">
         <div class="stat-k">😬 歯ぎしり</div>
@@ -139,10 +159,6 @@
         <div id="count-fart" class="stat-val" style="color:var(--fart);">0</div>
       </div>
       <div class="card col" style="padding:10px; text-align:center;">
-        <div class="stat-k">🛏 環境音/寝返り</div>
-        <div id="count-env" class="stat-val" style="color:var(--env);">0</div>
-      </div>
-      <div class="card col" style="padding:10px; text-align:center;">
         <div class="stat-k">⚠️ 無呼吸疑い</div>
         <div id="count-apnea" class="stat-val" style="color:#f43f5e;">0</div>
       </div>
@@ -154,7 +170,7 @@
     <div class="card col">
       <div class="row" style="justify-content:space-between; flex-wrap:wrap;">
         <div>
-          <strong>検出音声クリップ（耳で答え合わせ）</strong>
+          <strong>検出音声＆体動クリップ</strong>
           <div style="font-size:11px; color:var(--muted);">タップして実際の音声を再生し、分類を確認できます</div>
         </div>
         <button class="btn btn-soft" style="padding:6px 10px; font-size:11px;" onclick="App.clearClips()">全消去</button>
@@ -163,6 +179,7 @@
       <div class="filter-bar" style="margin-top:6px;">
         <button class="filter-btn active" onclick="App.filterCategory('all', this)">すべて (<span id="fc-all">0</span>)</button>
         <button class="filter-btn" onclick="App.filterCategory('snore', this)">😴 いびき (<span id="fc-snore">0</span>)</button>
+        <button class="filter-btn" onclick="App.filterCategory('roll', this)">🔄 寝返り (<span id="fc-roll">0</span>)</button>
         <button class="filter-btn" onclick="App.filterCategory('bruxism', this)">😬 歯ぎしり (<span id="fc-brux">0</span>)</button>
         <button class="filter-btn" onclick="App.filterCategory('talk', this)">🗣 寝言 (<span id="fc-talk">0</span>)</button>
         <button class="filter-btn" onclick="App.filterCategory('fart', this)">💨 おなら (<span id="fc-fart">0</span>)</button>
@@ -180,9 +197,7 @@
      ========================================== -->
 <script>
   const GitHubLoader = (() => {
-    // ご自身のGitHub Raw URLまたはリポジトリのパスを指定（クエリパラメータ?t=でキャッシュを強制破棄）
     const GITHUB_CONFIG_KEY = 'ST_GITHUB_RAW_URL';
-    // デフォルトURL（必要に応じてご自身のリポジトリに変更可能）
     const DEFAULT_URL = 'https://raw.githubusercontent.com/user/sleeptracker/main/app-core.js';
 
     function getUrl() {
@@ -201,7 +216,6 @@
 
     async function fetchLatestRemoteScript() {
       const targetUrl = getUrl();
-      // キャッシュを100%無視するタイムスタンプクエリ
       const cacheBusterUrl = targetUrl + (targetUrl.includes('?') ? '&' : '?') + '_t=' + Date.now();
 
       updateStatus('GitHubから最新コードをフェッチ中...', false, false);
@@ -209,7 +223,7 @@
       try {
         const res = await fetch(cacheBusterUrl, {
           method: 'GET',
-          cache: 'no-store', // ブラウザキャッシュを完全無効化
+          cache: 'no-store',
           headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
         });
 
@@ -217,11 +231,9 @@
         const remoteCode = await res.text();
 
         if (remoteCode && remoteCode.length > 50) {
-          // 次回オフライン用に保存
           localStorage.setItem('ST_CACHED_REMOTE_SCRIPT', remoteCode);
           updateStatus('GitHub最新版コードを動的適用完了', true, true);
           
-          // 動的インジェクション実行
           const scriptEl = document.createElement('script');
           scriptEl.text = remoteCode;
           document.body.appendChild(scriptEl);
@@ -230,9 +242,7 @@
           throw new Error('Script is empty');
         }
       } catch (err) {
-        console.warn('[GitHubLoader] リモートフェッチをスキップし、内蔵スクリプト/ローカルキャッシュで起動します:', err.message);
-        
-        // オフラインキャッシュがあるか確認
+        console.warn('[GitHubLoader] ローカルエンジンで起動します:', err.message);
         const cachedCode = localStorage.getItem('ST_CACHED_REMOTE_SCRIPT');
         if (cachedCode) {
           updateStatus(`オフライン（前回保存版で実行）: ${err.message}`, true, false);
@@ -242,7 +252,7 @@
           return true;
         } else {
           updateStatus(`内蔵ローカルエンジンで起動中 (${err.message})`, true, false);
-          return false; // 内蔵Appを実行
+          return false;
         }
       }
     }
@@ -263,12 +273,11 @@
 </script>
 
 <!-- ==========================================
-     SleepTracker Core (内蔵スタンドアロンエンジン)
-     ※ GitHubロード成功時は上書き拡張可能
+     SleepTracker Core (体動解析 + 音声多分類エンジン)
      ========================================== -->
 <script>
   const App = (() => {
-    const DB_NAME = 'SleepTrackerClassifierV4DB';
+    const DB_NAME = 'SleepTrackerClassifierV5DB';
     const DB_VERSION = 1;
     let db = null;
 
@@ -345,6 +354,13 @@
     let baselineDb = 24.0;
     let baselineSamples = [];
 
+    /* --- 体動（モーション）解析ステート --- */
+    let motionPermissionGranted = false;
+    let currentMotionG = 0.0;
+    let peakMotionG = 0.0;
+    let lastMotionTime = 0;
+    let lastAcc = { x: 0, y: 0, z: 0 };
+
     let mediaRecorder = null;
     let currentRecordingChunks = [];
     let isClipRecording = false;
@@ -352,12 +368,12 @@
     let currentClipMeta = null;
 
     let lastTriggerTime = 0;
-    const TRIGGER_COOLDOWN_MS = 5000; // 連続過剰録音防止（5秒）
+    const TRIGGER_COOLDOWN_MS = 5000;
 
     let snoreTimestamps = [];
     let silenceStartTime = null;
 
-    const counts = { snore: 0, bruxism: 0, talk: 0, fart: 0, env: 0, apnea: 0 };
+    const counts = { snore: 0, roll: 0, bruxism: 0, talk: 0, fart: 0, env: 0, apnea: 0 };
     let currentFilter = 'all';
     let currentAudioPlayer = null;
 
@@ -400,6 +416,69 @@
         panelClips.classList.remove("hidden");
         renderClipList();
       }
+    }
+
+    /* ==========================================================
+       iPhone (iOS) モーションセンサー許可ハンドラ
+       ========================================================== */
+    function checkIosMotionBanner() {
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        // iOS 13+ の場合、許可バナーを表示
+        if (!motionPermissionGranted) {
+          const banner = document.getElementById('iosMotionBanner');
+          if (banner) banner.classList.remove('hidden');
+        }
+      } else {
+        // Android または非iOSはイベントリスナーを直接登録
+        bindMotionListener();
+      }
+    }
+
+    async function requestIosMotionPermission() {
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        try {
+          const res = await DeviceMotionEvent.requestPermission();
+          if (res === 'granted') {
+            motionPermissionGranted = true;
+            bindMotionListener();
+            const banner = document.getElementById('iosMotionBanner');
+            if (banner) banner.classList.add('hidden');
+            toast("iPhoneのモーションセンサーを許可しました");
+          } else {
+            alert("モーションセンサーの許可が拒否されました");
+          }
+        } catch(e) {
+          alert("センサー認証エラー: " + e.message);
+        }
+      }
+    }
+
+    function bindMotionListener() {
+      window.removeEventListener('devicemotion', handleDeviceMotion);
+      window.addEventListener('devicemotion', handleDeviceMotion, { passive: true });
+      motionPermissionGranted = true;
+    }
+
+    // 加速度変化量（ジャーク・体動ベクトル）の算出
+    function handleDeviceMotion(e) {
+      const acc = e.acceleration || e.accelerationIncludingGravity;
+      if (!acc || acc.x === null) return;
+
+      const x = acc.x || 0;
+      const y = acc.y || 0;
+      const z = acc.z || 0;
+
+      // 前フレームとの差分（重力加速度成分を排除した動的加速度）
+      const dx = x - lastAcc.x;
+      const dy = y - lastAcc.y;
+      const dz = z - lastAcc.z;
+
+      lastAcc = { x, y, z };
+
+      const deltaMag = Math.sqrt(dx*dx + dy*dy + dz*dz) / 9.80665; // G単位
+      // 平滑化
+      currentMotionG = currentMotionG * 0.7 + deltaMag * 0.3;
+      if (currentMotionG > peakMotionG) peakMotionG = currentMotionG;
     }
 
     async function requestWakeLock() {
@@ -462,32 +541,38 @@
       };
     }
 
-    function classifySound(deltaDb, spec) {
+    // 音響と体動（モーション）を統合したハイブリッド分類
+    function classifySoundAndMotion(deltaDb, spec, motionG) {
+      // 体動大（0.12G以上）かつ音圧あり ＝ 寝返り
+      if (motionG >= 0.12) {
+        return { category: 'roll', label: '🔄 寝返り (体動検知)', tagClass: 'tag-roll' };
+      }
+
       if (deltaDb < 5.0) return null;
 
       const { centroid, subLowRatio, lowRatio, midRatio, highRatio } = spec;
 
-      // 1. おなら
+      // 1. おなら（体動なし・超低周波集中）
       if (subLowRatio > 0.48 && centroid < 300) {
         return { category: 'fart', label: '💨 おなら', tagClass: 'tag-fart' };
       }
-      // 2. 歯ぎしり / 食いしばり音
+      // 2. 歯ぎしり / 食いしばり音（高周波摩擦または鋭い接触音）
       if (highRatio > 0.28 || (centroid > 1800 && deltaDb >= 12)) {
         return { category: 'bruxism', label: '😬 歯ぎしり / 硬音', tagClass: 'tag-brux' };
       }
-      // 3. 寝言
+      // 3. 寝言（人間の声の帯域）
       if (midRatio > 0.42 && centroid >= 500 && centroid <= 1800) {
         return { category: 'talk', label: '🗣 寝言', tagClass: 'tag-talk' };
       }
-      // 4. いびき（単発も拾う）
+      // 4. いびき（体動が静止している状態での低中音）
       if (lowRatio > 0.35 || (centroid >= 200 && centroid < 700)) {
         return { category: 'snore', label: '😴 いびき', tagClass: 'tag-snore' };
       }
-      // 5. 環境音 / 寝返り
-      return { category: 'env', label: '🛏 環境音 / 寝返り', tagClass: 'tag-env' };
+      // 5. 環境音（布団の擦れ・遠くの物音）
+      return { category: 'env', label: '🛏 環境音 / 微動', tagClass: 'tag-env' };
     }
 
-    function triggerClipRecording(classResult, peakDb, durationMs = 10000) {
+    function triggerClipRecording(classResult, peakDb, motionG, durationMs = 10000) {
       const now = Date.now();
       if (isClipRecording) return;
       if (now - lastTriggerTime < TRIGGER_COOLDOWN_MS) return;
@@ -502,6 +587,7 @@
         label: classResult.label,
         tagClass: classResult.tagClass,
         peakDb: peakDb,
+        motionG: motionG.toFixed(2),
         timeStr: formatHMS(recSec),
         realClock: new Date().toLocaleTimeString("ja-JP", { hour:"2-digit", minute:"2-digit", second:"2-digit" }),
         durationSec: Math.round(durationMs / 1000)
@@ -526,7 +612,7 @@
             await saveClipToDB(clipRecord);
             counts[clipRecord.category] = (counts[clipRecord.category] || 0) + 1;
             updateCountUI();
-            toast(`録音保存: ${clipRecord.label}`);
+            toast(`記録保存: ${clipRecord.label}`);
           }
           isClipRecording = false;
           currentClipMeta = null;
@@ -550,15 +636,17 @@
     function updateCountUI() {
       const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
       setVal("count-snore", counts.snore);
+      setVal("count-roll", counts.roll);
       setVal("count-brux", counts.bruxism);
       setVal("count-talk", counts.talk);
       setVal("count-fart", counts.fart);
       setVal("count-env", counts.env);
       setVal("count-apnea", counts.apnea);
 
-      const total = counts.snore + counts.bruxism + counts.talk + counts.fart + counts.env;
+      const total = counts.snore + counts.roll + counts.bruxism + counts.talk + counts.fart + counts.env;
       setVal("fc-all", total);
       setVal("fc-snore", counts.snore);
+      setVal("fc-roll", counts.roll);
       setVal("fc-brux", counts.bruxism);
       setVal("fc-talk", counts.talk);
       setVal("fc-fart", counts.fart);
@@ -568,18 +656,27 @@
     function monitorTick() {
       currentDb = calcDb();
       const spec = analyzeFrequencySpectrum();
+      const motionSnapshot = peakMotionG;
+      peakMotionG = 0; // スナップショット後リセット
 
       const dbEl = document.getElementById("dbText");
       const fillEl = document.getElementById("meterFill");
+      const motionEl = document.getElementById("motionText");
+      const motionFillEl = document.getElementById("meterMotionFill");
       const liveClassEl = document.getElementById("liveClassText");
-      const centroidEl = document.getElementById("specCentroidText");
 
       if(dbEl) dbEl.textContent = `${currentDb.toFixed(1)} dB`;
-      if(centroidEl) centroidEl.textContent = `${spec.centroid} Hz`;
+      if(motionEl) motionEl.textContent = `${motionSnapshot.toFixed(2)} G`;
+
       if(fillEl) {
         const pct = Math.min(100, Math.max(0, (currentDb - 20) * 1.5));
         fillEl.style.width = `${pct}%`;
         fillEl.style.background = currentDb >= baselineDb + 14 ? "var(--danger)" : (currentDb >= baselineDb + 6 ? "var(--warn)" : "#10b981");
+      }
+
+      if(motionFillEl) {
+        const mPct = Math.min(100, motionSnapshot * 300); // 0.33Gで100%
+        motionFillEl.style.width = `${mPct}%`;
       }
 
       if(baselineSamples.length < 30) {
@@ -594,22 +691,22 @@
       const now = Date.now();
       const delta = currentDb - baselineDb;
 
-      const classResult = classifySound(delta, spec);
+      // ハイブリッド分類（音と体動）
+      const classResult = classifySoundAndMotion(delta, spec, motionSnapshot);
 
       if(classResult) {
         if(liveClassEl) liveClassEl.textContent = classResult.label;
         if(classResult.category === 'snore') snoreTimestamps.push(now);
 
-        // 単発もすべて逃さず録音
-        triggerClipRecording(classResult, currentDb, 10000);
+        triggerClipRecording(classResult, currentDb, motionSnapshot, 10000);
       } else {
-        if(liveClassEl && delta < 3.0) liveClassEl.textContent = "静寂 / 正常呼吸";
+        if(liveClassEl && delta < 3.0 && motionSnapshot < 0.05) liveClassEl.textContent = "静寂 / 正常呼吸";
       }
 
       snoreTimestamps = snoreTimestamps.filter(t => (now - t) < 35000);
 
-      // 無呼吸監視（連続いびき後の静寂＆あえぎ音）
-      const isSilent = (delta < 2.5);
+      // 無呼吸監視（体動なし・静寂持続・あえぎ音）
+      const isSilent = (delta < 2.5 && motionSnapshot < 0.05);
       if(snoreTimestamps.length >= 2) {
         if(isSilent) {
           if(silenceStartTime === null) silenceStartTime = now;
@@ -624,7 +721,7 @@
                 label: `⚠️ 無呼吸疑い（静寂${Math.round(silenceDurationSec)}秒後）`,
                 tagClass: 'tag-snore'
               };
-              triggerClipRecording(apneaResult, currentDb, 14000);
+              triggerClipRecording(apneaResult, currentDb, motionSnapshot, 14000);
               toast(`無呼吸疑いを記録 (静寂${Math.round(silenceDurationSec)}秒)`);
               snoreTimestamps = [];
             }
@@ -639,6 +736,11 @@
     async function startTracking() {
       if(isTracking) return;
       await initDB();
+
+      // もしiOSで未認証なら開始時にリクエスト
+      if (!motionPermissionGranted && typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        await requestIosMotionPermission();
+      }
 
       try {
         stream = await navigator.mediaDevices.getUserMedia({
@@ -671,7 +773,7 @@
       silenceStartTime = null;
       lastTriggerTime = 0;
 
-      document.getElementById("statusBadge").textContent = "分類モニタ中";
+      document.getElementById("statusBadge").textContent = "体動＆音声監視中";
       document.getElementById("statusBadge").className = "badge b-green";
       document.getElementById("btnStart").disabled = true;
       document.getElementById("btnStop").disabled = false;
@@ -686,7 +788,7 @@
       clearInterval(monitorInterval);
       monitorInterval = setInterval(monitorTick, 500);
 
-      toast("測定を開始しました");
+      toast("睡眠測定を開始しました（体動・音声録音ON）");
     }
 
     async function stopTracking() {
@@ -752,7 +854,7 @@
           <div class="clip-info">
             <div class="clip-title">
               <span class="badge ${clip.tagClass || 'tag-env'}">${clip.label}</span>
-              <span style="font-size:11px; font-weight:normal; color:#94a3b8; font-family:ui-monospace;">${clip.peakDb.toFixed(1)} dB</span>
+              <span style="font-size:11px; font-weight:normal; color:#94a3b8; font-family:ui-monospace;">${clip.peakDb.toFixed(1)} dB / ${clip.motionG || '0.00'}G</span>
             </div>
             <div class="clip-sub">
               時刻: ${clip.realClock}（開始後 ${clip.timeStr}） / 長さ: 約${clip.durationSec}秒
@@ -805,6 +907,7 @@
     }
 
     async function init() {
+      checkIosMotionBanner();
       try { await initDB(); } catch(e){}
       const clips = await getClipsFromDB();
       clips.forEach(c => {
@@ -814,11 +917,10 @@
     }
 
     return {
-      init, switchTab, startTracking, stopTracking, clearClips, filterCategory
+      init, switchTab, startTracking, stopTracking, clearClips, filterCategory, requestIosMotionPermission
     };
   })();
 
-  // 起動処理: GitHubの最新コード確認 → 完了後にアプリ初期化
   window.addEventListener("DOMContentLoaded", async () => {
     await GitHubLoader.init();
     App.init();
