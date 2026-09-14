@@ -1,930 +1,1964 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8" />
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-<meta http-equiv="Pragma" content="no-cache" />
-<meta http-equiv="Expires" content="0" />
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-<title>SleepTracker AI (Motion + Audio AI)</title>
-<meta name="theme-color" content="#090d16">
-<style>
-  :root{
-    --bg:#090d16; --card:#131b2e; --card-hover:#1a253f; --line:#1e293b; --text:#f1f5f9; --muted:#94a3b8;
-    --snore:#38bdf8; --brux:#f59e0b; --talk:#a855f7; --fart:#10b981; --env:#64748b;
-    --primary:#6366f1; --danger:#ef4444; --motion:#ec4899;
-  }
-  *{ box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; -webkit-tap-highlight-color:transparent; }
-  body{ background:var(--bg); color:var(--text); line-height:1.4; padding-bottom:80px; }
-  .top{ position:sticky; top:0; z-index:40; background:#090d16eb; backdrop-filter:blur(12px); border-bottom:1px solid var(--line); }
-  .top-inner{ max-width:960px; height:56px; margin:0 auto; padding:0 16px; display:flex; align-items:center; justify-content:space-between; }
-  .brand{ display:flex; align-items:center; gap:8px; font-weight:800; font-size:15px; color:#fff; }
-  .brand span{ color:var(--primary); font-size:11px; background:#1e1b4b; padding:2px 6px; border-radius:6px; }
-  .container{ max-width:960px; margin:14px auto 0; padding:0 14px; display:flex; flex-direction:column; gap:14px; }
-  .card{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; box-shadow:0 4px 12px rgba(0,0,0,.3); }
-  .hidden{ display:none !important; }
-  .row{ display:flex; align-items:center; gap:8px; }
-  .col{ display:flex; flex-direction:column; gap:10px; }
-  .btn{ border:1px solid transparent; border-radius:12px; padding:12px 16px; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:8px; transition:.15s all; }
-  .btn:active{ transform:scale(.97); }
-  .btn:disabled{ opacity:.4; cursor:not-allowed; }
-  .btn-primary{ background:var(--primary); color:#fff; }
-  .btn-danger{ background:var(--danger); color:#fff; }
-  .btn-soft{ background:#1e293b; border-color:#334155; color:#cbd5e1; }
-  .btn-motion{ background:#831843; border-color:var(--motion); color:#fbcfe8; }
-  .badge{ display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:800; }
-  .b-gray{ background:#334155; color:#cbd5e1; }
-  .b-green{ background:#064e3b; color:#34d399; }
-  .tabs{ display:flex; border-bottom:1px solid var(--line); gap:8px; margin-bottom:4px; }
-  .tab{ border:none; background:transparent; padding:12px 16px; color:var(--muted); font-size:13px; font-weight:700; border-bottom:2px solid transparent; cursor:pointer; }
-  .tab.active{ color:#fff; border-bottom-color:var(--primary); }
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#090d16">
+  <title>SleepTracker AI Stable V6.2</title>
 
-  /* GitHub同期インジケーター */
-  .gh-bar{ background:#0d1527; border:1px solid #1e293b; border-radius:10px; padding:8px 12px; display:flex; align-items:center; justify-content:space-between; font-size:11px; gap:8px; }
-  .gh-status{ display:flex; align-items:center; gap:6px; }
-  .gh-dot{ width:8px; height:8px; border-radius:50%; background:#94a3b8; }
-  .gh-dot.live{ background:#10b981; box-shadow:0 0 8px #10b981; }
+  <style>
+    :root {
+      --bg:#090d16;
+      --card:#131b2e;
+      --line:#1e293b;
+      --text:#f1f5f9;
+      --muted:#94a3b8;
+      --primary:#6366f1;
+      --danger:#ef4444;
+      --warn:#f59e0b;
+      --success:#10b981;
+      --snore:#38bdf8;
+      --brux:#f59e0b;
+      --talk:#a855f7;
+      --fart:#10b981;
+      --motion:#ec4899;
+      --env:#64748b;
+    }
 
-  /* カテゴリ別タグ */
-  .tag-snore{ background:#0369a133; color:var(--snore); border:1px solid #0284c755; }
-  .tag-brux{ background:#b4530933; color:var(--brux); border:1px solid #d9770655; }
-  .tag-talk{ background:#6b21a833; color:var(--talk); border:1px solid #9333ea55; }
-  .tag-fart{ background:#065f4633; color:var(--fart); border:1px solid #05966955; }
-  .tag-roll{ background:#83184333; color:var(--motion); border:1px solid #db277755; }
-  .tag-env{ background:#33415544; color:var(--env); border:1px solid #47556955; }
+    * {
+      box-sizing:border-box;
+      margin:0;
+      padding:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+      -webkit-tap-highlight-color:transparent;
+    }
 
-  .clip-item{ background:#101726; border:1px solid var(--line); border-radius:12px; padding:12px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
-  .play-btn{ width:40px; height:40px; border-radius:50%; background:var(--primary); color:#fff; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; font-size:14px; }
-  .clip-info{ display:flex; flex-direction:column; gap:3px; flex:1; }
-  .clip-title{ font-weight:800; font-size:13px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
-  .clip-sub{ font-size:11px; color:var(--muted); }
+    body {
+      background:var(--bg);
+      color:var(--text);
+      line-height:1.4;
+      padding-bottom:80px;
+    }
 
-  .filter-bar{ display:flex; gap:6px; overflow-x:auto; padding-bottom:6px; scrollbar-width:none; }
-  .filter-btn{ background:#1e293b; border:1px solid #334155; color:var(--muted); border-radius:20px; padding:5px 12px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; }
-  .filter-btn.active{ background:var(--primary); color:#fff; border-color:var(--primary); }
+    .top {
+      position:sticky;
+      top:0;
+      z-index:40;
+      background:#090d16eb;
+      backdrop-filter:blur(12px);
+      border-bottom:1px solid var(--line);
+    }
 
-  .meter-bar{ height:6px; background:#1e293b; border-radius:3px; overflow:hidden; }
-  .meter-fill{ height:100%; width:0%; background:#10b981; transition:width .08s linear; }
-  .stat-val{ font-size:20px; font-weight:900; color:#fff; font-family:ui-monospace,Menlo,monospace; }
-  .stat-k{ font-size:11px; color:var(--muted); }
+    .top-inner {
+      max-width:960px;
+      height:56px;
+      margin:auto;
+      padding:0 16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
 
-  #toastWrap{ position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:100; width:min(90vw,400px); display:flex; flex-direction:column; gap:8px; pointer-events:none; }
-  .toast{ background:rgba(15,23,42,.95); border:1px solid #334155; color:#fff; border-radius:10px; padding:12px; font-size:12px; text-align:center; box-shadow:0 8px 20px rgba(0,0,0,.5); }
-</style>
+    .brand {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-size:15px;
+      font-weight:800;
+    }
+
+    .brand span {
+      color:#a5b4fc;
+      font-size:10px;
+      background:#1e1b4b;
+      padding:3px 7px;
+      border-radius:6px;
+    }
+
+    .container {
+      max-width:960px;
+      margin:14px auto 0;
+      padding:0 14px;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+
+    .card {
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:16px;
+      box-shadow:0 4px 12px rgba(0,0,0,.3);
+    }
+
+    .hidden { display:none !important; }
+    .row { display:flex; align-items:center; gap:8px; }
+    .col { display:flex; flex-direction:column; gap:10px; }
+
+    .btn {
+      border:1px solid transparent;
+      border-radius:12px;
+      padding:12px 16px;
+      font-size:13px;
+      font-weight:700;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+    }
+
+    .btn:active { transform:scale(.97); }
+    .btn:disabled { opacity:.4; cursor:not-allowed; }
+    .btn-primary { background:var(--primary); color:white; }
+    .btn-danger { background:var(--danger); color:white; }
+    .btn-soft { background:#1e293b; border-color:#334155; color:#cbd5e1; }
+    .btn-motion { background:#831843; border-color:var(--motion); color:#fbcfe8; }
+
+    .badge {
+      display:inline-flex;
+      align-items:center;
+      border-radius:999px;
+      padding:3px 8px;
+      font-size:11px;
+      font-weight:800;
+    }
+
+    .b-gray { background:#334155; color:#cbd5e1; }
+    .b-green { background:#064e3b; color:#34d399; }
+    .b-warn { background:#78350f; color:#fbbf24; }
+
+    .tabs {
+      display:flex;
+      gap:8px;
+      border-bottom:1px solid var(--line);
+    }
+
+    .tab {
+      border:none;
+      background:transparent;
+      padding:12px 16px;
+      color:var(--muted);
+      font-size:13px;
+      font-weight:700;
+      border-bottom:2px solid transparent;
+      cursor:pointer;
+    }
+
+    .tab.active {
+      color:white;
+      border-bottom-color:var(--primary);
+    }
+
+    .gh-bar {
+      background:#0d1527;
+      border:1px solid var(--line);
+      border-radius:10px;
+      padding:8px 12px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      font-size:11px;
+    }
+
+    .gh-status {
+      display:flex;
+      align-items:center;
+      gap:6px;
+      min-width:0;
+    }
+
+    .gh-dot {
+      width:8px;
+      height:8px;
+      flex:0 0 auto;
+      border-radius:50%;
+      background:#94a3b8;
+    }
+
+    .gh-dot.live {
+      background:var(--success);
+      box-shadow:0 0 8px var(--success);
+    }
+
+    .notice {
+      font-size:11px;
+      color:#cbd5e1;
+      background:#172033;
+      border:1px solid #334155;
+      border-radius:10px;
+      padding:10px 12px;
+    }
+
+    .meter-bar {
+      height:6px;
+      background:#1e293b;
+      border-radius:3px;
+      overflow:hidden;
+    }
+
+    .meter-fill {
+      height:100%;
+      width:0;
+      background:var(--success);
+      transition:width .12s linear;
+    }
+
+    .stat-grid {
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:8px;
+    }
+
+    .stat-card {
+      padding:10px;
+      text-align:center;
+    }
+
+    .stat-k { font-size:11px; color:var(--muted); }
+
+    .stat-val {
+      font-size:20px;
+      font-weight:900;
+      font-family:ui-monospace,Menlo,monospace;
+    }
+
+    .filter-bar {
+      display:flex;
+      gap:6px;
+      overflow-x:auto;
+      padding-bottom:6px;
+      scrollbar-width:none;
+    }
+
+    .filter-btn {
+      background:#1e293b;
+      border:1px solid #334155;
+      color:var(--muted);
+      border-radius:20px;
+      padding:5px 12px;
+      font-size:11px;
+      font-weight:700;
+      cursor:pointer;
+      white-space:nowrap;
+    }
+
+    .filter-btn.active {
+      background:var(--primary);
+      color:white;
+      border-color:var(--primary);
+    }
+
+    .clip-item {
+      background:#101726;
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:12px 14px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+
+    .clip-info {
+      display:flex;
+      flex:1;
+      min-width:0;
+      flex-direction:column;
+      gap:4px;
+    }
+
+    .clip-title {
+      display:flex;
+      align-items:center;
+      gap:6px;
+      flex-wrap:wrap;
+      font-size:13px;
+      font-weight:800;
+    }
+
+    .clip-sub { font-size:11px; color:var(--muted); }
+
+    .play-btn {
+      width:40px;
+      height:40px;
+      flex:0 0 auto;
+      border:0;
+      border-radius:50%;
+      background:var(--primary);
+      color:white;
+      cursor:pointer;
+    }
+
+    .tag-snore { background:#0369a133; color:var(--snore); }
+    .tag-roll { background:#83184333; color:var(--motion); }
+    .tag-brux { background:#b4530933; color:var(--brux); }
+    .tag-talk { background:#6b21a833; color:var(--talk); }
+    .tag-fart { background:#065f4633; color:var(--fart); }
+    .tag-env { background:#33415544; color:#94a3b8; }
+
+    #toastWrap {
+      position:fixed;
+      top:16px;
+      left:50%;
+      transform:translateX(-50%);
+      z-index:100;
+      width:min(90vw,400px);
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      pointer-events:none;
+    }
+
+    .toast {
+      background:rgba(15,23,42,.97);
+      border:1px solid #334155;
+      color:white;
+      border-radius:10px;
+      padding:12px;
+      font-size:12px;
+      text-align:center;
+      box-shadow:0 8px 20px rgba(0,0,0,.5);
+    }
+
+    @media (max-width:520px) {
+      .stat-grid { grid-template-columns:repeat(2,1fr); }
+      .clip-item { align-items:flex-start; }
+    }
+  </style>
 </head>
+
 <body>
-<div id="toastWrap"></div>
+  <div id="toastWrap"></div>
 
-<header class="top">
-  <div class="top-inner">
-    <div class="brand">🌙 SleepTracker <span>Motion+Sound AI</span></div>
-    <div id="statusBadge" class="badge b-gray">待機中</div>
-  </div>
-</header>
-
-<main class="container">
-  <!-- GitHub 同期ステータス -->
-  <div class="gh-bar">
-    <div class="gh-status">
-      <div id="ghDot" class="gh-dot"></div>
-      <span id="ghStatusText" style="color:#cbd5e1;">GitHubコード同期: 初期化中...</span>
+  <header class="top">
+    <div class="top-inner">
+      <div class="brand">🌙 SleepTracker <span>STABLE V6.2</span></div>
+      <div id="statusBadge" class="badge b-gray">待機中</div>
     </div>
-    <button class="btn btn-soft" style="padding:4px 8px; font-size:10px;" onclick="GitHubLoader.forceReload()">強制再読込</button>
-  </div>
+  </header>
 
-  <!-- iPhone モーションセンサー認証バナー（iOSで未許可時のみ自動表示） -->
-  <div id="iosMotionBanner" class="card hidden row" style="background:#3b0764; border-color:#a855f7; justify-content:space-between;">
-    <div style="font-size:12px; color:#f3e8ff;">
-      <strong>📱 iPhoneの体動センサー許可が必要です</strong>
-      <div style="font-size:11px; color:#d8b4fe;">寝返り・体動を記録するため、右のボタンを押して許可してください</div>
+  <main class="container">
+    <div class="gh-bar">
+      <div class="gh-status">
+        <div id="ghDot" class="gh-dot"></div>
+        <span id="ghStatusText">GitHubコード同期: 初期化中</span>
+      </div>
+      <button class="btn btn-soft" style="padding:5px 8px;font-size:10px" onclick="GitHubLoader.forceReload()">
+        URL設定
+      </button>
     </div>
-    <button class="btn btn-motion" style="padding:8px 14px; font-size:12px;" onclick="App.requestIosMotionPermission()">センサー許可</button>
-  </div>
 
-  <div class="tabs">
-    <button id="tab-rec" class="tab active" onclick="App.switchTab('rec')">測定・モニタ</button>
-    <button id="tab-clips" class="tab" onclick="App.switchTab('clips')">分類録音一覧（再生確認）</button>
-  </div>
+    <div id="recoveryNotice" class="notice hidden"></div>
 
-  <!-- 1. 測定画面 -->
-  <section id="panel-rec" class="col">
-    <div class="card col" style="text-align:center; padding:22px 16px;">
-      <div class="stat-k">経過時間（体動監視 & 周波数分類稼働中）</div>
-      <div id="timerText" style="font-size:36px; font-weight:900; margin:4px 0 14px; font-family:ui-monospace,monospace;">00:00:00</div>
-
-      <!-- 音量メーター -->
-      <div class="col" style="max-width:320px; margin:0 auto; width:100%; gap:4px;">
-        <div class="row" style="justify-content:space-between; font-size:11px; color:var(--muted);">
-          <span>入力音量: <b id="dbText" style="color:#fff;">-- dB</b></span>
-          <span>直近判定: <b id="liveClassText" style="color:var(--primary);">待機中</b></span>
+    <div id="iosMotionBanner" class="card hidden row"
+         style="background:#3b0764;border-color:#a855f7;justify-content:space-between">
+      <div style="font-size:12px;color:#f3e8ff">
+        <strong>📱 モーションセンサーの許可が必要です</strong>
+        <div style="font-size:11px;color:#d8b4fe">
+          寝返り・体動を記録するために許可してください。
         </div>
-        <div class="meter-bar"><div id="meterFill" class="meter-fill"></div></div>
       </div>
+      <button class="btn btn-motion" style="padding:8px 12px"
+              onclick="App.requestIosMotionPermission()">
+        許可
+      </button>
+    </div>
 
-      <!-- 体動（加速度）メーター -->
-      <div class="col" style="max-width:320px; margin:10px auto 0; width:100%; gap:4px;">
-        <div class="row" style="justify-content:space-between; font-size:11px; color:var(--muted);">
-          <span>体動強度 (加速度): <b id="motionText" style="color:var(--motion);">0.00 G</b></span>
-          <span>寝室底面: <span id="baseText">-- dB</span></span>
+    <div class="tabs">
+      <button id="tab-rec" class="tab active" onclick="App.switchTab('rec')">測定・モニタ</button>
+      <button id="tab-clips" class="tab" onclick="App.switchTab('clips')">分類録音一覧</button>
+    </div>
+
+    <section id="panel-rec" class="col">
+      <div class="card col" style="text-align:center;padding:22px 16px">
+        <div class="stat-k">経過時間</div>
+        <div id="timerText"
+             style="font-size:36px;font-weight:900;font-family:ui-monospace,monospace">
+          00:00:00
         </div>
-        <div class="meter-bar"><div id="meterMotionFill" class="meter-fill" style="background:var(--motion);"></div></div>
-      </div>
 
-      <div class="row" style="margin-top:20px; justify-content:center;">
-        <button id="btnStart" class="btn btn-primary" style="flex:1; max-width:180px;" onclick="App.startTracking()">睡眠測定を開始</button>
-        <button id="btnStop" class="btn btn-danger" style="flex:1; max-width:180px;" onclick="App.stopTracking()" disabled>測定終了</button>
-      </div>
-    </div>
-
-    <!-- カテゴリ別集計グリッド（体動・寝返りを追加） -->
-    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px;">
-      <div class="card col" style="padding:10px; text-align:center;">
-        <div class="stat-k">😴 いびき</div>
-        <div id="count-snore" class="stat-val" style="color:var(--snore);">0</div>
-      </div>
-      <div class="card col" style="padding:10px; text-align:center;">
-        <div class="stat-k">🔄 寝返り (体動)</div>
-        <div id="count-roll" class="stat-val" style="color:var(--motion);">0</div>
-      </div>
-      <div class="card col" style="padding:10px; text-align:center;">
-        <div class="stat-k">😬 歯ぎしり</div>
-        <div id="count-brux" class="stat-val" style="color:var(--brux);">0</div>
-      </div>
-      <div class="card col" style="padding:10px; text-align:center;">
-        <div class="stat-k">🗣 寝言</div>
-        <div id="count-talk" class="stat-val" style="color:var(--talk);">0</div>
-      </div>
-      <div class="card col" style="padding:10px; text-align:center;">
-        <div class="stat-k">💨 おなら</div>
-        <div id="count-fart" class="stat-val" style="color:var(--fart);">0</div>
-      </div>
-      <div class="card col" style="padding:10px; text-align:center;">
-        <div class="stat-k">⚠️ 無呼吸疑い</div>
-        <div id="count-apnea" class="stat-val" style="color:#f43f5e;">0</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 2. 分類録音一覧画面 -->
-  <section id="panel-clips" class="hidden col">
-    <div class="card col">
-      <div class="row" style="justify-content:space-between; flex-wrap:wrap;">
-        <div>
-          <strong>検出音声＆体動クリップ</strong>
-          <div style="font-size:11px; color:var(--muted);">タップして実際の音声を再生し、分類を確認できます</div>
+        <div class="col" style="max-width:340px;margin:8px auto 0;width:100%;gap:4px">
+          <div class="row" style="justify-content:space-between;font-size:11px;color:var(--muted)">
+            <span>入力音量: <b id="dbText" style="color:white">-- dB</b></span>
+            <span>判定: <b id="liveClassText" style="color:#a5b4fc">待機中</b></span>
+          </div>
+          <div class="meter-bar"><div id="meterFill" class="meter-fill"></div></div>
         </div>
-        <button class="btn btn-soft" style="padding:6px 10px; font-size:11px;" onclick="App.clearClips()">全消去</button>
+
+        <div class="col" style="max-width:340px;margin:8px auto 0;width:100%;gap:4px">
+          <div class="row" style="justify-content:space-between;font-size:11px;color:var(--muted)">
+            <span>体動: <b id="motionText" style="color:var(--motion)">0.00 G</b></span>
+            <span>基準音: <b id="baseText">-- dB</b></span>
+          </div>
+          <div class="meter-bar">
+            <div id="meterMotionFill" class="meter-fill" style="background:var(--motion)"></div>
+          </div>
+        </div>
+
+        <div id="engineText" style="font-size:10px;color:var(--muted);margin-top:8px">
+          エンジン待機中
+        </div>
+
+        <div class="row" style="margin-top:14px;justify-content:center">
+          <button id="btnStart" class="btn btn-primary" style="flex:1;max-width:180px"
+                  onclick="App.startTracking()">
+            睡眠測定を開始
+          </button>
+          <button id="btnStop" class="btn btn-danger" style="flex:1;max-width:180px"
+                  onclick="App.stopTracking()" disabled>
+            測定終了
+          </button>
+        </div>
       </div>
 
-      <div class="filter-bar" style="margin-top:6px;">
-        <button class="filter-btn active" onclick="App.filterCategory('all', this)">すべて (<span id="fc-all">0</span>)</button>
-        <button class="filter-btn" onclick="App.filterCategory('snore', this)">😴 いびき (<span id="fc-snore">0</span>)</button>
-        <button class="filter-btn" onclick="App.filterCategory('roll', this)">🔄 寝返り (<span id="fc-roll">0</span>)</button>
-        <button class="filter-btn" onclick="App.filterCategory('bruxism', this)">😬 歯ぎしり (<span id="fc-brux">0</span>)</button>
-        <button class="filter-btn" onclick="App.filterCategory('talk', this)">🗣 寝言 (<span id="fc-talk">0</span>)</button>
-        <button class="filter-btn" onclick="App.filterCategory('fart', this)">💨 おなら (<span id="fc-fart">0</span>)</button>
-        <button class="filter-btn" onclick="App.filterCategory('env', this)">🛏 環境音 (<span id="fc-env">0</span>)</button>
+      <div class="stat-grid">
+        <div class="card stat-card"><div class="stat-k">😴 いびき</div><div id="count-snore" class="stat-val" style="color:var(--snore)">0</div></div>
+        <div class="card stat-card"><div class="stat-k">🔄 寝返り</div><div id="count-roll" class="stat-val" style="color:var(--motion)">0</div></div>
+        <div class="card stat-card"><div class="stat-k">😬 歯ぎしり</div><div id="count-brux" class="stat-val" style="color:var(--brux)">0</div></div>
+        <div class="card stat-card"><div class="stat-k">🗣 寝言</div><div id="count-talk" class="stat-val" style="color:var(--talk)">0</div></div>
+        <div class="card stat-card"><div class="stat-k">💨 おなら</div><div id="count-fart" class="stat-val" style="color:var(--fart)">0</div></div>
+        <div class="card stat-card"><div class="stat-k">⚠️ 無呼吸疑い</div><div id="count-apnea" class="stat-val" style="color:#f43f5e">0</div></div>
       </div>
+    </section>
 
-      <div id="clipList" class="col" style="gap:8px; margin-top:4px;">
-        <div style="text-align:center; padding:30px; font-size:12px; color:var(--muted);">録音データはまだありません。</div>
+    <section id="panel-clips" class="hidden col">
+      <div class="card col">
+        <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+          <div>
+            <strong>検出クリップ</strong>
+            <div style="font-size:11px;color:var(--muted)">分類結果を実際の音声で確認できます。</div>
+          </div>
+          <button class="btn btn-soft" style="padding:6px 10px;font-size:11px"
+                  onclick="App.clearClips()">
+            全消去
+          </button>
+        </div>
+
+        <div class="filter-bar">
+          <button class="filter-btn active" onclick="App.filterCategory('all',this)">すべて (<span id="fc-all">0</span>)</button>
+          <button class="filter-btn" onclick="App.filterCategory('snore',this)">いびき (<span id="fc-snore">0</span>)</button>
+          <button class="filter-btn" onclick="App.filterCategory('roll',this)">寝返り (<span id="fc-roll">0</span>)</button>
+          <button class="filter-btn" onclick="App.filterCategory('bruxism',this)">歯ぎしり (<span id="fc-brux">0</span>)</button>
+          <button class="filter-btn" onclick="App.filterCategory('talk',this)">寝言 (<span id="fc-talk">0</span>)</button>
+          <button class="filter-btn" onclick="App.filterCategory('fart',this)">おなら (<span id="fc-fart">0</span>)</button>
+          <button class="filter-btn" onclick="App.filterCategory('env',this)">環境音 (<span id="fc-env">0</span>)</button>
+        </div>
+
+        <div id="clipList" class="col">
+          <div style="text-align:center;padding:30px;font-size:12px;color:var(--muted)">
+            録音データはまだありません。
+          </div>
+        </div>
       </div>
-    </div>
-  </section>
-</main>
-<!-- ==========================================
-     GitHub Dynamic Loader (最新コード動的実行エンジン)
-     ========================================== -->
-<script>
-  const GitHubLoader = (() => {
-    const GITHUB_CONFIG_KEY = 'ST_GITHUB_RAW_URL';
-    const DEFAULT_URL = 'https://raw.githubusercontent.com/user/sleeptracker/main/app-core.js';
+    </section>
+  </main>
 
-    function getUrl() {
-      return localStorage.getItem(GITHUB_CONFIG_KEY) || DEFAULT_URL;
-    }
+  <script>
+    const GitHubLoader = (() => {
+      const URL_KEY = "ST_GITHUB_RAW_URL";
+      const CACHE_KEY = "ST_CACHED_REMOTE_SCRIPT";
+      const DEFAULT_URL =
+        "https://raw.githubusercontent.com/user/sleeptracker/main/app-core.js";
+      const FETCH_TIMEOUT_MS = 12000;
 
-    function updateStatus(text, isSuccess = false, isLive = false) {
-      const txtEl = document.getElementById('ghStatusText');
-      const dotEl = document.getElementById('ghDot');
-      if (txtEl) txtEl.textContent = text;
-      if (dotEl) {
-        dotEl.className = 'gh-dot' + (isLive ? ' live' : '');
-        if (!isLive && !isSuccess) dotEl.style.background = 'var(--danger)';
+      function getUrl() {
+        return localStorage.getItem(URL_KEY) || DEFAULT_URL;
       }
-    }
 
-    async function fetchLatestRemoteScript() {
-      const targetUrl = getUrl();
-      const cacheBusterUrl = targetUrl + (targetUrl.includes('?') ? '&' : '?') + '_t=' + Date.now();
+      function updateStatus(text, state = "idle") {
+        const textEl = document.getElementById("ghStatusText");
+        const dotEl = document.getElementById("ghDot");
 
-      updateStatus('GitHubから最新コードをフェッチ中...', false, false);
+        if (textEl) textEl.textContent = text;
+        if (!dotEl) return;
 
-      try {
-        const res = await fetch(cacheBusterUrl, {
-          method: 'GET',
-          cache: 'no-store',
-          headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
-        });
+        dotEl.className = "gh-dot";
+        dotEl.style.background = "";
 
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const remoteCode = await res.text();
+        if (state === "live") dotEl.classList.add("live");
+        if (state === "error") dotEl.style.background = "var(--danger)";
+        if (state === "cache") dotEl.style.background = "var(--warn)";
+      }
 
-        if (remoteCode && remoteCode.length > 50) {
-          localStorage.setItem('ST_CACHED_REMOTE_SCRIPT', remoteCode);
-          updateStatus('GitHub最新版コードを動的適用完了', true, true);
-          
-          const scriptEl = document.createElement('script');
-          scriptEl.text = remoteCode;
-          document.body.appendChild(scriptEl);
-          return true;
-        } else {
-          throw new Error('Script is empty');
+      function validateCode(code) {
+        if (!code || code.trim().length < 50) {
+          throw new Error("取得コードが空です");
         }
-      } catch (err) {
-        console.warn('[GitHubLoader] ローカルエンジンで起動します:', err.message);
-        const cachedCode = localStorage.getItem('ST_CACHED_REMOTE_SCRIPT');
-        if (cachedCode) {
-          updateStatus(`オフライン（前回保存版で実行）: ${err.message}`, true, false);
-          const scriptEl = document.createElement('script');
-          scriptEl.text = cachedCode;
-          document.body.appendChild(scriptEl);
+
+        // 実行前に最低限の構文検査を行う。
+        new Function(code);
+        return code;
+      }
+
+      function executeCode(code, sourceName) {
+        const script = document.createElement("script");
+        script.dataset.remoteSource = sourceName;
+        script.textContent = code + "\n//# sourceURL=" + sourceName;
+        document.body.appendChild(script);
+      }
+
+      async function fetchRemote() {
+        const targetUrl = getUrl();
+        const separator = targetUrl.includes("?") ? "&" : "?";
+        const requestUrl = targetUrl + separator + "_t=" + Date.now();
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+        updateStatus("GitHubから最新版を取得中...");
+
+        try {
+          const response = await fetch(requestUrl, {
+            cache:"no-store",
+            signal:controller.signal,
+            headers:{
+              "Pragma":"no-cache",
+              "Cache-Control":"no-cache"
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+          }
+
+          const code = validateCode(await response.text());
+
+          // 構文検査通過後にだけキャッシュを更新する。
+          localStorage.setItem(CACHE_KEY, code);
+          executeCode(code, "sleeptracker-remote.js");
+          updateStatus("GitHub最新版を動的適用", "live");
           return true;
+        } catch (error) {
+          const cached = localStorage.getItem(CACHE_KEY);
+
+          if (cached) {
+            try {
+              validateCode(cached);
+              executeCode(cached, "sleeptracker-cached.js");
+              updateStatus("オフライン：前回保存版を適用", "cache");
+              return true;
+            } catch (cacheError) {
+              localStorage.removeItem(CACHE_KEY);
+            }
+          }
+
+          updateStatus("内蔵安定版で正常起動（GitHub未接続）", "cache");
+          return false;
+        } finally {
+          clearTimeout(timeout);
+        }
+      }
+
+      function forceReload() {
+        const value = prompt("GitHub Raw URLを入力してください", getUrl());
+
+        if (value === null) return;
+
+        const url = value.trim();
+
+        if (!url) {
+          localStorage.removeItem(URL_KEY);
+          location.reload();
+          return;
+        }
+
+        if (!/^https:\/\//i.test(url)) {
+          alert("HTTPSのURLを指定してください。");
+          return;
+        }
+
+        localStorage.setItem(URL_KEY, url);
+        location.reload();
+      }
+
+      return {
+        init:fetchRemote,
+        forceReload
+      };
+    })();
+  </script>
+
+  <script>
+    const App = (() => {
+      const DB_NAME = "SleepTrackerClassifierV6DB";
+      const DB_VERSION = 1;
+      const SESSION_KEY = "ST_ACTIVE_SESSION_V6";
+
+      const MONITOR_INTERVAL_MS = 500;
+      const WATCHDOG_INTERVAL_MS = 4000;
+      const MONITOR_STALE_MS = 7000;
+      const CLIP_DURATION_MS = 10000;
+      const TRIGGER_COOLDOWN_MS = 5000;
+
+      let db = null;
+      let initialized = false;
+      let isTracking = false;
+      let isRecoveringAudio = false;
+      let stopRequested = false;
+
+      let stream = null;
+      let audioCtx = null;
+      let sourceNode = null;
+      let analyser = null;
+      let timeBuf = null;
+      let freqBuf = null;
+      let wakeLock = null;
+
+      let sessionStartMs = 0;
+      let monitorTimeout = null;
+      let watchdogInterval = null;
+      let timerInterval = null;
+      let heartbeatInterval = null;
+      let lastMonitorTickMs = 0;
+      let monitorGeneration = 0;
+
+      let currentDb = 24;
+      let baselineDb = 24;
+      let baselineSamples = [];
+
+      let motionPermissionGranted = false;
+      let motionListenerBound = false;
+      let currentMotionG = 0;
+      let peakMotionG = 0;
+      let lastAcc = null;
+
+      let mediaRecorder = null;
+      let currentRecordingChunks = [];
+      let currentClipMeta = null;
+      let isClipRecording = false;
+      let clipStopTimeout = null;
+      let clipFinalizePromise = null;
+      let clipFinalizeResolve = null;
+      let lastTriggerTime = 0;
+
+      let snoreTimestamps = [];
+      let silenceStartTime = null;
+
+      let currentFilter = "all";
+      let currentAudioPlayer = null;
+      let currentAudioButton = null;
+      let activeObjectUrls = [];
+
+      const counts = {
+        snore:0,
+        roll:0,
+        bruxism:0,
+        talk:0,
+        fart:0,
+        env:0,
+        apnea:0
+      };
+
+      function toast(message) {
+        const wrap = document.getElementById("toastWrap");
+        if (!wrap) return;
+
+        const item = document.createElement("div");
+        item.className = "toast";
+        item.textContent = message;
+        wrap.appendChild(item);
+
+        setTimeout(() => {
+          item.style.opacity = "0";
+          item.style.transition = "opacity .3s";
+          setTimeout(() => item.remove(), 300);
+        }, 2500);
+      }
+
+      function setEngineText(message, color = "var(--muted)") {
+        const el = document.getElementById("engineText");
+        if (!el) return;
+        el.textContent = message;
+        el.style.color = color;
+      }
+
+      function formatHMS(seconds) {
+        const safe = Math.max(0, Math.floor(seconds));
+        const h = String(Math.floor(safe / 3600)).padStart(2, "0");
+        const m = String(Math.floor((safe % 3600) / 60)).padStart(2, "0");
+        const s = String(safe % 60).padStart(2, "0");
+        return h + ":" + m + ":" + s;
+      }
+
+      function elapsedSeconds() {
+        if (!sessionStartMs) return 0;
+        return Math.floor((Date.now() - sessionStartMs) / 1000);
+      }
+
+      function updateTimer() {
+        const el = document.getElementById("timerText");
+        if (el) el.textContent = formatHMS(elapsedSeconds());
+      }
+
+      function initDB() {
+        return new Promise(resolve => {
+          if (!("indexedDB" in window)) {
+            resolve(null);
+            return;
+          }
+
+          try {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+            request.onerror = () => resolve(null);
+
+            request.onsuccess = event => {
+              db = event.target.result;
+
+              db.onversionchange = () => {
+                db.close();
+                db = null;
+              };
+
+              resolve(db);
+            };
+
+            request.onupgradeneeded = event => {
+              const database = event.target.result;
+
+              if (!database.objectStoreNames.contains("clips")) {
+                database.createObjectStore("clips", { keyPath:"id" });
+              }
+            };
+          } catch (error) {
+            resolve(null);
+          }
+        });
+      }
+
+      async function saveClipToDB(clip) {
+        if (!db) await initDB();
+        if (!db) return false;
+
+        return new Promise(resolve => {
+          try {
+            const tx = db.transaction("clips", "readwrite");
+            tx.objectStore("clips").put(clip);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+            tx.onabort = () => resolve(false);
+          } catch (error) {
+            resolve(false);
+          }
+        });
+      }
+
+      async function getClipsFromDB() {
+        if (!db) await initDB();
+        if (!db) return [];
+
+        return new Promise(resolve => {
+          try {
+            const tx = db.transaction("clips", "readonly");
+            const request = tx.objectStore("clips").getAll();
+
+            request.onsuccess = () => {
+              const result = request.result || [];
+              result.sort((a,b) => Number(b.id) - Number(a.id));
+              resolve(result);
+            };
+
+            request.onerror = () => resolve([]);
+          } catch (error) {
+            resolve([]);
+          }
+        });
+      }
+
+      async function clearClipsFromDB() {
+        if (!db) await initDB();
+        if (!db) return false;
+
+        return new Promise(resolve => {
+          try {
+            const tx = db.transaction("clips", "readwrite");
+            tx.objectStore("clips").clear();
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+            tx.onabort = () => resolve(false);
+          } catch (error) {
+            resolve(false);
+          }
+        });
+      }
+
+      function saveSessionHeartbeat() {
+        if (!isTracking) return;
+
+        try {
+          localStorage.setItem(SESSION_KEY, JSON.stringify({
+            active:true,
+            startedAt:sessionStartMs,
+            heartbeatAt:Date.now()
+          }));
+        } catch (error) {}
+      }
+
+      function clearSessionHeartbeat() {
+        try {
+          localStorage.removeItem(SESSION_KEY);
+        } catch (error) {}
+      }
+
+      function showInterruptedSessionNotice() {
+        try {
+          const raw = localStorage.getItem(SESSION_KEY);
+          if (!raw) return;
+
+          const previous = JSON.parse(raw);
+          if (!previous.active || !previous.startedAt) return;
+
+          const duration = Math.floor(
+            ((previous.heartbeatAt || Date.now()) - previous.startedAt) / 1000
+          );
+
+          const notice = document.getElementById("recoveryNotice");
+          if (notice) {
+            notice.textContent =
+              "前回の測定は正常終了していない可能性があります。最終記録時点: 開始から " +
+              formatHMS(duration);
+            notice.classList.remove("hidden");
+          }
+
+          clearSessionHeartbeat();
+        } catch (error) {
+          clearSessionHeartbeat();
+        }
+      }
+
+      function switchTab(tab) {
+        const recTab = document.getElementById("tab-rec");
+        const clipsTab = document.getElementById("tab-clips");
+        const recPanel = document.getElementById("panel-rec");
+        const clipsPanel = document.getElementById("panel-clips");
+
+        const showRecording = tab === "rec";
+
+        recTab.classList.toggle("active", showRecording);
+        clipsTab.classList.toggle("active", !showRecording);
+        recPanel.classList.toggle("hidden", !showRecording);
+        clipsPanel.classList.toggle("hidden", showRecording);
+
+        if (!showRecording) renderClipList();
+      }
+
+      function checkIosMotionBanner() {
+        const needsPermission =
+          typeof DeviceMotionEvent !== "undefined" &&
+          typeof DeviceMotionEvent.requestPermission === "function";
+
+        if (needsPermission) {
+          if (!motionPermissionGranted) {
+            document.getElementById("iosMotionBanner")?.classList.remove("hidden");
+          }
         } else {
-          updateStatus(`内蔵ローカルエンジンで起動中 (${err.message})`, true, false);
+          bindMotionListener();
+        }
+      }
+
+      async function requestIosMotionPermission() {
+        if (
+          typeof DeviceMotionEvent === "undefined" ||
+          typeof DeviceMotionEvent.requestPermission !== "function"
+        ) {
+          bindMotionListener();
+          return true;
+        }
+
+        try {
+          const result = await DeviceMotionEvent.requestPermission();
+
+          if (result !== "granted") {
+            toast("モーションセンサーが許可されませんでした");
+            return false;
+          }
+
+          motionPermissionGranted = true;
+          bindMotionListener();
+          document.getElementById("iosMotionBanner")?.classList.add("hidden");
+          toast("モーションセンサーを許可しました");
+          return true;
+        } catch (error) {
+          toast("センサー認証エラー: " + error.message);
           return false;
         }
       }
-    }
 
-    function forceReload() {
-      const newUrl = prompt('GitHub Raw URLを入力してください:', getUrl());
-      if (newUrl) {
-        localStorage.setItem(GITHUB_CONFIG_KEY, newUrl.trim());
-        location.reload(true);
-      }
-    }
+      function bindMotionListener() {
+        if (motionListenerBound) return;
 
-    return {
-      init: fetchLatestRemoteScript,
-      forceReload
-    };
-  })();
-</script>
+        window.addEventListener("devicemotion", handleDeviceMotion, {
+          passive:true
+        });
 
-<!-- ==========================================
-     SleepTracker Core (体動解析 + 音声多分類エンジン)
-     ========================================== -->
-<script>
-  const App = (() => {
-    const DB_NAME = 'SleepTrackerClassifierV5DB';
-    const DB_VERSION = 1;
-    let db = null;
-
-    function initDB() {
-      return new Promise((resolve) => {
-        try {
-          const req = indexedDB.open(DB_NAME, DB_VERSION);
-          req.onerror = () => resolve(null);
-          req.onsuccess = (e) => { db = e.target.result; resolve(db); };
-          req.onupgradeneeded = (e) => {
-            const d = e.target.result;
-            if (!d.objectStoreNames.contains('clips')) {
-              d.createObjectStore('clips', { keyPath: 'id' });
-            }
-          };
-        } catch(err) {
-          resolve(null);
-        }
-      });
-    }
-
-    async function saveClipToDB(clip) {
-      if (!db) await initDB();
-      if (!db) return;
-      return new Promise((resolve) => {
-        try {
-          const tx = db.transaction('clips', 'readwrite');
-          tx.objectStore('clips').put(clip);
-          tx.oncomplete = () => resolve();
-          tx.onerror = () => resolve();
-        } catch(e) { resolve(); }
-      });
-    }
-
-    async function getClipsFromDB() {
-      if (!db) await initDB();
-      if (!db) return [];
-      return new Promise((resolve) => {
-        try {
-          const tx = db.transaction('clips', 'readonly');
-          const req = tx.objectStore('clips').getAll();
-          req.onsuccess = () => resolve((req.result || []).sort((a,b) => Number(b.id) - Number(a.id)));
-          req.onerror = () => resolve([]);
-        } catch(e) { resolve([]); }
-      });
-    }
-
-    async function clearClipsFromDB() {
-      if (!db) await initDB();
-      if (!db) return;
-      return new Promise((resolve) => {
-        try {
-          const tx = db.transaction('clips', 'readwrite');
-          tx.objectStore('clips').clear();
-          tx.oncomplete = () => resolve();
-          tx.onerror = () => resolve();
-        } catch(e) { resolve(); }
-      });
-    }
-
-    let isTracking = false;
-    let stream = null;
-    let audioCtx = null;
-    let analyser = null;
-    let timeBuf = null;
-    let freqBuf = null;
-    let wakeLock = null;
-
-    let timerInterval = null;
-    let monitorInterval = null;
-    let recSec = 0;
-
-    let currentDb = 24.0;
-    let baselineDb = 24.0;
-    let baselineSamples = [];
-
-    /* --- 体動（モーション）解析ステート --- */
-    let motionPermissionGranted = false;
-    let currentMotionG = 0.0;
-    let peakMotionG = 0.0;
-    let lastMotionTime = 0;
-    let lastAcc = { x: 0, y: 0, z: 0 };
-
-    let mediaRecorder = null;
-    let currentRecordingChunks = [];
-    let isClipRecording = false;
-    let clipStopTimeout = null;
-    let currentClipMeta = null;
-
-    let lastTriggerTime = 0;
-    const TRIGGER_COOLDOWN_MS = 5000;
-
-    let snoreTimestamps = [];
-    let silenceStartTime = null;
-
-    const counts = { snore: 0, roll: 0, bruxism: 0, talk: 0, fart: 0, env: 0, apnea: 0 };
-    let currentFilter = 'all';
-    let currentAudioPlayer = null;
-
-    function toast(msg) {
-      const wrap = document.getElementById("toastWrap");
-      if(!wrap) return;
-      const t = document.createElement("div");
-      t.className = "toast";
-      t.textContent = msg;
-      wrap.appendChild(t);
-      setTimeout(() => {
-        t.style.opacity = "0";
-        t.style.transition = "opacity .3s";
-        setTimeout(() => t.remove(), 300);
-      }, 2200);
-    }
-
-    function formatHMS(sec) {
-      const h = String(Math.floor(sec/3600)).padStart(2,"0");
-      const m = String(Math.floor((sec%3600)/60)).padStart(2,"0");
-      const s = String(sec%60).padStart(2,"0");
-      return `${h}:${m}:${s}`;
-    }
-
-    function switchTab(t) {
-      const tabRec = document.getElementById("tab-rec");
-      const tabClips = document.getElementById("tab-clips");
-      const panelRec = document.getElementById("panel-rec");
-      const panelClips = document.getElementById("panel-clips");
-
-      if(t === 'rec') {
-        tabRec.classList.add("active");
-        tabClips.classList.remove("active");
-        panelRec.classList.remove("hidden");
-        panelClips.classList.add("hidden");
-      } else {
-        tabRec.classList.remove("active");
-        tabClips.classList.add("active");
-        panelRec.classList.add("hidden");
-        panelClips.classList.remove("hidden");
-        renderClipList();
-      }
-    }
-
-    /* ==========================================================
-       iPhone (iOS) モーションセンサー許可ハンドラ
-       ========================================================== */
-    function checkIosMotionBanner() {
-      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-        // iOS 13+ の場合、許可バナーを表示
-        if (!motionPermissionGranted) {
-          const banner = document.getElementById('iosMotionBanner');
-          if (banner) banner.classList.remove('hidden');
-        }
-      } else {
-        // Android または非iOSはイベントリスナーを直接登録
-        bindMotionListener();
-      }
-    }
-
-    async function requestIosMotionPermission() {
-      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-        try {
-          const res = await DeviceMotionEvent.requestPermission();
-          if (res === 'granted') {
-            motionPermissionGranted = true;
-            bindMotionListener();
-            const banner = document.getElementById('iosMotionBanner');
-            if (banner) banner.classList.add('hidden');
-            toast("iPhoneのモーションセンサーを許可しました");
-          } else {
-            alert("モーションセンサーの許可が拒否されました");
-          }
-        } catch(e) {
-          alert("センサー認証エラー: " + e.message);
-        }
-      }
-    }
-
-    function bindMotionListener() {
-      window.removeEventListener('devicemotion', handleDeviceMotion);
-      window.addEventListener('devicemotion', handleDeviceMotion, { passive: true });
-      motionPermissionGranted = true;
-    }
-
-    // 加速度変化量（ジャーク・体動ベクトル）の算出
-    function handleDeviceMotion(e) {
-      const acc = e.acceleration || e.accelerationIncludingGravity;
-      if (!acc || acc.x === null) return;
-
-      const x = acc.x || 0;
-      const y = acc.y || 0;
-      const z = acc.z || 0;
-
-      // 前フレームとの差分（重力加速度成分を排除した動的加速度）
-      const dx = x - lastAcc.x;
-      const dy = y - lastAcc.y;
-      const dz = z - lastAcc.z;
-
-      lastAcc = { x, y, z };
-
-      const deltaMag = Math.sqrt(dx*dx + dy*dy + dz*dz) / 9.80665; // G単位
-      // 平滑化
-      currentMotionG = currentMotionG * 0.7 + deltaMag * 0.3;
-      if (currentMotionG > peakMotionG) peakMotionG = currentMotionG;
-    }
-
-    async function requestWakeLock() {
-      try {
-        if ("wakeLock" in navigator) {
-          wakeLock = await navigator.wakeLock.request("screen");
-        }
-      } catch(e) {}
-    }
-
-    function releaseWakeLock() {
-      if(wakeLock) { wakeLock.release().catch(()=>{}); wakeLock = null; }
-    }
-
-    function calcDb() {
-      if(!analyser || !timeBuf) return 24.0;
-      analyser.getFloatTimeDomainData(timeBuf);
-      let sum = 0;
-      for(let i=0; i<timeBuf.length; i++) sum += timeBuf[i] * timeBuf[i];
-      const rms = Math.sqrt(sum / timeBuf.length);
-      if(rms <= 1e-7) return 20.0;
-      return Math.min(95, Math.max(20, 20 * Math.log10(rms) + 72));
-    }
-
-    function analyzeFrequencySpectrum() {
-      if(!analyser || !freqBuf) return { centroid: 0, subLowRatio: 0, lowRatio: 0, midRatio: 0, highRatio: 0 };
-      analyser.getByteFrequencyData(freqBuf);
-
-      const binCount = analyser.frequencyBinCount;
-      const sampleRate = audioCtx ? audioCtx.sampleRate : 44100;
-      const binHz = (sampleRate / 2) / binCount;
-
-      let totalPower = 0;
-      let weightedSum = 0;
-      let subLowPower = 0;
-      let lowPower = 0;
-      let midPower = 0;
-      let highPower = 0;
-
-      for(let i = 0; i < binCount; i++) {
-        const freq = i * binHz;
-        const amp = freqBuf[i];
-        const power = amp * amp;
-        totalPower += power;
-        weightedSum += freq * power;
-
-        if(freq >= 40 && freq < 200) subLowPower += power;
-        else if(freq >= 200 && freq < 600) lowPower += power;
-        else if(freq >= 600 && freq < 2500) midPower += power;
-        else if(freq >= 2500 && freq <= 8000) highPower += power;
+        motionListenerBound = true;
+        motionPermissionGranted = true;
       }
 
-      const centroid = totalPower > 0 ? (weightedSum / totalPower) : 0;
-      return {
-        centroid: Math.round(centroid),
-        subLowRatio: totalPower > 0 ? (subLowPower / totalPower) : 0,
-        lowRatio: totalPower > 0 ? (lowPower / totalPower) : 0,
-        midRatio: totalPower > 0 ? (midPower / totalPower) : 0,
-        highRatio: totalPower > 0 ? (highPower / totalPower) : 0
-      };
-    }
+      function handleDeviceMotion(event) {
+        if (!isTracking) return;
 
-    // 音響と体動（モーション）を統合したハイブリッド分類
-    function classifySoundAndMotion(deltaDb, spec, motionG) {
-      // 体動大（0.12G以上）かつ音圧あり ＝ 寝返り
-      if (motionG >= 0.12) {
-        return { category: 'roll', label: '🔄 寝返り (体動検知)', tagClass: 'tag-roll' };
-      }
+        const acc = event.acceleration || event.accelerationIncludingGravity;
+        if (!acc || acc.x == null || acc.y == null || acc.z == null) return;
 
-      if (deltaDb < 5.0) return null;
-
-      const { centroid, subLowRatio, lowRatio, midRatio, highRatio } = spec;
-
-      // 1. おなら（体動なし・超低周波集中）
-      if (subLowRatio > 0.48 && centroid < 300) {
-        return { category: 'fart', label: '💨 おなら', tagClass: 'tag-fart' };
-      }
-      // 2. 歯ぎしり / 食いしばり音（高周波摩擦または鋭い接触音）
-      if (highRatio > 0.28 || (centroid > 1800 && deltaDb >= 12)) {
-        return { category: 'bruxism', label: '😬 歯ぎしり / 硬音', tagClass: 'tag-brux' };
-      }
-      // 3. 寝言（人間の声の帯域）
-      if (midRatio > 0.42 && centroid >= 500 && centroid <= 1800) {
-        return { category: 'talk', label: '🗣 寝言', tagClass: 'tag-talk' };
-      }
-      // 4. いびき（体動が静止している状態での低中音）
-      if (lowRatio > 0.35 || (centroid >= 200 && centroid < 700)) {
-        return { category: 'snore', label: '😴 いびき', tagClass: 'tag-snore' };
-      }
-      // 5. 環境音（布団の擦れ・遠くの物音）
-      return { category: 'env', label: '🛏 環境音 / 微動', tagClass: 'tag-env' };
-    }
-
-    function triggerClipRecording(classResult, peakDb, motionG, durationMs = 10000) {
-      const now = Date.now();
-      if (isClipRecording) return;
-      if (now - lastTriggerTime < TRIGGER_COOLDOWN_MS) return;
-
-      lastTriggerTime = now;
-      isClipRecording = true;
-      currentRecordingChunks = [];
-
-      currentClipMeta = {
-        id: String(now),
-        category: classResult.category,
-        label: classResult.label,
-        tagClass: classResult.tagClass,
-        peakDb: peakDb,
-        motionG: motionG.toFixed(2),
-        timeStr: formatHMS(recSec),
-        realClock: new Date().toLocaleTimeString("ja-JP", { hour:"2-digit", minute:"2-digit", second:"2-digit" }),
-        durationSec: Math.round(durationMs / 1000)
-      };
-
-      try {
-        const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : (MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '');
-        const options = mime ? { mimeType: mime } : {};
-        mediaRecorder = new MediaRecorder(stream, options);
-
-        mediaRecorder.ondataavailable = (e) => {
-          if(e.data && e.data.size > 0) currentRecordingChunks.push(e.data);
+        const current = {
+          x:Number(acc.x) || 0,
+          y:Number(acc.y) || 0,
+          z:Number(acc.z) || 0
         };
 
-        mediaRecorder.onstop = async () => {
-          const blob = new Blob(currentRecordingChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
-          if (currentClipMeta && blob.size > 0) {
-            const clipRecord = {
-              ...currentClipMeta,
-              blob: blob
-            };
-            await saveClipToDB(clipRecord);
-            counts[clipRecord.category] = (counts[clipRecord.category] || 0) + 1;
-            updateCountUI();
-            toast(`記録保存: ${clipRecord.label}`);
+        if (!lastAcc) {
+          lastAcc = current;
+          return;
+        }
+
+        const dx = current.x - lastAcc.x;
+        const dy = current.y - lastAcc.y;
+        const dz = current.z - lastAcc.z;
+        lastAcc = current;
+
+        const deltaG = Math.sqrt(dx*dx + dy*dy + dz*dz) / 9.80665;
+
+        // センサー復帰直後などに出る極端な異常値は分類に使わない。
+        if (!Number.isFinite(deltaG) || deltaG > 4) return;
+
+        currentMotionG = currentMotionG * 0.72 + deltaG * 0.28;
+        peakMotionG = Math.max(peakMotionG, currentMotionG);
+      }
+
+      async function requestWakeLock() {
+        if (!isTracking || document.visibilityState !== "visible") return;
+
+        try {
+          if ("wakeLock" in navigator && !wakeLock) {
+            wakeLock = await navigator.wakeLock.request("screen");
+
+            wakeLock.addEventListener("release", () => {
+              wakeLock = null;
+            });
           }
+        } catch (error) {
+          wakeLock = null;
+        }
+      }
+
+      async function releaseWakeLock() {
+        if (!wakeLock) return;
+
+        const lock = wakeLock;
+        wakeLock = null;
+
+        try {
+          await lock.release();
+        } catch (error) {}
+      }
+
+      async function createAudioPipeline() {
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          audio:{
+            echoCancellation:false,
+            noiseSuppression:false,
+            autoGainControl:false
+          }
+        });
+
+        if (stopRequested) {
+          newStream.getTracks().forEach(track => track.stop());
+          throw new Error("測定終了処理中");
+        }
+
+        const AudioContextClass =
+          window.AudioContext || window.webkitAudioContext;
+
+        if (!AudioContextClass) {
+          newStream.getTracks().forEach(track => track.stop());
+          throw new Error("AudioContext非対応");
+        }
+
+        if (!audioCtx || audioCtx.state === "closed") {
+          audioCtx = new AudioContextClass();
+        }
+
+        if (audioCtx.state === "suspended") {
+          await audioCtx.resume();
+        }
+
+        if (sourceNode) {
+          try { sourceNode.disconnect(); } catch (error) {}
+        }
+
+        if (stream && stream !== newStream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+
+        stream = newStream;
+        sourceNode = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 2048;
+        analyser.smoothingTimeConstant = 0.4;
+        sourceNode.connect(analyser);
+
+        timeBuf = new Float32Array(analyser.fftSize);
+        freqBuf = new Uint8Array(analyser.frequencyBinCount);
+
+        stream.getAudioTracks().forEach(track => {
+          track.addEventListener("ended", () => {
+            if (isTracking && !stopRequested) {
+              recoverAudioPipeline("マイク接続が終了しました");
+            }
+          });
+        });
+      }
+
+      async function recoverAudioPipeline(reason) {
+        if (!isTracking || stopRequested || isRecoveringAudio) return;
+
+        isRecoveringAudio = true;
+        setEngineText("音声エンジンを復旧中...", "var(--warn)");
+
+        try {
+          await createAudioPipeline();
+          setEngineText("音声エンジン復旧完了", "var(--success)");
+          toast("音声監視を自動復旧しました");
+        } catch (error) {
+          setEngineText(
+            "音声復旧失敗。画面を開いて再測定してください",
+            "var(--danger)"
+          );
+          console.warn("[AudioRecovery]", reason, error);
+        } finally {
+          isRecoveringAudio = false;
+        }
+      }
+
+      function calcDb() {
+        if (!analyser || !timeBuf || !audioCtx || audioCtx.state !== "running") {
+          return null;
+        }
+
+        analyser.getFloatTimeDomainData(timeBuf);
+
+        let sum = 0;
+        for (let i = 0; i < timeBuf.length; i++) {
+          sum += timeBuf[i] * timeBuf[i];
+        }
+
+        const rms = Math.sqrt(sum / timeBuf.length);
+        if (!Number.isFinite(rms) || rms <= 1e-7) return 20;
+
+        return Math.min(95, Math.max(20, 20 * Math.log10(rms) + 72));
+      }
+
+      function analyzeFrequencySpectrum() {
+        const empty = {
+          centroid:0,
+          subLowRatio:0,
+          lowRatio:0,
+          midRatio:0,
+          highRatio:0
+        };
+
+        if (!analyser || !freqBuf || !audioCtx) return empty;
+
+        analyser.getByteFrequencyData(freqBuf);
+
+        const binHz =
+          (audioCtx.sampleRate / 2) / analyser.frequencyBinCount;
+
+        let totalPower = 0;
+        let weighted = 0;
+        let subLow = 0;
+        let low = 0;
+        let mid = 0;
+        let high = 0;
+
+        for (let i = 0; i < freqBuf.length; i++) {
+          const frequency = i * binHz;
+          const amplitude = freqBuf[i];
+          const power = amplitude * amplitude;
+
+          totalPower += power;
+          weighted += frequency * power;
+
+          if (frequency >= 40 && frequency < 200) subLow += power;
+          else if (frequency < 600) low += power;
+          else if (frequency < 2500) mid += power;
+          else if (frequency <= 8000) high += power;
+        }
+
+        if (!totalPower) return empty;
+
+        return {
+          centroid:Math.round(weighted / totalPower),
+          subLowRatio:subLow / totalPower,
+          lowRatio:low / totalPower,
+          midRatio:mid / totalPower,
+          highRatio:high / totalPower
+        };
+      }
+
+      function classResult(category, label, tagClass, reason) {
+        return { category, label, tagClass, reason };
+      }
+
+      function classifySoundAndMotion(deltaDb, spectrum, motionG) {
+        // V6.2: 単一周波数ではなく帯域比の組合せで判定する。
+        // いびきの低い基音は subLow(40-200Hz) に入るため、low と必ず合算する。
+        const breathingLow = spectrum.subLowRatio + spectrum.lowRatio;
+
+        if (motionG >= 0.12) {
+          return classResult("roll", "🔄 寝返り・体動", "tag-roll",
+            "体動 " + motionG.toFixed(2) + "G");
+        }
+
+        if (deltaDb < 5) return null;
+
+        // いびき優先。スピーカー再生で高調波が混ざっても、低域が十分なら歯ぎしりにしない。
+        if (
+          breathingLow >= 0.38 ||
+          spectrum.subLowRatio >= 0.20 ||
+          (spectrum.centroid >= 120 && spectrum.centroid <= 950 && breathingLow >= 0.27)
+        ) {
+          return classResult("snore", "😴 いびき", "tag-snore",
+            "呼吸低域 " + Math.round(breathingLow * 100) + "% / 重心 " + spectrum.centroid + "Hz");
+        }
+
+        // 歯ぎしりは「低域が少ない」「高域が強い」「十分大きい」をすべて満たす時だけ。
+        if (
+          deltaDb >= 14 &&
+          spectrum.highRatio >= 0.42 &&
+          spectrum.centroid >= 2200 &&
+          breathingLow < 0.24 &&
+          spectrum.subLowRatio < 0.10
+        ) {
+          return classResult("bruxism", "😬 歯ぎしり・硬音", "tag-brux",
+            "高域 " + Math.round(spectrum.highRatio * 100) + "% / 重心 " + spectrum.centroid + "Hz");
+        }
+
+        if (
+          spectrum.midRatio > 0.46 &&
+          spectrum.centroid >= 650 &&
+          spectrum.centroid <= 2100 &&
+          breathingLow < 0.34
+        ) {
+          return classResult("talk", "🗣 寝言", "tag-talk",
+            "音声中域 " + Math.round(spectrum.midRatio * 100) + "% / 重心 " + spectrum.centroid + "Hz");
+        }
+
+        // おならは極低域が圧倒的で短い音のみ候補。いびき条件に該当した音はここへ来ない。
+        if (
+          spectrum.subLowRatio > 0.62 &&
+          spectrum.centroid < 180 &&
+          deltaDb >= 8
+        ) {
+          return classResult("fart", "💨 おなら", "tag-fart",
+            "極低域 " + Math.round(spectrum.subLowRatio * 100) + "%");
+        }
+
+        return classResult("env", "🛏 環境音", "tag-env",
+          "既知分類の特徴不足 / 重心 " + spectrum.centroid + "Hz");
+      }
+
+      function addClipVote(result) {
+        if (!isClipRecording || !currentClipMeta || !result) return;
+        const votes = currentClipMeta.votes || (currentClipMeta.votes = {});
+        votes[result.category] = (votes[result.category] || 0) + 1;
+        if (result.reason) currentClipMeta.reasons[result.category] = result.reason;
+      }
+
+      function finalizeClipClassification(meta) {
+        const votes = meta.votes || {};
+        const score = key => Number(votes[key] || 0);
+        let category = "env";
+
+        // 10秒全体の投票。いびきは呼吸音の揺らぎを考慮し、同点なら優先する。
+        if (score("roll") >= 2) category = "roll";
+        else if (score("snore") >= 2 && score("snore") >= score("bruxism")) category = "snore";
+        else if (score("bruxism") >= 3 && score("bruxism") > score("snore") * 1.5) category = "bruxism";
+        else if (score("talk") >= 3) category = "talk";
+        else if (score("fart") >= 2) category = "fart";
+        else if (score("snore") >= 1) category = "snore";
+
+        const defs = {
+          snore:["😴 いびき", "tag-snore"],
+          roll:["🔄 寝返り・体動", "tag-roll"],
+          bruxism:["😬 歯ぎしり・硬音", "tag-brux"],
+          talk:["🗣 寝言", "tag-talk"],
+          fart:["💨 おなら", "tag-fart"],
+          env:["🛏 環境音", "tag-env"]
+        };
+        meta.category = category;
+        meta.label = defs[category][0];
+        meta.tagClass = defs[category][1];
+        meta.reason = (meta.reasons && meta.reasons[category]) ||
+          "10秒投票 snore:" + score("snore") + " brux:" + score("bruxism") + " env:" + score("env");
+        meta.voteSummary = Object.entries(votes).map(([k,v]) => k + ":" + v).join(" / ");
+        return meta;
+      }
+
+      function selectRecorderMimeType() {
+        if (!window.MediaRecorder) return "";
+
+        const candidates = [
+          "audio/webm;codecs=opus",
+          "audio/mp4",
+          "audio/webm"
+        ];
+
+        return candidates.find(type => {
+          try {
+            return MediaRecorder.isTypeSupported(type);
+          } catch (error) {
+            return false;
+          }
+        }) || "";
+      }
+
+      function triggerClipRecording(result, peakDb, motionG, durationMs) {
+        const now = Date.now();
+
+        if (!isTracking || !stream || !window.MediaRecorder) return;
+        if (isClipRecording || now - lastTriggerTime < TRIGGER_COOLDOWN_MS) return;
+
+        const audioTracks = stream.getAudioTracks();
+        if (!audioTracks.length || audioTracks[0].readyState !== "live") return;
+
+        lastTriggerTime = now;
+        isClipRecording = true;
+        currentRecordingChunks = [];
+
+        currentClipMeta = {
+          id:String(now),
+          category:result.category,
+          label:result.label,
+          tagClass:result.tagClass,
+          peakDb:Number(peakDb),
+          motionG:Number(motionG).toFixed(2),
+          timeStr:formatHMS(elapsedSeconds()),
+          realClock:new Date().toLocaleTimeString("ja-JP", {
+            hour:"2-digit",
+            minute:"2-digit",
+            second:"2-digit"
+          }),
+          durationSec:Math.round(durationMs / 1000),
+          votes:{ [result.category]:1 },
+          reasons:{ [result.category]:result.reason || "初期判定" },
+          reason:result.reason || ""
+        };
+
+        clipFinalizePromise = new Promise(resolve => {
+          clipFinalizeResolve = resolve;
+        });
+
+        try {
+          const mimeType = selectRecorderMimeType();
+          mediaRecorder = new MediaRecorder(
+            stream,
+            mimeType ? { mimeType } : undefined
+          );
+
+          mediaRecorder.ondataavailable = event => {
+            if (event.data && event.data.size > 0) {
+              currentRecordingChunks.push(event.data);
+            }
+          };
+
+          mediaRecorder.onerror = event => {
+            console.warn("[Recorder]", event.error || event);
+          };
+
+          mediaRecorder.onstop = async () => {
+            const recorderType =
+              mediaRecorder?.mimeType || mimeType || "audio/webm";
+
+            const blob = new Blob(currentRecordingChunks, {
+              type:recorderType
+            });
+
+            const meta = currentClipMeta;
+
+            mediaRecorder = null;
+            currentRecordingChunks = [];
+            currentClipMeta = null;
+            isClipRecording = false;
+
+            if (meta && blob.size > 0) {
+              finalizeClipClassification(meta);
+              const saved = await saveClipToDB({
+                ...meta,
+                blob
+              });
+
+              if (saved) {
+                counts[meta.category] =
+                  (counts[meta.category] || 0) + 1;
+
+                updateCountUI();
+              } else {
+                toast("録音保存に失敗しました。監視は継続します");
+              }
+            }
+
+            if (clipFinalizeResolve) clipFinalizeResolve();
+            clipFinalizeResolve = null;
+            clipFinalizePromise = null;
+          };
+
+          mediaRecorder.start(1000);
+
+          clearTimeout(clipStopTimeout);
+          clipStopTimeout = setTimeout(() => {
+            stopActiveRecorder();
+          }, durationMs);
+        } catch (error) {
+          mediaRecorder = null;
           isClipRecording = false;
           currentClipMeta = null;
-        };
 
-        mediaRecorder.start();
+          if (clipFinalizeResolve) clipFinalizeResolve();
+          clipFinalizeResolve = null;
+          clipFinalizePromise = null;
 
+          console.warn("[Recording]", error);
+        }
+      }
+
+      function stopActiveRecorder() {
         clearTimeout(clipStopTimeout);
-        clipStopTimeout = setTimeout(() => {
-          if(mediaRecorder && mediaRecorder.state === "recording") {
+        clipStopTimeout = null;
+
+        try {
+          if (mediaRecorder && mediaRecorder.state === "recording") {
+            mediaRecorder.requestData();
             mediaRecorder.stop();
           }
-        }, durationMs);
-
-      } catch(err) {
-        console.error("Recording error:", err);
-        isClipRecording = false;
-      }
-    }
-
-    function updateCountUI() {
-      const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
-      setVal("count-snore", counts.snore);
-      setVal("count-roll", counts.roll);
-      setVal("count-brux", counts.bruxism);
-      setVal("count-talk", counts.talk);
-      setVal("count-fart", counts.fart);
-      setVal("count-env", counts.env);
-      setVal("count-apnea", counts.apnea);
-
-      const total = counts.snore + counts.roll + counts.bruxism + counts.talk + counts.fart + counts.env;
-      setVal("fc-all", total);
-      setVal("fc-snore", counts.snore);
-      setVal("fc-roll", counts.roll);
-      setVal("fc-brux", counts.bruxism);
-      setVal("fc-talk", counts.talk);
-      setVal("fc-fart", counts.fart);
-      setVal("fc-env", counts.env);
-    }
-
-    function monitorTick() {
-      currentDb = calcDb();
-      const spec = analyzeFrequencySpectrum();
-      const motionSnapshot = peakMotionG;
-      peakMotionG = 0; // スナップショット後リセット
-
-      const dbEl = document.getElementById("dbText");
-      const fillEl = document.getElementById("meterFill");
-      const motionEl = document.getElementById("motionText");
-      const motionFillEl = document.getElementById("meterMotionFill");
-      const liveClassEl = document.getElementById("liveClassText");
-
-      if(dbEl) dbEl.textContent = `${currentDb.toFixed(1)} dB`;
-      if(motionEl) motionEl.textContent = `${motionSnapshot.toFixed(2)} G`;
-
-      if(fillEl) {
-        const pct = Math.min(100, Math.max(0, (currentDb - 20) * 1.5));
-        fillEl.style.width = `${pct}%`;
-        fillEl.style.background = currentDb >= baselineDb + 14 ? "var(--danger)" : (currentDb >= baselineDb + 6 ? "var(--warn)" : "#10b981");
-      }
-
-      if(motionFillEl) {
-        const mPct = Math.min(100, motionSnapshot * 300); // 0.33Gで100%
-        motionFillEl.style.width = `${mPct}%`;
-      }
-
-      if(baselineSamples.length < 30) {
-        baselineSamples.push(currentDb);
-        if(baselineSamples.length % 5 === 0) {
-          const sorted = [...baselineSamples].sort((a,b)=>a-b);
-          baselineDb = sorted[Math.floor(sorted.length/2)];
-          document.getElementById("baseText").textContent = `${baselineDb.toFixed(1)} dB`;
+        } catch (error) {
+          console.warn("[RecorderStop]", error);
         }
       }
 
-      const now = Date.now();
-      const delta = currentDb - baselineDb;
+      async function waitForRecorderFinalize() {
+        stopActiveRecorder();
 
-      // ハイブリッド分類（音と体動）
-      const classResult = classifySoundAndMotion(delta, spec, motionSnapshot);
+        if (!clipFinalizePromise) return;
 
-      if(classResult) {
-        if(liveClassEl) liveClassEl.textContent = classResult.label;
-        if(classResult.category === 'snore') snoreTimestamps.push(now);
-
-        triggerClipRecording(classResult, currentDb, motionSnapshot, 10000);
-      } else {
-        if(liveClassEl && delta < 3.0 && motionSnapshot < 0.05) liveClassEl.textContent = "静寂 / 正常呼吸";
+        await Promise.race([
+          clipFinalizePromise,
+          new Promise(resolve => setTimeout(resolve, 3000))
+        ]);
       }
 
-      snoreTimestamps = snoreTimestamps.filter(t => (now - t) < 35000);
+      function updateCountUI() {
+        const values = {
+          "count-snore":counts.snore,
+          "count-roll":counts.roll,
+          "count-brux":counts.bruxism,
+          "count-talk":counts.talk,
+          "count-fart":counts.fart,
+          "count-apnea":counts.apnea,
+          "fc-snore":counts.snore,
+          "fc-roll":counts.roll,
+          "fc-brux":counts.bruxism,
+          "fc-talk":counts.talk,
+          "fc-fart":counts.fart,
+          "fc-env":counts.env
+        };
 
-      // 無呼吸監視（体動なし・静寂持続・あえぎ音）
-      const isSilent = (delta < 2.5 && motionSnapshot < 0.05);
-      if(snoreTimestamps.length >= 2) {
-        if(isSilent) {
-          if(silenceStartTime === null) silenceStartTime = now;
-        } else {
-          if(silenceStartTime !== null) {
-            const silenceDurationSec = (now - silenceStartTime) / 1000;
-            if(silenceDurationSec >= 15 && silenceDurationSec <= 60 && delta >= 14) {
-              counts.apnea++;
-              updateCountUI();
-              const apneaResult = {
-                category: 'snore',
-                label: `⚠️ 無呼吸疑い（静寂${Math.round(silenceDurationSec)}秒後）`,
-                tagClass: 'tag-snore'
-              };
-              triggerClipRecording(apneaResult, currentDb, motionSnapshot, 14000);
-              toast(`無呼吸疑いを記録 (静寂${Math.round(silenceDurationSec)}秒)`);
-              snoreTimestamps = [];
-            }
-            silenceStartTime = null;
+        Object.entries(values).forEach(([id,value]) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = value;
+        });
+
+        const total =
+          counts.snore +
+          counts.roll +
+          counts.bruxism +
+          counts.talk +
+          counts.fart +
+          counts.env;
+
+        const totalEl = document.getElementById("fc-all");
+        if (totalEl) totalEl.textContent = total;
+      }
+
+      function updateMeters(motionSnapshot) {
+        const dbText = document.getElementById("dbText");
+        const meterFill = document.getElementById("meterFill");
+        const motionText = document.getElementById("motionText");
+        const motionFill = document.getElementById("meterMotionFill");
+
+        if (dbText) dbText.textContent = currentDb.toFixed(1) + " dB";
+        if (motionText) motionText.textContent = motionSnapshot.toFixed(2) + " G";
+
+        if (meterFill) {
+          const level = Math.min(100, Math.max(0, (currentDb - 20) * 1.5));
+          meterFill.style.width = level + "%";
+
+          if (currentDb >= baselineDb + 14) {
+            meterFill.style.background = "var(--danger)";
+          } else if (currentDb >= baselineDb + 6) {
+            meterFill.style.background = "var(--warn)";
+          } else {
+            meterFill.style.background = "var(--success)";
           }
         }
-      } else {
+
+        if (motionFill) {
+          motionFill.style.width =
+            Math.min(100, motionSnapshot * 300) + "%";
+        }
+      }
+
+      function updateBaseline() {
+        if (baselineSamples.length >= 30) return;
+
+        baselineSamples.push(currentDb);
+
+        if (baselineSamples.length % 5 === 0) {
+          const sorted = [...baselineSamples].sort((a,b) => a - b);
+          baselineDb = sorted[Math.floor(sorted.length / 2)];
+
+          const el = document.getElementById("baseText");
+          if (el) el.textContent = baselineDb.toFixed(1) + " dB";
+        }
+      }
+
+      function processApneaCandidate(now, delta, motionSnapshot) {
+        snoreTimestamps = snoreTimestamps.filter(
+          timestamp => now - timestamp < 35000
+        );
+
+        const silent = delta < 2.5 && motionSnapshot < 0.05;
+
+        if (snoreTimestamps.length < 2) {
+          silenceStartTime = null;
+          return;
+        }
+
+        if (silent) {
+          if (silenceStartTime === null) silenceStartTime = now;
+          return;
+        }
+
+        if (silenceStartTime === null) return;
+
+        const silenceSeconds = (now - silenceStartTime) / 1000;
+
+        if (
+          silenceSeconds >= 15 &&
+          silenceSeconds <= 60 &&
+          delta >= 14
+        ) {
+          counts.apnea++;
+          updateCountUI();
+
+          triggerClipRecording({
+            category:"snore",
+            label:"⚠️ 無呼吸疑い（静寂" +
+              Math.round(silenceSeconds) + "秒後）",
+            tagClass:"tag-snore"
+          }, currentDb, motionSnapshot, 14000);
+
+          toast("無呼吸疑いを記録しました");
+          snoreTimestamps = [];
+        }
+
         silenceStartTime = null;
       }
-    }
 
-    async function startTracking() {
-      if(isTracking) return;
-      await initDB();
+      function monitorTick() {
+        if (!isTracking || stopRequested) return;
 
-      // もしiOSで未認証なら開始時にリクエスト
-      if (!motionPermissionGranted && typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-        await requestIosMotionPermission();
-      }
+        lastMonitorTickMs = Date.now();
 
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
-        });
-      } catch(e) {
-        alert("マイクアクセス拒否: " + (e.message || e.name));
-        return;
-      }
+        try {
+          const measuredDb = calcDb();
 
-      const AC = window.AudioContext || window.webkitAudioContext;
-      audioCtx = new AC();
-      if(audioCtx.state === "suspended") await audioCtx.resume();
-
-      const src = audioCtx.createMediaStreamSource(stream);
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 512;
-      analyser.smoothingTimeConstant = 0.4;
-      src.connect(analyser);
-
-      timeBuf = new Float32Array(analyser.fftSize);
-      freqBuf = new Uint8Array(analyser.frequencyBinCount);
-
-      await requestWakeLock();
-
-      isTracking = true;
-      recSec = 0;
-      baselineSamples = [];
-      snoreTimestamps = [];
-      silenceStartTime = null;
-      lastTriggerTime = 0;
-
-      document.getElementById("statusBadge").textContent = "体動＆音声監視中";
-      document.getElementById("statusBadge").className = "badge b-green";
-      document.getElementById("btnStart").disabled = true;
-      document.getElementById("btnStop").disabled = false;
-
-      clearInterval(timerInterval);
-      timerInterval = setInterval(() => {
-        recSec++;
-        document.getElementById("timerText").textContent = formatHMS(recSec);
-      }, 1000);
-
-      // 500msの超省電力駆動
-      clearInterval(monitorInterval);
-      monitorInterval = setInterval(monitorTick, 500);
-
-      toast("睡眠測定を開始しました（体動・音声録音ON）");
-    }
-
-    async function stopTracking() {
-      if(!isTracking) return;
-      isTracking = false;
-
-      clearInterval(timerInterval);
-      clearInterval(monitorInterval);
-
-      clearTimeout(clipStopTimeout);
-      if(mediaRecorder && mediaRecorder.state === "recording") {
-        mediaRecorder.stop();
-      }
-
-      releaseWakeLock();
-
-      if(stream) {
-        stream.getTracks().forEach(t => t.stop());
-        stream = null;
-      }
-      if(audioCtx) {
-        audioCtx.close().catch(()=>{});
-        audioCtx = null;
-      }
-
-      document.getElementById("statusBadge").textContent = "完了";
-      document.getElementById("statusBadge").className = "badge b-gray";
-      document.getElementById("btnStart").disabled = false;
-      document.getElementById("btnStop").disabled = true;
-
-      toast("測定終了。音声を耳で確認できます");
-      switchTab('clips');
-    }
-
-    function filterCategory(cat, btn) {
-      currentFilter = cat;
-      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-      if(btn) btn.classList.add('active');
-      renderClipList();
-    }
-
-    async function renderClipList() {
-      const listEl = document.getElementById("clipList");
-      if(!listEl) return;
-      listEl.innerHTML = "";
-
-      const allClips = await getClipsFromDB();
-      const clips = currentFilter === 'all' 
-        ? allClips 
-        : allClips.filter(c => c.category === currentFilter);
-
-      if(!clips || clips.length === 0) {
-        listEl.innerHTML = `<div style="text-align:center; padding:30px; font-size:12px; color:var(--muted);">該当する録音データはありません。</div>`;
-        return;
-      }
-
-      clips.forEach(clip => {
-        const item = document.createElement("div");
-        item.className = "clip-item";
-
-        item.innerHTML = `
-          <button class="play-btn" id="btn-play-${clip.id}">▶</button>
-          <div class="clip-info">
-            <div class="clip-title">
-              <span class="badge ${clip.tagClass || 'tag-env'}">${clip.label}</span>
-              <span style="font-size:11px; font-weight:normal; color:#94a3b8; font-family:ui-monospace;">${clip.peakDb.toFixed(1)} dB / ${clip.motionG || '0.00'}G</span>
-            </div>
-            <div class="clip-sub">
-              時刻: ${clip.realClock}（開始後 ${clip.timeStr}） / 長さ: 約${clip.durationSec}秒
-            </div>
-          </div>
-          <a id="download-${clip.id}" class="btn btn-soft" style="padding:6px 10px; font-size:11px; text-decoration:none;">保存</a>
-        `;
-
-        listEl.appendChild(item);
-
-        const playBtn = item.querySelector(`#btn-play-${clip.id}`);
-        const dlBtn = item.querySelector(`#download-${clip.id}`);
-
-        const audioUrl = URL.createObjectURL(clip.blob);
-        dlBtn.href = audioUrl;
-        dlBtn.download = `SleepSound_${clip.category}_${clip.realClock.replace(/:/g,"-")}.webm`;
-
-        playBtn.onclick = () => {
-          if(currentAudioPlayer) {
-            currentAudioPlayer.pause();
-            currentAudioPlayer = null;
-            document.querySelectorAll('.play-btn').forEach(b => b.textContent = "▶");
+          if (measuredDb === null) {
+            if (audioCtx?.state === "suspended") {
+              audioCtx.resume().catch(() => {});
+            }
+            return;
           }
 
-          const audio = new Audio(audioUrl);
-          currentAudioPlayer = audio;
-          playBtn.textContent = "⏸";
+          currentDb = measuredDb;
 
-          audio.onended = () => {
-            playBtn.textContent = "▶";
-            currentAudioPlayer = null;
+          const spectrum = analyzeFrequencySpectrum();
+          const motionSnapshot = Math.min(4, peakMotionG);
+
+          peakMotionG = 0;
+          currentMotionG *= 0.65;
+
+          updateMeters(motionSnapshot);
+          updateBaseline();
+
+          const now = Date.now();
+          const delta = currentDb - baselineDb;
+          const result =
+            classifySoundAndMotion(delta, spectrum, motionSnapshot);
+
+          const liveClass = document.getElementById("liveClassText");
+
+          if (result) {
+            if (liveClass) liveClass.textContent = result.label;
+
+            if (result.category === "snore") {
+              snoreTimestamps.push(now);
+            }
+
+            addClipVote(result);
+
+            triggerClipRecording(
+              result,
+              currentDb,
+              motionSnapshot,
+              CLIP_DURATION_MS
+            );
+          } else if (
+            liveClass &&
+            delta < 3 &&
+            motionSnapshot < 0.05
+          ) {
+            liveClass.textContent = "静寂・正常呼吸";
+          }
+
+          processApneaCandidate(now, delta, motionSnapshot);
+        } catch (error) {
+          console.warn("[MonitorTick]", error);
+        }
+      }
+
+      function scheduleMonitor() {
+        const generation = ++monitorGeneration;
+
+        clearTimeout(monitorTimeout);
+
+        const run = () => {
+          if (
+            !isTracking ||
+            stopRequested ||
+            generation !== monitorGeneration
+          ) {
+            return;
+          }
+
+          monitorTick();
+          monitorTimeout = setTimeout(run, MONITOR_INTERVAL_MS);
+        };
+
+        monitorTimeout = setTimeout(run, 0);
+      }
+
+      function startWatchdog() {
+        clearInterval(watchdogInterval);
+
+        watchdogInterval = setInterval(async () => {
+          if (!isTracking || stopRequested) return;
+
+          const staleFor = Date.now() - lastMonitorTickMs;
+
+          if (staleFor > MONITOR_STALE_MS) {
+            setEngineText(
+              "監視停止を検出。エンジンを再起動しました",
+              "var(--warn)"
+            );
+            scheduleMonitor();
+          }
+
+          if (audioCtx?.state === "suspended" &&
+              document.visibilityState === "visible") {
+            try {
+              await audioCtx.resume();
+            } catch (error) {}
+          }
+
+          const audioTrack = stream?.getAudioTracks()?.[0];
+
+          if (!audioTrack || audioTrack.readyState !== "live") {
+            await recoverAudioPipeline("ウォッチドッグ検出");
+          }
+
+          if (!wakeLock && document.visibilityState === "visible") {
+            await requestWakeLock();
+          }
+        }, WATCHDOG_INTERVAL_MS);
+      }
+
+      async function startTracking() {
+        if (isTracking) return;
+
+        stopRequested = false;
+
+        if (
+          !motionPermissionGranted &&
+          typeof DeviceMotionEvent !== "undefined" &&
+          typeof DeviceMotionEvent.requestPermission === "function"
+        ) {
+          await requestIosMotionPermission();
+        }
+
+        try {
+          await createAudioPipeline();
+        } catch (error) {
+          alert("マイクを開始できません: " + (error.message || error.name));
+          return;
+        }
+
+        isTracking = true;
+        sessionStartMs = Date.now();
+        lastMonitorTickMs = Date.now();
+        baselineSamples = [];
+        baselineDb = 24;
+        snoreTimestamps = [];
+        silenceStartTime = null;
+        lastTriggerTime = 0;
+        lastAcc = null;
+        currentMotionG = 0;
+        peakMotionG = 0;
+
+        document.getElementById("statusBadge").textContent = "体動・音声監視中";
+        document.getElementById("statusBadge").className = "badge b-green";
+        document.getElementById("btnStart").disabled = true;
+        document.getElementById("btnStop").disabled = false;
+        document.getElementById("recoveryNotice")?.classList.add("hidden");
+
+        setEngineText("音声・体動エンジン正常稼働中", "var(--success)");
+
+        await requestWakeLock();
+
+        clearInterval(timerInterval);
+        timerInterval = setInterval(updateTimer, 1000);
+        updateTimer();
+
+        scheduleMonitor();
+        startWatchdog();
+
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = setInterval(saveSessionHeartbeat, 5000);
+        saveSessionHeartbeat();
+
+        toast("睡眠測定を開始しました");
+      }
+
+      async function stopTracking() {
+        if (!isTracking) return;
+
+        stopRequested = true;
+        isTracking = false;
+        monitorGeneration++;
+
+        clearTimeout(monitorTimeout);
+        clearInterval(watchdogInterval);
+        clearInterval(timerInterval);
+        clearInterval(heartbeatInterval);
+
+        // 録音の最終データを受け取ってからマイクを閉じる。
+        await waitForRecorderFinalize();
+        await releaseWakeLock();
+
+        if (sourceNode) {
+          try { sourceNode.disconnect(); } catch (error) {}
+          sourceNode = null;
+        }
+
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          stream = null;
+        }
+
+        if (audioCtx) {
+          try { await audioCtx.close(); } catch (error) {}
+          audioCtx = null;
+        }
+
+        analyser = null;
+        timeBuf = null;
+        freqBuf = null;
+
+        clearSessionHeartbeat();
+
+        document.getElementById("statusBadge").textContent = "完了";
+        document.getElementById("statusBadge").className = "badge b-gray";
+        document.getElementById("btnStart").disabled = false;
+        document.getElementById("btnStop").disabled = true;
+
+        setEngineText("測定終了", "var(--muted)");
+        stopRequested = false;
+
+        toast("測定を終了しました");
+        switchTab("clips");
+      }
+
+      function filterCategory(category, button) {
+        currentFilter = category;
+
+        document.querySelectorAll(".filter-btn").forEach(item => {
+          item.classList.remove("active");
+        });
+
+        button?.classList.add("active");
+        renderClipList();
+      }
+
+      function revokeObjectUrls() {
+        activeObjectUrls.forEach(url => URL.revokeObjectURL(url));
+        activeObjectUrls = [];
+      }
+
+      async function renderClipList() {
+        const list = document.getElementById("clipList");
+        if (!list) return;
+
+        if (currentAudioPlayer) {
+          currentAudioPlayer.pause();
+          currentAudioPlayer = null;
+          currentAudioButton = null;
+        }
+
+        revokeObjectUrls();
+        list.textContent = "";
+
+        const all = await getClipsFromDB();
+        const clips =
+          currentFilter === "all"
+            ? all
+            : all.filter(clip => clip.category === currentFilter);
+
+        if (!clips.length) {
+          list.innerHTML =
+            '<div style="text-align:center;padding:30px;font-size:12px;color:var(--muted)">' +
+            "該当する録音データはありません。" +
+            "</div>";
+          return;
+        }
+
+        clips.forEach(clip => {
+          const item = document.createElement("div");
+          item.className = "clip-item";
+
+          const play = document.createElement("button");
+          play.className = "play-btn";
+          play.textContent = "▶";
+          play.setAttribute("aria-label", "再生");
+
+          const info = document.createElement("div");
+          info.className = "clip-info";
+
+          const title = document.createElement("div");
+          title.className = "clip-title";
+
+          const tag = document.createElement("span");
+          tag.className = "badge " + (clip.tagClass || "tag-env");
+          tag.textContent = clip.label || "未分類";
+
+          const value = document.createElement("span");
+          value.style.cssText =
+            "font-size:11px;font-weight:normal;color:#94a3b8;font-family:ui-monospace";
+          value.textContent =
+            Number(clip.peakDb || 0).toFixed(1) +
+            " dB / " +
+            (clip.motionG || "0.00") +
+            " G";
+
+          const sub = document.createElement("div");
+          sub.className = "clip-sub";
+          sub.textContent =
+            "時刻: " + (clip.realClock || "--") +
+            "（開始後 " + (clip.timeStr || "--") + "）" +
+            " / 約" + (clip.durationSec || 0) + "秒";
+
+          title.append(tag, value);
+          const reason = document.createElement("div");
+          reason.className = "clip-sub";
+          reason.style.color = "#64748b";
+          reason.textContent = "判定根拠: " + (clip.reason || clip.voteSummary || "旧データ・根拠なし");
+
+          info.append(title, sub, reason);
+
+          const download = document.createElement("a");
+          download.className = "btn btn-soft";
+          download.style.cssText =
+            "padding:6px 10px;font-size:11px;text-decoration:none";
+          download.textContent = "保存";
+
+          const audioUrl = URL.createObjectURL(clip.blob);
+          activeObjectUrls.push(audioUrl);
+
+          const extension =
+            String(clip.blob?.type || "").includes("mp4") ? "m4a" : "webm";
+
+          download.href = audioUrl;
+          download.download =
+            "SleepSound_" +
+            (clip.category || "unknown") +
+            "_" +
+            String(clip.realClock || clip.id).replace(/:/g, "-") +
+            "." +
+            extension;
+
+          play.onclick = async () => {
+            // 同じクリップのボタンなら再生・停止を切り替える。
+            if (currentAudioPlayer && currentAudioButton === play) {
+              currentAudioPlayer.pause();
+              currentAudioPlayer.currentTime = 0;
+              currentAudioPlayer = null;
+              currentAudioButton = null;
+              play.textContent = "▶";
+              play.setAttribute("aria-label", "再生");
+              return;
+            }
+
+            // 別クリップへ移る場合は先に再生中の音を止める。
+            if (currentAudioPlayer) {
+              currentAudioPlayer.pause();
+              currentAudioPlayer.currentTime = 0;
+            }
+            if (currentAudioButton) {
+              currentAudioButton.textContent = "▶";
+              currentAudioButton.setAttribute("aria-label", "再生");
+            }
+
+            const audio = new Audio(audioUrl);
+            currentAudioPlayer = audio;
+            currentAudioButton = play;
+            play.textContent = "■";
+            play.setAttribute("aria-label", "停止");
+
+            const resetPlayer = () => {
+              if (currentAudioPlayer === audio) currentAudioPlayer = null;
+              if (currentAudioButton === play) currentAudioButton = null;
+              play.textContent = "▶";
+              play.setAttribute("aria-label", "再生");
+            };
+
+            audio.onended = resetPlayer;
+            audio.onerror = () => {
+              resetPlayer();
+              toast("音声を再生できませんでした");
+            };
+
+            try {
+              await audio.play();
+            } catch (error) {
+              resetPlayer();
+              toast("再生エラー: " + error.message);
+            }
           };
 
-          audio.play().catch(e => {
-            toast("再生エラー: " + e.message);
-            playBtn.textContent = "▶";
-          });
-        };
-      });
-    }
+          item.append(play, info, download);
+          list.appendChild(item);
+        });
+      }
 
-    async function clearClips() {
-      if(!confirm("すべての録音クリップを消去しますか？")) return;
-      if(currentAudioPlayer) { currentAudioPlayer.pause(); currentAudioPlayer = null; }
-      await clearClipsFromDB();
-      Object.keys(counts).forEach(k => counts[k] = 0);
-      updateCountUI();
-      await renderClipList();
-      toast("全消去完了");
-    }
+      async function clearClips() {
+        if (!confirm("すべての録音クリップを消去しますか？")) return;
 
-    async function init() {
-      checkIosMotionBanner();
-      try { await initDB(); } catch(e){}
-      const clips = await getClipsFromDB();
-      clips.forEach(c => {
-        if(counts[c.category] !== undefined) counts[c.category]++;
-      });
-      updateCountUI();
-    }
+        if (currentAudioPlayer) {
+          currentAudioPlayer.pause();
+          currentAudioPlayer = null;
+          currentAudioButton = null;
+        }
 
-    return {
-      init, switchTab, startTracking, stopTracking, clearClips, filterCategory, requestIosMotionPermission
-    };
-  })();
+        revokeObjectUrls();
 
-  window.addEventListener("DOMContentLoaded", async () => {
-    await GitHubLoader.init();
-    App.init();
-  });
-</script>
+        const cleared = await clearClipsFromDB();
+
+        if (!cleared) {
+          toast("録音データを消去できませんでした");
+          return;
+        }
+
+        Object.keys(counts).forEach(key => {
+          counts[key] = 0;
+        });
+
+        updateCountUI();
+        await renderClipList();
+        toast("録音データを全消去しました");
+      }
+
+      async function handleVisibilityChange() {
+        if (!isTracking || document.visibilityState !== "visible") return;
+
+        setEngineText("画面復帰後の監視状態を確認中...", "var(--warn)");
+
+        try {
+          if (audioCtx?.state === "suspended") {
+            await audioCtx.resume();
+          }
+        } catch (error) {}
+
+        await requestWakeLock();
+
+        const staleFor = Date.now() - lastMonitorTickMs;
+        if (staleFor > MONITOR_STALE_MS) scheduleMonitor();
+
+        const track = stream?.getAudioTracks()?.[0];
+        if (!track || track.readyState !== "live") {
+          await recoverAudioPipeline("画面復帰");
+        }
+
+        setEngineText("音声・体動エンジン正常稼働中", "var(--success)");
+      }
+
+      async function init() {
+        if (initialized) return;
+        initialized = true;
+
+        showInterruptedSessionNotice();
+        checkIosMotionBanner();
+
+        await initDB();
+
+        const clips = await getClipsFromDB();
+
+        clips.forEach(clip => {
+          if (counts[clip.category] !== undefined) {
+            counts[clip.category]++;
+          }
+        });
+
+        updateCountUI();
+
+        document.addEventListener(
+          "visibilitychange",
+          handleVisibilityChange
+        );
+
+        window.addEventListener("pageshow", handleVisibilityChange);
+
+        window.addEventListener("beforeunload", () => {
+          if (isTracking) saveSessionHeartbeat();
+          revokeObjectUrls();
+        });
+      }
+
+      return {
+        init,
+        switchTab,
+        startTracking,
+        stopTracking,
+        clearClips,
+        filterCategory,
+        requestIosMotionPermission
+      };
+    })();
+
+    window.addEventListener("DOMContentLoaded", async () => {
+      // GitHub側が失敗しても内蔵エンジンは必ず起動する。
+      try {
+        await GitHubLoader.init();
+      } catch (error) {
+        console.warn("[GitHubLoader]", error);
+      }
+
+      await App.init();
+    });
+  </script>
 </body>
 </html>
