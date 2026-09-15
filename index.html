@@ -7,7 +7,7 @@
   <meta http-equiv="Expires" content="0">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <meta name="theme-color" content="#090d16">
-  <title>SleepTracker AI Stable V6.2</title>
+  <title>SleepTracker AI Stable V6.4</title>
 
   <style>
     :root {
@@ -326,6 +326,35 @@
       box-shadow:0 8px 20px rgba(0,0,0,.5);
     }
 
+
+    .waveform-wrap {
+      position:relative; height:36px; flex:1; min-width:150px;
+      display:flex; align-items:center; gap:2px; overflow:hidden;
+      border-radius:6px; background:#0b1220; padding:4px 5px;
+    }
+    .waveform-bar { flex:1; min-width:1px; background:#64748b; border-radius:2px; opacity:.8; }
+    .waveform-progress { position:absolute; left:0; top:0; bottom:0; width:0; background:rgba(99,102,241,.22); border-right:2px solid #a5b4fc; pointer-events:none; }
+    .report-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+    .export-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+    .report-tile { background:#101726; border:1px solid var(--line); border-radius:12px; padding:12px; }
+    .report-k { color:var(--muted); font-size:11px; }
+    .report-v { color:white; font-size:20px; font-weight:900; margin-top:2px; }
+    .quality-ring { width:104px; height:104px; border-radius:50%; display:grid; place-items:center; background:conic-gradient(var(--warn) 0deg,#263247 0deg); position:relative; }
+    .quality-ring::after { content:""; position:absolute; inset:12px; background:var(--card); border-radius:50%; }
+    .quality-ring-inner { position:relative; z-index:1; text-align:center; font-weight:900; }
+    .sleep-chart { width:100%; height:210px; background:#08111f; border-radius:10px; overflow:hidden; }
+    .legend-row { display:flex; flex-wrap:wrap; gap:10px; color:var(--muted); font-size:10px; }
+    .legend-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:4px; }
+    .report-section-title { font-size:15px; font-weight:900; display:flex; align-items:center; gap:7px; margin-top:4px; }
+    .quality-summary { background:linear-gradient(135deg,#111c31,#17162f); border:1px solid #34345f; border-radius:16px; padding:16px; }
+    .evaluation-table { width:100%; border-collapse:separate; border-spacing:0 7px; }
+    .evaluation-table td { background:#101726; padding:10px; font-size:12px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+    .evaluation-table td:first-child { border-left:1px solid var(--line); border-radius:10px 0 0 10px; color:#cbd5e1; font-weight:700; }
+    .evaluation-table td:last-child { border-right:1px solid var(--line); border-radius:0 10px 10px 0; text-align:right; font-weight:900; }
+    .score-track { height:7px; background:#263247; border-radius:999px; overflow:hidden; margin-top:5px; }
+    .score-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#6366f1,#22d3ee); }
+    .quality-note { color:#94a3b8; font-size:10px; line-height:1.6; }
+
     @media (max-width:520px) {
       .stat-grid { grid-template-columns:repeat(2,1fr); }
       .clip-item { align-items:flex-start; }
@@ -338,7 +367,7 @@
 
   <header class="top">
     <div class="top-inner">
-      <div class="brand">🌙 SleepTracker <span>STABLE V6.2</span></div>
+      <div class="brand">🌙 SleepTracker <span>STABLE V6.5</span></div>
       <div id="statusBadge" class="badge b-gray">待機中</div>
     </div>
   </header>
@@ -373,6 +402,7 @@
     <div class="tabs">
       <button id="tab-rec" class="tab active" onclick="App.switchTab('rec')">測定・モニタ</button>
       <button id="tab-clips" class="tab" onclick="App.switchTab('clips')">分類録音一覧</button>
+      <button id="tab-report" class="tab" onclick="App.switchTab('report')">睡眠レポート</button>
     </div>
 
     <section id="panel-rec" class="col">
@@ -447,6 +477,7 @@
           <button class="filter-btn" onclick="App.filterCategory('bruxism',this)">歯ぎしり (<span id="fc-brux">0</span>)</button>
           <button class="filter-btn" onclick="App.filterCategory('talk',this)">寝言 (<span id="fc-talk">0</span>)</button>
           <button class="filter-btn" onclick="App.filterCategory('fart',this)">おなら (<span id="fc-fart">0</span>)</button>
+          <button class="filter-btn" onclick="App.filterCategory('apnea',this)">無呼吸疑い (<span id="fc-apnea">0</span>)</button>
           <button class="filter-btn" onclick="App.filterCategory('env',this)">環境音 (<span id="fc-env">0</span>)</button>
         </div>
 
@@ -454,6 +485,55 @@
           <div style="text-align:center;padding:30px;font-size:12px;color:var(--muted)">
             録音データはまだありません。
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-report" class="hidden col">
+      <div class="card col">
+        <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+          <div><strong>推定睡眠レポート</strong><div class="stat-k">音声・体動からの参考推定（医療的な睡眠段階ではありません）</div></div>
+          <select id="reportSessionSelect" class="btn btn-soft" style="max-width:300px" onchange="App.renderSleepReport(this.value)"></select>
+        </div>
+        <div class="export-grid">
+          <button class="btn btn-primary" onclick="App.exportSessionLog(false)">軽量ログ出力</button>
+          <button class="btn btn-soft" onclick="App.shareSessionLog(false)">軽量ログ共有</button>
+          <button class="btn btn-primary" onclick="App.exportSessionLog(true)">音声付き完全ログ出力</button>
+          <button class="btn btn-soft" onclick="App.shareSessionLog(true)">音声付き完全ログ共有</button>
+        </div>
+        <div id="reportEmpty" class="notice">保存済みレポートはありません。下のグラフは表示例です。測定終了後、実測データに自動更新されます。</div>
+        <div id="reportContent" class="col">
+          <div class="report-section-title">📊 睡眠の質と評価表</div>
+          <div class="quality-summary">
+          <div class="row" style="justify-content:space-around;align-items:center;flex-wrap:wrap">
+            <div id="qualityRing" class="quality-ring"><div class="quality-ring-inner"><div id="qualityScore" style="font-size:28px">--</div><div class="stat-k">推定品質</div></div></div>
+            <div><div id="qualityLabel" style="font-size:20px;font-weight:900">--</div><div id="qualityReason" class="stat-k" style="max-width:340px;margin-top:6px"></div></div>
+          </div>
+          </div>
+          <table class="evaluation-table" aria-label="睡眠品質の評価表">
+            <tbody>
+              <tr><td>睡眠時間</td><td><span id="eDuration">--</span><div class="score-track"><div id="eDurationBar" class="score-fill" style="width:0%"></div></div></td></tr>
+              <tr><td>睡眠の連続性</td><td><span id="eContinuity">--</span><div class="score-track"><div id="eContinuityBar" class="score-fill" style="width:0%"></div></div></td></tr>
+              <tr><td>いびきの少なさ</td><td><span id="eSnore">--</span><div class="score-track"><div id="eSnoreBar" class="score-fill" style="width:0%"></div></div></td></tr>
+              <tr><td>呼吸の安定性</td><td><span id="eBreathing">--</span><div class="score-track"><div id="eBreathingBar" class="score-fill" style="width:0%"></div></div></td></tr>
+              <tr><td>体動の少なさ</td><td><span id="eMotion">--</span><div class="score-track"><div id="eMotionBar" class="score-fill" style="width:0%"></div></div></td></tr>
+            </tbody>
+          </table>
+          <div class="report-section-title">🌙 推定睡眠推移</div>
+          <div id="sleepChart" class="sleep-chart"></div>
+          <div class="legend-row"><span><i class="legend-dot" style="background:#fb7185"></i>覚醒傾向</span><span><i class="legend-dot" style="background:#38bdf8"></i>浅い睡眠傾向</span><span><i class="legend-dot" style="background:#6366f1"></i>安定睡眠傾向</span><span><i class="legend-dot" style="background:#a78bfa"></i>推定深睡眠傾向</span><span><i class="legend-dot" style="background:#f59e0b"></i>いびき</span></div>
+          <div class="report-section-title">🛏️ 睡眠詳細</div>
+          <div class="report-grid">
+            <div class="report-tile"><div class="report-k">就寝（測定開始）</div><div id="rStart" class="report-v">--:--</div></div>
+            <div class="report-tile"><div class="report-k">起床（測定終了）</div><div id="rEnd" class="report-v">--:--</div></div>
+            <div class="report-tile"><div class="report-k">ベッドでの時間</div><div id="rBed" class="report-v">--</div></div>
+            <div class="report-tile"><div class="report-k">推定睡眠時間</div><div id="rSleep" class="report-v">--</div></div>
+            <div class="report-tile"><div class="report-k">推定入眠まで</div><div id="rLatency" class="report-v">--</div></div>
+            <div class="report-tile"><div class="report-k">推定安定睡眠</div><div id="rDeep" class="report-v">--</div></div>
+            <div class="report-tile"><div class="report-k">いびき録音</div><div id="rSnore" class="report-v">--回</div></div>
+            <div class="report-tile"><div class="report-k">無呼吸疑い</div><div id="rApnea" class="report-v">--回</div></div>
+          </div>
+          <div class="quality-note">※ 睡眠状態・品質・入眠・安定睡眠・無呼吸疑いは、端末のマイクとモーションセンサーから算出する参考推定です。医療機器による診断ではありません。</div>
         </div>
       </div>
     </section>
@@ -593,7 +673,11 @@
       const WATCHDOG_INTERVAL_MS = 4000;
       const MONITOR_STALE_MS = 7000;
       const CLIP_DURATION_MS = 10000;
-      const TRIGGER_COOLDOWN_MS = 5000;
+      const SNORE_GAP_MS = 10000;
+      const SNORE_MAX_MS = 90000;
+      const TRIGGER_COOLDOWN_MS = 2500;
+      const SESSION_HISTORY_KEY = "ST_SESSION_HISTORY_V63";
+      const PROFILE_BIN_MS = 30000;
 
       let db = null;
       let initialized = false;
@@ -643,6 +727,10 @@
       let currentAudioPlayer = null;
       let currentAudioButton = null;
       let activeObjectUrls = [];
+      let pendingClipRequest = null;
+      let profileBins = [];
+      let profileAccumulator = null;
+      let lastProfileFlushMs = 0;
 
       const counts = {
         snore:0,
@@ -834,17 +922,28 @@
       function switchTab(tab) {
         const recTab = document.getElementById("tab-rec");
         const clipsTab = document.getElementById("tab-clips");
+        const reportTab = document.getElementById("tab-report");
         const recPanel = document.getElementById("panel-rec");
         const clipsPanel = document.getElementById("panel-clips");
+        const reportPanel = document.getElementById("panel-report");
 
-        const showRecording = tab === "rec";
+        recTab.classList.toggle("active", tab === "rec");
+        clipsTab.classList.toggle("active", tab === "clips");
+        reportTab.classList.toggle("active", tab === "report");
+        recPanel.classList.toggle("hidden", tab !== "rec");
+        clipsPanel.classList.toggle("hidden", tab !== "clips");
+        reportPanel.classList.toggle("hidden", tab !== "report");
 
-        recTab.classList.toggle("active", showRecording);
-        clipsTab.classList.toggle("active", !showRecording);
-        recPanel.classList.toggle("hidden", !showRecording);
-        clipsPanel.classList.toggle("hidden", showRecording);
+        // モーションセンサー許可案内は測定画面だけに表示する。
+        const motionBanner = document.getElementById("iosMotionBanner");
+        const needsMotionPermission =
+          typeof DeviceMotionEvent !== "undefined" &&
+          typeof DeviceMotionEvent.requestPermission === "function" &&
+          !motionPermissionGranted;
+        if (motionBanner) motionBanner.classList.toggle("hidden", tab !== "rec" || !needsMotionPermission);
 
-        if (!showRecording) renderClipList();
+        if (tab === "clips") renderClipList();
+        if (tab === "report") loadReportSessions();
       }
 
       function checkIosMotionBanner() {
@@ -1169,6 +1268,7 @@
         const votes = currentClipMeta.votes || (currentClipMeta.votes = {});
         votes[result.category] = (votes[result.category] || 0) + 1;
         if (result.reason) currentClipMeta.reasons[result.category] = result.reason;
+        if (result.category === "snore") currentClipMeta.lastSnoreAt = Date.now();
       }
 
       function finalizeClipClassification(meta) {
@@ -1176,8 +1276,9 @@
         const score = key => Number(votes[key] || 0);
         let category = "env";
 
-        // 10秒全体の投票。いびきは呼吸音の揺らぎを考慮し、同点なら優先する。
-        if (score("roll") >= 2) category = "roll";
+        // 録音全体の投票。無呼吸疑いは独立イベントとして最優先にする。
+        if (meta.forceCategory === "apnea" || score("apnea") >= 1) category = "apnea";
+        else if (score("roll") >= 2) category = "roll";
         else if (score("snore") >= 2 && score("snore") >= score("bruxism")) category = "snore";
         else if (score("bruxism") >= 3 && score("bruxism") > score("snore") * 1.5) category = "bruxism";
         else if (score("talk") >= 3) category = "talk";
@@ -1190,6 +1291,7 @@
           bruxism:["😬 歯ぎしり・硬音", "tag-brux"],
           talk:["🗣 寝言", "tag-talk"],
           fart:["💨 おなら", "tag-fart"],
+          apnea:["⚠️ 無呼吸疑い", "tag-snore"],
           env:["🛏 環境音", "tag-env"]
         };
         meta.category = category;
@@ -1223,7 +1325,17 @@
         const now = Date.now();
 
         if (!isTracking || !stream || !window.MediaRecorder) return;
-        if (isClipRecording || now - lastTriggerTime < TRIGGER_COOLDOWN_MS) return;
+        if (isClipRecording) {
+          if (result.category === "snore" && currentClipMeta) {
+            currentClipMeta.lastSnoreAt = now;
+            addClipVote(result);
+          } else if (result.category === "apnea") {
+            pendingClipRequest = { result, peakDb, motionG, durationMs };
+            stopActiveRecorder();
+          }
+          return;
+        }
+        if (now - lastTriggerTime < TRIGGER_COOLDOWN_MS && result.category !== "apnea") return;
 
         const audioTracks = stream.getAudioTracks();
         if (!audioTracks.length || audioTracks[0].readyState !== "live") return;
@@ -1245,7 +1357,11 @@
             minute:"2-digit",
             second:"2-digit"
           }),
-          durationSec:Math.round(durationMs / 1000),
+          durationSec:0,
+          startedAt:now,
+          lastSnoreAt:result.category === "snore" ? now : 0,
+          forceCategory:result.category === "apnea" ? "apnea" : "",
+          waveformDb:[],
           votes:{ [result.category]:1 },
           reasons:{ [result.category]:result.reason || "初期判定" },
           reason:result.reason || ""
@@ -1288,6 +1404,9 @@
             isClipRecording = false;
 
             if (meta && blob.size > 0) {
+              meta.durationSec = Math.max(1, Math.round((Date.now() - meta.startedAt) / 1000));
+              meta.waveform = normalizeWaveform(meta.waveformDb || [], 56);
+              delete meta.waveformDb;
               finalizeClipClassification(meta);
               const saved = await saveClipToDB({
                 ...meta,
@@ -1307,14 +1426,30 @@
             if (clipFinalizeResolve) clipFinalizeResolve();
             clipFinalizeResolve = null;
             clipFinalizePromise = null;
+
+            if (pendingClipRequest && isTracking && !stopRequested) {
+              const next = pendingClipRequest;
+              pendingClipRequest = null;
+              setTimeout(() => triggerClipRecording(next.result, next.peakDb, next.motionG, next.durationMs), 100);
+            }
           };
 
           mediaRecorder.start(1000);
 
           clearTimeout(clipStopTimeout);
-          clipStopTimeout = setTimeout(() => {
-            stopActiveRecorder();
-          }, durationMs);
+          const checkClipEnd = () => {
+            if (!isClipRecording || !currentClipMeta) return;
+            const elapsed = Date.now() - currentClipMeta.startedAt;
+            const isSnore = currentClipMeta.category === "snore" || currentClipMeta.votes?.snore;
+            const quietFor = Date.now() - (currentClipMeta.lastSnoreAt || currentClipMeta.startedAt);
+            if ((isSnore && (quietFor >= SNORE_GAP_MS || elapsed >= SNORE_MAX_MS)) ||
+                (!isSnore && elapsed >= durationMs)) {
+              stopActiveRecorder();
+              return;
+            }
+            clipStopTimeout = setTimeout(checkClipEnd, 500);
+          };
+          clipStopTimeout = setTimeout(checkClipEnd, 500);
         } catch (error) {
           mediaRecorder = null;
           isClipRecording = false;
@@ -1353,6 +1488,350 @@
         ]);
       }
 
+      function normalizeWaveform(values, target = 56) {
+        if (!values.length) return Array(target).fill(0.08);
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const out = [];
+        for (let i = 0; i < target; i++) {
+          const from = Math.floor(i * values.length / target);
+          const to = Math.max(from + 1, Math.floor((i + 1) * values.length / target));
+          const slice = values.slice(from, to);
+          const peak = Math.max(...slice);
+          out.push(Math.max(0.08, Math.min(1, (peak - min + 1) / (max - min + 4))));
+        }
+        return out;
+      }
+
+      function buildWaveformElement(values) {
+        const wrap = document.createElement("div");
+        wrap.className = "waveform-wrap";
+        const arr = values.length ? values : Array(42).fill(0.12);
+        arr.forEach(value => {
+          const bar = document.createElement("i");
+          bar.className = "waveform-bar";
+          bar.style.height = Math.max(3, Number(value) * 28) + "px";
+          wrap.appendChild(bar);
+        });
+        const progress = document.createElement("div");
+        progress.className = "waveform-progress";
+        wrap.appendChild(progress);
+        return wrap;
+      }
+
+      function collectProfileSample(now, dbValue, delta, motion, result) {
+        if (!profileAccumulator) {
+          profileAccumulator = { startMs:now, n:0, dbSum:0, dbSq:0, motionSum:0, motionMax:0, loud:0, snore:0, apnea:0 };
+        }
+        const a = profileAccumulator;
+        a.n++;
+        a.dbSum += dbValue;
+        a.dbSq += dbValue * dbValue;
+        a.motionSum += motion;
+        a.motionMax = Math.max(a.motionMax, motion);
+        if (delta >= 8) a.loud++;
+        if (result?.category === "snore") a.snore++;
+        if (result?.category === "apnea") a.apnea++;
+        if (now - lastProfileFlushMs >= PROFILE_BIN_MS) flushProfileBin(false);
+      }
+
+      function flushProfileBin(force) {
+        const a = profileAccumulator;
+        if (!a || !a.n) return;
+        const avgDb = a.dbSum / a.n;
+        const variance = Math.max(0, a.dbSq / a.n - avgDb * avgDb);
+        const avgMotion = a.motionSum / a.n;
+        const disturbance = Math.min(1, avgMotion * 4 + a.motionMax * 1.8 + a.loud / a.n * 1.8);
+        let state = 2;
+        if (disturbance > 0.65) state = 0;
+        else if (disturbance > 0.30 || Math.sqrt(variance) > 7) state = 1;
+        else if (avgMotion < 0.025 && Math.sqrt(variance) < 3 && a.snore / a.n < 0.15) state = 3;
+        profileBins.push({
+          startSec:Math.max(0, Math.round((a.startMs - sessionStartMs) / 1000)),
+          durationSec:Math.max(1, Math.round((Date.now() - a.startMs) / 1000)),
+          state, avgDb:+avgDb.toFixed(1), dbVariation:+Math.sqrt(variance).toFixed(1),
+          avgMotion:+avgMotion.toFixed(3), maxMotion:+a.motionMax.toFixed(2),
+          snoreRatio:+(a.snore / a.n).toFixed(2), disturbance:+disturbance.toFixed(2)
+        });
+        profileAccumulator = null;
+        lastProfileFlushMs = Date.now();
+      }
+
+      function loadSessionHistory() {
+        try { return JSON.parse(localStorage.getItem(SESSION_HISTORY_KEY) || "[]"); }
+        catch (error) { return []; }
+      }
+
+      function saveSessionHistory(items) {
+        try { localStorage.setItem(SESSION_HISTORY_KEY, JSON.stringify(items.slice(0, 60))); return true; }
+        catch (error) { toast("レポート保存容量が不足しています"); return false; }
+      }
+
+      function qualityFromSession(session) {
+        const bins = session.profileBins || [];
+        const total = Math.max(1, Number(session.durationSec || 1));
+        const awakeSec = bins.filter(b => b.state === 0).reduce((n,b) => n + Number(b.durationSec || 0), 0);
+        const stableSec = bins.filter(b => b.state >= 2).reduce((n,b) => n + Number(b.durationSec || 0), 0);
+        const durationHours = total / 3600;
+        const durationPct = Math.round(Math.max(0, Math.min(100, 100 - Math.abs(7.5 - durationHours) * 20)));
+        const continuityPct = Math.round(Math.max(0, Math.min(100, 100 * (1 - awakeSec / total))));
+        const snoreImpact = (session.counts?.snore || 0) * 4 + (session.snoreDurationSec || 0) / total * 100;
+        const snorePct = Math.round(Math.max(0, Math.min(100, 100 - snoreImpact)));
+        const breathingPct = Math.round(Math.max(0, Math.min(100, 100 - (session.counts?.apnea || 0) * 15)));
+        const motionAvg = bins.length ? bins.reduce((n,b) => n + Number(b.avgMotion || 0), 0) / bins.length : 0;
+        const motionPct = Math.round(Math.max(0, Math.min(100, 100 - motionAvg * 250)));
+        const score = Math.round(durationPct * .25 + continuityPct * .25 + snorePct * .18 + breathingPct * .17 + motionPct * .15);
+        return {
+          score, awakeSec, stableSec, durationPct, continuityPct, snorePct, breathingPct, motionPct,
+          label:score>=85?"良好":score>=70?"比較的良好":score>=50?"やや不安定":"要確認"
+        };
+      }
+
+      async function saveCompletedSession() {
+        const clips = await getClipsFromDB();
+        const start = sessionStartMs;
+        const end = Date.now();
+        const own = clips.filter(c => Number(c.id) >= start && Number(c.id) <= end + 5000);
+        const c = {snore:0,roll:0,bruxism:0,talk:0,fart:0,env:0,apnea:0};
+        own.forEach(x => { if (c[x.category] !== undefined) c[x.category]++; });
+        const snoreDurationSec = own.filter(x => x.category === "snore").reduce((n,x) => n + Number(x.durationSec || 0), 0);
+        const session = {
+          id:String(start), startedAt:start, endedAt:end,
+          dateStr:new Date(start).toLocaleDateString("ja-JP"),
+          startTime:new Date(start).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
+          endTime:new Date(end).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
+          durationSec:Math.max(1,Math.round((end-start)/1000)), baselineDb:+baselineDb.toFixed(1),
+          counts:c, snoreDurationSec, profileBins:[...profileBins]
+        };
+        session.quality = qualityFromSession(session);
+        const history = loadSessionHistory().filter(x => x.id !== session.id);
+        history.unshift(session);
+        saveSessionHistory(history);
+      }
+
+      function formatDurationJP(sec) {
+        sec = Math.max(0, Math.round(sec || 0));
+        const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+        return h ? h + "時間" + m + "分" : m + "分";
+      }
+
+      function loadReportSessions() {
+        const select = document.getElementById("reportSessionSelect");
+        if (!select) return;
+        const sessions = loadSessionHistory();
+        select.textContent = "";
+        if (!sessions.length) {
+          const op = document.createElement("option"); op.textContent = "保存済みレポートなし"; op.value = ""; select.appendChild(op);
+          document.getElementById("reportEmpty")?.classList.remove("hidden");
+          document.getElementById("reportContent")?.classList.remove("hidden");
+          resetEmptySleepReport();
+          return;
+        }
+        sessions.forEach(s => {
+          const op = document.createElement("option"); op.value = s.id;
+          op.textContent = s.dateStr + " " + s.startTime + "〜" + s.endTime;
+          select.appendChild(op);
+        });
+        renderSleepReport(select.value);
+      }
+
+      function resetEmptySleepReport() {
+        const ring = document.getElementById("qualityRing");
+        if (ring) ring.style.background = "conic-gradient(#334155 0deg,#263247 0deg)";
+        const values = {
+          qualityScore:"--", qualityLabel:"未測定",
+          qualityReason:"測定終了後、音声・体動の30秒単位データから睡眠品質を推定します。",
+          rStart:"--:--", rEnd:"--:--", rBed:"--", rSleep:"--",
+          rLatency:"--", rDeep:"--", rSnore:"--回", rApnea:"--回"
+        };
+        Object.entries(values).forEach(([id,value]) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = value;
+        });
+        ["Duration","Continuity","Snore","Breathing","Motion"].forEach(key => {
+          const label = document.getElementById("e" + key);
+          const bar = document.getElementById("e" + key + "Bar");
+          if (label) label.textContent = "未測定";
+          if (bar) bar.style.width = "0%";
+        });
+        drawEmptySleepChart();
+      }
+
+      function drawEmptySleepChart() {
+        const wrap = document.getElementById("sleepChart");
+        if (!wrap) return;
+        const w=900,h=210,left=55,right=18,top=18,bottom=38,pw=w-left-right;
+        const ys=[30,78,126,164];
+        const labels=["覚醒","浅い","安定","深い"];
+        let grid="";
+        ys.forEach((y,i) => {
+          grid += `<line x1="${left}" y1="${y}" x2="${w-right}" y2="${y}" stroke="#263247"/>` +
+                  `<text x="8" y="${y+4}" fill="#94a3b8" font-size="11">${labels[i]}</text>`;
+        });
+        for(let i=0;i<=6;i++){
+          const x=left+i*pw/6;
+          grid += `<line x1="${x}" y1="${top}" x2="${x}" y2="${h-bottom}" stroke="#1e293b"/>` +
+                  `<text x="${x-8}" y="${h-12}" fill="#64748b" font-size="10">${i}h</text>`;
+        }
+        const sample = [
+          [0,35],[.07,42],[.13,92],[.20,115],[.27,72],[.34,138],[.42,158],
+          [.50,102],[.58,52],[.66,118],[.74,86],[.82,155],[.90,92],[1,40]
+        ].map(p => `${left+p[0]*pw},${p[1]}`).join(" ");
+        wrap.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" height="100%" preserveAspectRatio="none">
+          ${grid}
+          <polyline points="${sample}" fill="none" stroke="#155e75" stroke-width="4" opacity=".42" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="${left}" y="${h-bottom+7}" width="${pw}" height="5" rx="2" fill="#334155" opacity=".55"/>
+          <text x="${w/2}" y="${h/2-6}" text-anchor="middle" fill="#e2e8f0" font-size="16" font-weight="700">睡眠推移グラフ</text>
+          <text x="${w/2}" y="${h/2+17}" text-anchor="middle" fill="#94a3b8" font-size="12">測定終了後、実測データを表示します</text>
+        </svg>`;
+      }
+
+      function renderSleepReport(id) {
+        const sessions = loadSessionHistory();
+        const s = sessions.find(x => String(x.id) === String(id)) || sessions[0];
+        if (!s) return;
+        document.getElementById("reportEmpty").classList.add("hidden");
+        document.getElementById("reportContent").classList.remove("hidden");
+        const q = qualityFromSession(s);
+        const ring = document.getElementById("qualityRing");
+        ring.style.background = `conic-gradient(${q.score>=70?"var(--success)":"var(--warn)"} ${q.score*3.6}deg,#263247 0deg)`;
+        document.getElementById("qualityScore").textContent = q.score;
+        document.getElementById("qualityLabel").textContent = q.label;
+        document.getElementById("qualityReason").textContent = "測定時間・連続性・いびき・呼吸・体動の5項目から算出した参考評価です。";
+        const evaluations = [
+          ["eDuration", "eDurationBar", q.durationPct],
+          ["eContinuity", "eContinuityBar", q.continuityPct],
+          ["eSnore", "eSnoreBar", q.snorePct],
+          ["eBreathing", "eBreathingBar", q.breathingPct],
+          ["eMotion", "eMotionBar", q.motionPct]
+        ];
+        evaluations.forEach(([textId, barId, value]) => {
+          const text = document.getElementById(textId);
+          const bar = document.getElementById(barId);
+          if (text) text.textContent = value + "点";
+          if (bar) bar.style.width = value + "%";
+        });
+        const bins = s.profileBins || [];
+        const firstSleep = bins.find(b => b.state > 0);
+        const latency = firstSleep ? firstSleep.startSec : 0;
+        const sleepSec = Math.max(0, s.durationSec - q.awakeSec - latency);
+        document.getElementById("rStart").textContent = s.startTime;
+        document.getElementById("rEnd").textContent = s.endTime;
+        document.getElementById("rBed").textContent = formatDurationJP(s.durationSec);
+        document.getElementById("rSleep").textContent = formatDurationJP(sleepSec);
+        document.getElementById("rLatency").textContent = formatDurationJP(latency);
+        document.getElementById("rDeep").textContent = formatDurationJP(q.stableSec);
+        document.getElementById("rSnore").textContent = (s.counts?.snore || 0) + "回 / " + formatDurationJP(s.snoreDurationSec || 0);
+        document.getElementById("rApnea").textContent = (s.counts?.apnea || 0) + "回";
+        drawSleepChart(s);
+      }
+
+      function drawSleepChart(session) {
+        const wrap = document.getElementById("sleepChart");
+        const bins = session.profileBins || [];
+        if (!bins.length) { wrap.innerHTML = '<div class="notice" style="margin:20px">グラフ用データがありません。</div>'; return; }
+        const w=900,h=210,left=45,right=12,top=18,bottom=35, pw=w-left-right, ph=h-top-bottom;
+        const total=Math.max(1,session.durationSec), ys=[22,65,108,151];
+        const points=bins.map((b,i) => `${left + Math.min(1,(b.startSec+b.durationSec/2)/total)*pw},${ys[b.state]}`).join(" ");
+        const colors=["#fb7185","#38bdf8","#6366f1","#a78bfa"];
+        let grid="";
+        for(let i=0;i<4;i++) grid += `<line x1="${left}" y1="${ys[i]}" x2="${w-right}" y2="${ys[i]}" stroke="#263247"/><text x="5" y="${ys[i]+4}" fill="#94a3b8" font-size="10">${["覚醒","浅い","安定","深い"][i]}</text>`;
+        let marks="";
+        const hourCount=Math.max(1,Math.ceil(total/3600));
+        for(let i=0;i<=hourCount;i++){ const x=left+Math.min(1,i*3600/total)*pw; marks += `<line x1="${x}" y1="${top}" x2="${x}" y2="${h-bottom}" stroke="#1e293b"/><text x="${x-10}" y="${h-10}" fill="#94a3b8" font-size="10">${i}h</text>`; }
+        let snore="";
+        bins.forEach(b=>{ if(b.snoreRatio>0){ const x=left+(b.startSec/total)*pw, bw=Math.max(2,b.durationSec/total*pw); snore += `<rect x="${x}" y="${h-bottom+6}" width="${bw}" height="5" fill="#f59e0b"/>`; }});
+        wrap.innerHTML=`<svg viewBox="0 0 ${w} ${h}" width="100%" height="100%" preserveAspectRatio="none">${grid}${marks}<polyline points="${points}" fill="none" stroke="#22d3ee" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>${bins.map((b,i)=>{const x=left+Math.min(1,(b.startSec+b.durationSec/2)/total)*pw;return `<circle cx="${x}" cy="${ys[b.state]}" r="3" fill="${colors[b.state]}"/>`;}).join("")}${snore}</svg>`;
+      }
+
+      function selectedReportSession() {
+        const id = document.getElementById("reportSessionSelect")?.value;
+        const sessions = loadSessionHistory();
+        return sessions.find(x => String(x.id) === String(id)) || sessions[0] || null;
+      }
+
+      function blobToDataUrl(blob) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      async function buildSessionExport(session, withAudio) {
+        const all = await getClipsFromDB();
+        const start = Number(session.startedAt || session.id);
+        const end = Number(session.endedAt || start + session.durationSec * 1000);
+        const clips = all.filter(c => Number(c.id) >= start && Number(c.id) <= end + 5000);
+        const exportedClips = [];
+        for (const clip of clips) {
+          const item = {
+            id:clip.id, category:clip.category, label:clip.label,
+            timeStr:clip.timeStr, realClock:clip.realClock,
+            durationSec:clip.durationSec, peakDb:clip.peakDb,
+            motionG:clip.motionG, reason:clip.reason,
+            voteSummary:clip.voteSummary, waveform:clip.waveform || [],
+            mimeType:clip.blob?.type || ""
+          };
+          if (withAudio && clip.blob) item.audioBase64 = await blobToDataUrl(clip.blob);
+          exportedClips.push(item);
+        }
+        return {
+          meta:{ app:"SleepTracker AI Stable", version:"6.4", exportedAt:new Date().toISOString(), fullAudio:withAudio,
+            notice:"睡眠段階・睡眠品質・無呼吸は音声と体動による参考推定で、医学的診断ではありません。" },
+          session:{...session, quality:qualityFromSession(session)}, clips:exportedClips
+        };
+      }
+
+      function safeSessionFilename(session, full) {
+        const date = String(session.dateStr || "session").replace(/[\\/:*?"<>|]/g,"-");
+        const time = String(session.startTime || "").replace(/:/g,"");
+        return `SleepTracker_${full?"full":"lite"}_${date}_${time}.json`;
+      }
+
+      function downloadJsonObject(data, filename) {
+        const blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json;charset=utf-8"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a"); a.href=url; a.download=filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),1000);
+        return blob;
+      }
+
+      async function exportSessionLog(withAudio) {
+        const session = selectedReportSession();
+        if (!session) { toast("保存済みセッションがありません"); return; }
+        toast(withAudio ? "音声付きログを作成中..." : "軽量ログを作成中...");
+        try {
+          const data = await buildSessionExport(session, withAudio);
+          downloadJsonObject(data, safeSessionFilename(session,withAudio));
+          toast("ログを書き出しました");
+        } catch (error) { toast("ログ作成に失敗しました: " + error.message); }
+      }
+
+      async function shareSessionLog(withAudio) {
+        const session = selectedReportSession();
+        if (!session) { toast("保存済みセッションがありません"); return; }
+        toast(withAudio ? "音声付き共有ファイルを作成中..." : "共有ファイルを作成中...");
+        try {
+          const data = await buildSessionExport(session, withAudio);
+          const filename = safeSessionFilename(session,withAudio);
+          const blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json;charset=utf-8"});
+          const file = new File([blob], filename, {type:"application/json"});
+          if (navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))) {
+            await navigator.share({title:"SleepTracker 睡眠ログ",text:"睡眠測定ログ",files:[file]});
+            toast("共有しました");
+          } else {
+            downloadJsonObject(data,filename);
+            toast("共有非対応のためダウンロードしました");
+          }
+        } catch (error) {
+          if (error?.name === "AbortError") toast("共有をキャンセルしました");
+          else toast("共有に失敗しました: " + error.message);
+        }
+      }
+
       function updateCountUI() {
         const values = {
           "count-snore":counts.snore,
@@ -1366,6 +1845,7 @@
           "fc-brux":counts.bruxism,
           "fc-talk":counts.talk,
           "fc-fart":counts.fart,
+          "fc-apnea":counts.apnea,
           "fc-env":counts.env
         };
 
@@ -1380,6 +1860,7 @@
           counts.bruxism +
           counts.talk +
           counts.fart +
+          counts.apnea +
           counts.env;
 
         const totalEl = document.getElementById("fc-all");
@@ -1454,11 +1935,8 @@
           silenceSeconds <= 60 &&
           delta >= 14
         ) {
-          counts.apnea++;
-          updateCountUI();
-
           triggerClipRecording({
-            category:"snore",
+            category:"apnea",
             label:"⚠️ 無呼吸疑い（静寂" +
               Math.round(silenceSeconds) + "秒後）",
             tagClass:"tag-snore"
@@ -1487,6 +1965,9 @@
           }
 
           currentDb = measuredDb;
+          if (isClipRecording && currentClipMeta && currentClipMeta.waveformDb.length < 240) {
+            currentClipMeta.waveformDb.push(currentDb);
+          }
 
           const spectrum = analyzeFrequencySpectrum();
           const motionSnapshot = Math.min(4, peakMotionG);
@@ -1501,6 +1982,7 @@
           const delta = currentDb - baselineDb;
           const result =
             classifySoundAndMotion(delta, spectrum, motionSnapshot);
+          collectProfileSample(now, currentDb, delta, motionSnapshot, result);
 
           const liveClass = document.getElementById("liveClassText");
 
@@ -1620,6 +2102,9 @@
         lastAcc = null;
         currentMotionG = 0;
         peakMotionG = 0;
+        profileBins = [];
+        profileAccumulator = null;
+        lastProfileFlushMs = sessionStartMs;
 
         document.getElementById("statusBadge").textContent = "体動・音声監視中";
         document.getElementById("statusBadge").className = "badge b-green";
@@ -1680,6 +2165,8 @@
         timeBuf = null;
         freqBuf = null;
 
+        flushProfileBin(true);
+        await saveCompletedSession();
         clearSessionHeartbeat();
 
         document.getElementById("statusBadge").textContent = "完了";
@@ -1691,7 +2178,7 @@
         stopRequested = false;
 
         toast("測定を終了しました");
-        switchTab("clips");
+        switchTab("report");
       }
 
       function filterCategory(category, button) {
@@ -1841,6 +2328,10 @@
               resetPlayer();
               toast("音声を再生できませんでした");
             };
+            const progress = waveform.querySelector(".waveform-progress");
+            audio.ontimeupdate = () => {
+              if (progress && audio.duration) progress.style.width = ((audio.currentTime / audio.duration) * 100) + "%";
+            };
 
             try {
               await audio.play();
@@ -1850,7 +2341,10 @@
             }
           };
 
-          item.append(play, info, download);
+          const waveform = buildWaveformElement(clip.waveform || []);
+          audioUrl && waveform.classList.add("has-audio");
+
+          item.append(play, info, waveform, download);
           list.appendChild(item);
         });
       }
@@ -1924,6 +2418,7 @@
         });
 
         updateCountUI();
+        loadReportSessions();
 
         document.addEventListener(
           "visibilitychange",
@@ -1945,7 +2440,10 @@
         stopTracking,
         clearClips,
         filterCategory,
-        requestIosMotionPermission
+        requestIosMotionPermission,
+        renderSleepReport,
+        exportSessionLog,
+        shareSessionLog
       };
     })();
 
