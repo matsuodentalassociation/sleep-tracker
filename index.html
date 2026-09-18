@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#090d16">
-<title>SleepTracker AI Stable V6.8 NIGHT SCREEN</title>
+<title>SleepTracker AI Stable V6.9 NIGHT SCREEN</title>
 
 <style>
   :root {
@@ -355,7 +355,7 @@
   .score-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#6366f1,#22d3ee); }
   .quality-note { color:#94a3b8; font-size:10px; line-height:1.6; }
 
-  /* V6.8 NIGHT SCREEN: 陦ｨ遉ｺ縺ｮ縺ｿ縲よｸｬ螳壹・骭ｲ髻ｳ繝ｻ蜀咲函邨瑚ｷｯ縺ｫ縺ｯ蠖ｱ髻ｿ縺励∪縺帙ｓ */
+  /* V6.9 NIGHT SCREEN: 表示のみ。測定・録音・再生経路には影響しません */
   #nightScreen {
     position:fixed;
     inset:0;
@@ -415,42 +415,49 @@
     text-align:center;
   }
 
-  #nightStopButton {
+  .night-guide {
+    font-size:9px;
+    color:#17241e;
+  }
+
+  .night-hold {
     position:absolute;
-    z-index:3;
+    z-index:4;
     left:50%;
-    bottom:max(24px,env(safe-area-inset-bottom));
+    bottom:max(28px,env(safe-area-inset-bottom));
     transform:translateX(-50%);
-    width:min(72vw,280px);
-    height:52px;
-    border:1px solid #1b0709;
-    border-radius:14px;
-    background:#080102;
-    color:#3a1116;
-    font-size:12px;
+    width:min(76vw,300px);
+    color:#44232a;
+    font-size:11px;
     font-weight:800;
-    letter-spacing:.04em;
-    outline:none;
+    text-align:center;
+    opacity:0;
+    pointer-events:none;
+  }
+
+  #nightScreen.holding .night-hold { opacity:1; }
+
+  .night-hold-track {
+    height:5px;
+    margin-top:9px;
+    border-radius:999px;
     overflow:hidden;
-    touch-action:none;
+    background:#130306;
   }
 
-  #nightStopButton::before {
-    content:"";
-    position:absolute;
-    inset:0;
+  .night-hold-fill {
     width:0;
-    background:#27050a;
-    opacity:.72;
+    height:100%;
+    background:#52101a;
+    border-radius:999px;
   }
 
-  #nightStopButton.holding::before {
+  #nightScreen.holding .night-hold-fill {
     width:100%;
-    transition:width 2s linear;
+    transition:width 3s linear;
   }
 
-  #nightStopButton span { position:relative; z-index:1; }
-  #nightScreen.peek #nightStopButton { color:#632029; border-color:#2b0b10; }
+  .night-hold-seconds { margin-top:5px; color:#2b1116; font-size:9px; }
 
   body.night-screen-active {
     background:#000 !important;
@@ -470,23 +477,25 @@
 </head>
 
 <body>
-<div id="nightScreen" role="dialog" aria-label="豸育・繝｢繝ｼ繝・ aria-hidden="true">
+<div id="nightScreen" role="dialog" aria-label="消灯モード。3秒長押しで通常画面に戻ります" aria-hidden="true">
   <div class="night-peek" aria-live="polite">
-    <div class="night-title">笳・NIGHT SCREEN繝ｻ貂ｬ螳夂ｶ咏ｶ壻ｸｭ</div>
+    <div class="night-title">● NIGHT SCREEN・測定継続中</div>
     <div id="nightTimer">00:00:00</div>
-    <div id="nightState">髻ｳ螢ｰ繝ｻ菴灘虚繧ｨ繝ｳ繧ｸ繝ｳ豁｣蟶ｸ遞ｼ蜒堺ｸｭ</div>
-    <div style="font-size:9px;color:#17241e">5遘貞ｾ後↓蜀阪・證励￥縺ｪ繧翫∪縺・/div>
+    <div id="nightState">音声・体動エンジン正常稼働中</div>
+    <div class="night-guide">短くタップ：状態表示 ／ 3秒長押し：通常画面へ戻る</div>
   </div>
-  <button id="nightStopButton" type="button" aria-label="2遘帝聞謚ｼ縺励〒貂ｬ螳夂ｵゆｺ・>
-    <span>2遘帝聞謚ｼ縺励〒貂ｬ螳夂ｵゆｺ・/span>
-  </button>
+  <div class="night-hold" aria-hidden="true">
+    <div>通常画面に戻るまで長押し</div>
+    <div class="night-hold-track"><div class="night-hold-fill"></div></div>
+    <div class="night-hold-seconds">3秒</div>
+  </div>
 </div>
 <div id="toastWrap"></div>
 
 <header class="top">
   <div class="top-inner">
-    <div class="brand">嫌 SleepTracker <span id="buildBadge">V6.8 NIGHT SCREEN</span></div>
-    <div id="statusBadge" class="badge b-gray">蠕・ｩ滉ｸｭ</div>
+    <div class="brand">🌙 SleepTracker <span id="buildBadge">V6.9 NIGHT SCREEN</span></div>
+    <div id="statusBadge" class="badge b-gray">待機中</div>
   </div>
 </header>
 
@@ -494,10 +503,11 @@
   <div class="gh-bar">
     <div class="gh-status">
       <div id="ghDot" class="gh-dot"></div>
-      <span id="ghStatusText">GitHub繧ｳ繝ｼ繝牙酔譛・ 蛻晄悄蛹紋ｸｭ</span>
+      <span id="ghStatusText">GitHubコード同期: 初期化中</span>
     </div>
     <button class="btn btn-soft" style="padding:5px 8px;font-size:10px" onclick="GitHubLoader.forceReload()">
-      URL險ｭ螳・    </button>
+      URL設定
+    </button>
   </div>
 
   <div id="recoveryNotice" class="notice hidden"></div>
@@ -505,25 +515,26 @@
   <div id="iosMotionBanner" class="card hidden row"
        style="background:#3b0764;border-color:#a855f7;justify-content:space-between">
     <div style="font-size:12px;color:#f3e8ff">
-      <strong>導 繝｢繝ｼ繧ｷ繝ｧ繝ｳ繧ｻ繝ｳ繧ｵ繝ｼ縺ｮ險ｱ蜿ｯ縺悟ｿ・ｦ√〒縺・/strong>
+      <strong>📱 モーションセンサーの許可が必要です</strong>
       <div style="font-size:11px;color:#d8b4fe">
-        蟇晁ｿ斐ｊ繝ｻ菴灘虚繧定ｨ倬鹸縺吶ｋ縺溘ａ縺ｫ險ｱ蜿ｯ縺励※縺上□縺輔＞縲・      </div>
+        寝返り・体動を記録するために許可してください。
+      </div>
     </div>
     <button class="btn btn-motion" style="padding:8px 12px"
             onclick="App.requestIosMotionPermission()">
-      險ｱ蜿ｯ
+      許可
     </button>
   </div>
 
   <div class="tabs">
-    <button id="tab-rec" class="tab active" onclick="App.switchTab('rec')">貂ｬ螳壹・繝｢繝九ち</button>
-    <button id="tab-clips" class="tab" onclick="App.switchTab('clips')">蛻・｡樣鹸髻ｳ荳隕ｧ</button>
-    <button id="tab-report" class="tab" onclick="App.switchTab('report')">逹｡逵繝ｬ繝昴・繝・/button>
+    <button id="tab-rec" class="tab active" onclick="App.switchTab('rec')">測定・モニタ</button>
+    <button id="tab-clips" class="tab" onclick="App.switchTab('clips')">分類録音一覧</button>
+    <button id="tab-report" class="tab" onclick="App.switchTab('report')">睡眠レポート</button>
   </div>
 
   <section id="panel-rec" class="col">
     <div class="card col" style="text-align:center;padding:22px 16px">
-      <div class="stat-k">邨碁℃譎る俣</div>
+      <div class="stat-k">経過時間</div>
       <div id="timerText"
            style="font-size:36px;font-weight:900;font-family:ui-monospace,monospace">
         00:00:00
@@ -531,16 +542,16 @@
 
       <div class="col" style="max-width:340px;margin:8px auto 0;width:100%;gap:4px">
         <div class="row" style="justify-content:space-between;font-size:11px;color:var(--muted)">
-          <span>蜈･蜉幃浹驥・ <b id="dbText" style="color:white">-- dB</b></span>
-          <span>蛻､螳・ <b id="liveClassText" style="color:#a5b4fc">蠕・ｩ滉ｸｭ</b></span>
+          <span>入力音量: <b id="dbText" style="color:white">-- dB</b></span>
+          <span>判定: <b id="liveClassText" style="color:#a5b4fc">待機中</b></span>
         </div>
         <div class="meter-bar"><div id="meterFill" class="meter-fill"></div></div>
       </div>
 
       <div class="col" style="max-width:340px;margin:8px auto 0;width:100%;gap:4px">
         <div class="row" style="justify-content:space-between;font-size:11px;color:var(--muted)">
-          <span>菴灘虚: <b id="motionText" style="color:var(--motion)">0.00 G</b></span>
-          <span>蝓ｺ貅夜浹: <b id="baseText">-- dB</b></span>
+          <span>体動: <b id="motionText" style="color:var(--motion)">0.00 G</b></span>
+          <span>基準音: <b id="baseText">-- dB</b></span>
         </div>
         <div class="meter-bar">
           <div id="meterMotionFill" class="meter-fill" style="background:var(--motion)"></div>
@@ -548,26 +559,32 @@
       </div>
 
       <div id="engineText" style="font-size:10px;color:var(--muted);margin-top:8px">
-        繧ｨ繝ｳ繧ｸ繝ｳ蠕・ｩ滉ｸｭ
+        エンジン待機中
       </div>
 
-      <div class="row" style="margin-top:14px;justify-content:center">
+      <div class="row" style="margin-top:14px;justify-content:center;flex-wrap:wrap">
         <button id="btnStart" class="btn btn-primary" style="flex:1;max-width:180px"
                 onclick="App.startTracking()">
-          逹｡逵貂ｬ螳壹ｒ髢句ｧ・        </button>
+          睡眠測定を開始
+        </button>
+        <button id="btnNight" class="btn btn-soft" style="flex:1;max-width:180px"
+                onclick="App.enterNightScreen()" disabled>
+          🌑 消灯モード
+        </button>
         <button id="btnStop" class="btn btn-danger" style="flex:1;max-width:180px"
                 onclick="App.stopTracking()" disabled>
-          貂ｬ螳夂ｵゆｺ・        </button>
+          測定終了
+        </button>
       </div>
     </div>
 
     <div class="stat-grid">
-      <div class="card stat-card"><div class="stat-k">亢 縺・・縺・/div><div id="count-snore" class="stat-val" style="color:var(--snore)">0</div></div>
-      <div class="card stat-card"><div class="stat-k">売 蟇晁ｿ斐ｊ</div><div id="count-roll" class="stat-val" style="color:var(--motion)">0</div></div>
-      <div class="card stat-card"><div class="stat-k">豫 豁ｯ縺弱＠繧・/div><div id="count-brux" class="stat-val" style="color:var(--brux)">0</div></div>
-      <div class="card stat-card"><div class="stat-k">離・・蟇晁ｨ</div><div id="count-talk" class="stat-val" style="color:var(--talk)">0</div></div>
-      <div class="card stat-card"><div class="stat-k">暢 縺翫↑繧・/div><div id="count-fart" class="stat-val" style="color:var(--fart)">0</div></div>
-      <div class="card stat-card"><div class="stat-k">笞・・辟｡蜻ｼ蜷ｸ逍代＞</div><div id="count-apnea" class="stat-val" style="color:#f43f5e">0</div></div>
+      <div class="card stat-card"><div class="stat-k">😴 いびき</div><div id="count-snore" class="stat-val" style="color:var(--snore)">0</div></div>
+      <div class="card stat-card"><div class="stat-k">🔄 寝返り</div><div id="count-roll" class="stat-val" style="color:var(--motion)">0</div></div>
+      <div class="card stat-card"><div class="stat-k">😬 歯ぎしり</div><div id="count-brux" class="stat-val" style="color:var(--brux)">0</div></div>
+      <div class="card stat-card"><div class="stat-k">🗣️ 寝言</div><div id="count-talk" class="stat-val" style="color:var(--talk)">0</div></div>
+      <div class="card stat-card"><div class="stat-k">💨 おなら</div><div id="count-fart" class="stat-val" style="color:var(--fart)">0</div></div>
+      <div class="card stat-card"><div class="stat-k">⚠️ 無呼吸疑い</div><div id="count-apnea" class="stat-val" style="color:#f43f5e">0</div></div>
     </div>
   </section>
 
@@ -575,29 +592,30 @@
     <div class="card col">
       <div class="row" style="justify-content:space-between;flex-wrap:wrap">
         <div>
-          <strong>讀懷・繧ｯ繝ｪ繝・・</strong>
-          <div style="font-size:11px;color:var(--muted)">蛻・｡樒ｵ先棡繧偵け繝ｪ繧｢縺ｪ蠅怜ｹ・鹸髻ｳ縺ｧ遒ｺ隱阪〒縺阪∪縺吶・/div>
+          <strong>検出クリップ</strong>
+          <div style="font-size:11px;color:var(--muted)">分類結果をクリアな増幅録音で確認できます。</div>
         </div>
         <button class="btn btn-soft" style="padding:6px 10px;font-size:11px"
                 onclick="App.clearClips()">
-          蜈ｨ豸亥悉
+          全消去
         </button>
       </div>
 
       <div class="filter-bar">
-        <button class="filter-btn active" onclick="App.filterCategory('all',this)">縺吶∋縺ｦ (<span id="fc-all">0</span>)</button>
-        <button class="filter-btn" onclick="App.filterCategory('snore',this)">縺・・縺・(<span id="fc-snore">0</span>)</button>
-        <button class="filter-btn" onclick="App.filterCategory('roll',this)">蟇晁ｿ斐ｊ (<span id="fc-roll">0</span>)</button>
-        <button class="filter-btn" onclick="App.filterCategory('bruxism',this)">豁ｯ縺弱＠繧・(<span id="fc-brux">0</span>)</button>
-        <button class="filter-btn" onclick="App.filterCategory('talk',this)">蟇晁ｨ (<span id="fc-talk">0</span>)</button>
-        <button class="filter-btn" onclick="App.filterCategory('fart',this)">縺翫↑繧・(<span id="fc-fart">0</span>)</button>
-        <button class="filter-btn" onclick="App.filterCategory('apnea',this)">辟｡蜻ｼ蜷ｸ逍代＞ (<span id="fc-apnea">0</span>)</button>
-        <button class="filter-btn" onclick="App.filterCategory('env',this)">迺ｰ蠅・浹 (<span id="fc-env">0</span>)</button>
+        <button class="filter-btn active" onclick="App.filterCategory('all',this)">すべて (<span id="fc-all">0</span>)</button>
+        <button class="filter-btn" onclick="App.filterCategory('snore',this)">いびき (<span id="fc-snore">0</span>)</button>
+        <button class="filter-btn" onclick="App.filterCategory('roll',this)">寝返り (<span id="fc-roll">0</span>)</button>
+        <button class="filter-btn" onclick="App.filterCategory('bruxism',this)">歯ぎしり (<span id="fc-brux">0</span>)</button>
+        <button class="filter-btn" onclick="App.filterCategory('talk',this)">寝言 (<span id="fc-talk">0</span>)</button>
+        <button class="filter-btn" onclick="App.filterCategory('fart',this)">おなら (<span id="fc-fart">0</span>)</button>
+        <button class="filter-btn" onclick="App.filterCategory('apnea',this)">無呼吸疑い (<span id="fc-apnea">0</span>)</button>
+        <button class="filter-btn" onclick="App.filterCategory('env',this)">環境音 (<span id="fc-env">0</span>)</button>
       </div>
 
       <div id="clipList" class="col">
         <div style="text-align:center;padding:30px;font-size:12px;color:var(--muted)">
-          骭ｲ髻ｳ繝・・繧ｿ縺ｯ縺ｾ縺縺ゅｊ縺ｾ縺帙ｓ縲・        </div>
+          録音データはまだありません。
+        </div>
       </div>
     </div>
   </section>
@@ -605,55 +623,55 @@
   <section id="panel-report" class="hidden col">
     <div class="card col">
       <div class="row" style="justify-content:space-between;flex-wrap:wrap">
-        <div><strong>謗ｨ螳夂擅逵繝ｬ繝昴・繝・/strong><div class="stat-k">髻ｳ螢ｰ繝ｻ蜻ｨ豕｢謨ｰ繝ｻ菴灘虚蜷梧悄謗ｨ螳・/div></div>
+        <div><strong>推定睡眠レポート</strong><div class="stat-k">音声・周波数・体動同期推定</div></div>
         <select id="reportSessionSelect" class="btn btn-soft" style="max-width:300px" onchange="App.renderSleepReport(this.value)"></select>
       </div>
       <div class="export-grid">
-        <button class="btn btn-primary" onclick="App.exportSessionLog(false)">霆ｽ驥上Ο繧ｰ蜃ｺ蜉・/button>
-        <button class="btn btn-soft" onclick="App.shareSessionLog(false)">霆ｽ驥上Ο繧ｰ蜈ｱ譛・/button>
-        <button id="btnFullExport" class="btn btn-primary" onclick="App.exportSessionLog(true)">螳悟・繝ｭ繧ｰZIP蜃ｺ蜉・/button>
-        <button id="btnFullShare" class="btn btn-soft" onclick="App.shareSessionLog(true)">螳悟・繝ｭ繧ｰZIP蜈ｱ譛・/button>
+        <button class="btn btn-primary" onclick="App.exportSessionLog(false)">軽量ログ出力</button>
+        <button class="btn btn-soft" onclick="App.shareSessionLog(false)">軽量ログ共有</button>
+        <button id="btnFullExport" class="btn btn-primary" onclick="App.exportSessionLog(true)">完全ログZIP出力</button>
+        <button id="btnFullShare" class="btn btn-soft" onclick="App.shareSessionLog(true)">完全ログZIP共有</button>
       </div>
-      <div id="reportEmpty" class="notice">菫晏ｭ俶ｸ医∩繝ｬ繝昴・繝医・縺ゅｊ縺ｾ縺帙ｓ縲ゆｸ九・繧ｰ繝ｩ繝輔・陦ｨ遉ｺ萓九〒縺吶よｸｬ螳夂ｵゆｺ・ｾ後∝ｮ滓ｸｬ繝・・繧ｿ縺ｫ閾ｪ蜍墓峩譁ｰ縺輔ｌ縺ｾ縺吶・/div>
+      <div id="reportEmpty" class="notice">保存済みレポートはありません。下のグラフは表示例です。測定終了後、実測データに自動更新されます。</div>
       <div id="reportContent" class="col">
-        <div class="report-section-title">投 逹｡逵縺ｮ雉ｪ縺ｨ隧穂ｾ｡陦ｨ</div>
+        <div class="report-section-title">📊 睡眠の質と評価表</div>
         <div class="quality-summary">
         <div class="row" style="justify-content:space-around;align-items:center;flex-wrap:wrap">
-          <div id="qualityRing" class="quality-ring"><div class="quality-ring-inner"><div id="qualityScore" style="font-size:28px">--</div><div class="stat-k">謗ｨ螳壼刀雉ｪ</div></div></div>
+          <div id="qualityRing" class="quality-ring"><div class="quality-ring-inner"><div id="qualityScore" style="font-size:28px">--</div><div class="stat-k">推定品質</div></div></div>
           <div><div id="qualityLabel" style="font-size:20px;font-weight:900">--</div><div id="qualityReason" class="stat-k" style="max-width:340px;margin-top:6px"></div></div>
         </div>
         </div>
-        <table class="evaluation-table" aria-label="逹｡逵蜩∬ｳｪ縺ｮ隧穂ｾ｡陦ｨ">
+        <table class="evaluation-table" aria-label="睡眠品質の評価表">
           <tbody>
-            <tr><td>逹｡逵譎る俣</td><td><span id="eDuration">--</span><div class="score-track"><div id="eDurationBar" class="score-fill" style="width:0%"></div></div></td></tr>
-            <tr><td>逹｡逵縺ｮ騾｣邯壽ｧ</td><td><span id="eContinuity">--</span><div class="score-track"><div id="eContinuityBar" class="score-fill" style="width:0%"></div></div></td></tr>
-            <tr><td>縺・・縺阪・蟆代↑縺・/td><td><span id="eSnore">--</span><div class="score-track"><div id="eSnoreBar" class="score-fill" style="width:0%"></div></div></td></tr>
-            <tr><td>蜻ｼ蜷ｸ縺ｮ螳牙ｮ壽ｧ</td><td><span id="eBreathing">--</span><div class="score-track"><div id="eBreathingBar" class="score-fill" style="width:0%"></div></div></td></tr>
-            <tr><td>菴灘虚縺ｮ蟆代↑縺・/td><td><span id="eMotion">--</span><div class="score-track"><div id="eMotionBar" class="score-fill" style="width:0%"></div></div></td></tr>
+            <tr><td>睡眠時間</td><td><span id="eDuration">--</span><div class="score-track"><div id="eDurationBar" class="score-fill" style="width:0%"></div></div></td></tr>
+            <tr><td>睡眠の連続性</td><td><span id="eContinuity">--</span><div class="score-track"><div id="eContinuityBar" class="score-fill" style="width:0%"></div></div></td></tr>
+            <tr><td>いびきの少なさ</td><td><span id="eSnore">--</span><div class="score-track"><div id="eSnoreBar" class="score-fill" style="width:0%"></div></div></td></tr>
+            <tr><td>呼吸の安定性</td><td><span id="eBreathing">--</span><div class="score-track"><div id="eBreathingBar" class="score-fill" style="width:0%"></div></div></td></tr>
+            <tr><td>体動の少なさ</td><td><span id="eMotion">--</span><div class="score-track"><div id="eMotionBar" class="score-fill" style="width:0%"></div></div></td></tr>
           </tbody>
         </table>
-        <div class="report-section-title">嫌 逹｡逵讒矩繝ｻ髻ｳ髻ｿ蜷梧悄繝励Ο繝輔ぃ繧､繝ｫ</div>
+        <div class="report-section-title">🌙 睡眠構造・音響同期プロファイル</div>
         <div id="sleepChart" class="sleep-chart"></div>
         <div class="legend-row">
-          <span><i class="legend-dot" style="background:#fb7185"></i>隕夐・</span>
-          <span><i class="legend-dot" style="background:#38bdf8"></i>豬・＞逹｡逵</span>
-          <span><i class="legend-dot" style="background:#6366f1"></i>荳ｭ蠎ｦ逹｡逵</span>
-          <span><i class="legend-dot" style="background:#a78bfa"></i>豺ｱ縺・擅逵</span>
-          <span><i class="legend-dot" style="background:#f59e0b"></i>縺・・縺埼浹蝨ｧ(dB)</span>
-          <span><i class="legend-dot" style="background:#f43f5e"></i>辟｡蜻ｼ蜷ｸ逍代＞(笞・・</span>
+          <span><i class="legend-dot" style="background:#fb7185"></i>覚醒</span>
+          <span><i class="legend-dot" style="background:#38bdf8"></i>浅い睡眠</span>
+          <span><i class="legend-dot" style="background:#6366f1"></i>中度睡眠</span>
+          <span><i class="legend-dot" style="background:#a78bfa"></i>深い睡眠</span>
+          <span><i class="legend-dot" style="background:#f59e0b"></i>いびき音圧(dB)</span>
+          <span><i class="legend-dot" style="background:#f43f5e"></i>無呼吸疑い(⚠️)</span>
         </div>
-        <div class="report-section-title">寥 逹｡逵隧ｳ邏ｰ</div>
+        <div class="report-section-title">🛌 睡眠詳細</div>
         <div class="report-grid">
-          <div class="report-tile"><div class="report-k">蟆ｱ蟇晢ｼ域ｸｬ螳夐幕蟋具ｼ・/div><div id="rStart" class="report-v">--:--</div></div>
-          <div class="report-tile"><div class="report-k">襍ｷ蠎奇ｼ域ｸｬ螳夂ｵゆｺ・ｼ・/div><div id="rEnd" class="report-v">--:--</div></div>
-          <div class="report-tile"><div class="report-k">繝吶ャ繝峨〒縺ｮ譎る俣</div><div id="rBed" class="report-v">--</div></div>
-          <div class="report-tile"><div class="report-k">謗ｨ螳夂擅逵譎る俣</div><div id="rSleep" class="report-v">--</div></div>
-          <div class="report-tile"><div class="report-k">謗ｨ螳壼・逵縺ｾ縺ｧ</div><div id="rLatency" class="report-v">--</div></div>
-          <div class="report-tile"><div class="report-k">謗ｨ螳壼ｮ牙ｮ夂擅逵</div><div id="rDeep" class="report-v">--</div></div>
-          <div class="report-tile"><div class="report-k">縺・・縺埼鹸髻ｳ</div><div id="rSnore" class="report-v">--蝗・/div></div>
-          <div class="report-tile"><div class="report-k">辟｡蜻ｼ蜷ｸ逍代＞</div><div id="rApnea" class="report-v">--蝗・/div></div>
+          <div class="report-tile"><div class="report-k">就寝（測定開始）</div><div id="rStart" class="report-v">--:--</div></div>
+          <div class="report-tile"><div class="report-k">起床（測定終了）</div><div id="rEnd" class="report-v">--:--</div></div>
+          <div class="report-tile"><div class="report-k">ベッドでの時間</div><div id="rBed" class="report-v">--</div></div>
+          <div class="report-tile"><div class="report-k">推定睡眠時間</div><div id="rSleep" class="report-v">--</div></div>
+          <div class="report-tile"><div class="report-k">推定入眠まで</div><div id="rLatency" class="report-v">--</div></div>
+          <div class="report-tile"><div class="report-k">推定安定睡眠</div><div id="rDeep" class="report-v">--</div></div>
+          <div class="report-tile"><div class="report-k">いびき録音</div><div id="rSnore" class="report-v">--回</div></div>
+          <div class="report-tile"><div class="report-k">無呼吸疑い</div><div id="rApnea" class="report-v">--回</div></div>
         </div>
-        <div class="quality-note">窶ｻ 逹｡逵迥ｶ諷九・蜩∬ｳｪ繝ｻ蜈･逵繝ｻ螳牙ｮ夂擅逵繝ｻ辟｡蜻ｼ蜷ｸ逍代＞縺ｯ縲∫ｫｯ譛ｫ縺ｮ繝槭う繧ｯ縺ｨ繝｢繝ｼ繧ｷ繝ｧ繝ｳ繧ｻ繝ｳ繧ｵ繝ｼ縺九ｉ邂怜・縺吶ｋ蜿り・耳螳壹〒縺吶ょ現逋よｩ溷勣縺ｫ繧医ｋ險ｺ譁ｭ縺ｧ縺ｯ縺ゅｊ縺ｾ縺帙ｓ縲・/div>
+        <div class="quality-note">※ 睡眠状態・品質・入眠・安定睡眠・無呼吸疑いは、端末のマイクとモーションセンサーから算出する参考推定です。医療機器による診断ではありません。</div>
       </div>
     </div>
   </section>
@@ -662,9 +680,11 @@
 <script>
   /*
    * SleepTracker Dynamic Remote Fetching
-   * 蝗ｺ螳壼・髢句・:
+   * 固定公開先:
    * https://matsuodentalassociation.github.io/sleep-tracker/
-   * GitHub縺ｮindex.html縺ｫ蟇ｾ縺吶ｋ譛譁ｰ繧ｳ繝溘ャ繝・HA繧呈ｯ主屓遒ｺ隱阪＠縲・   * 縺昴・SHA縺ｮHTML繧坦aw邨檎罰縺ｧ蜿門ｾ励＠縺ｦ驕ｩ逕ｨ縺励∪縺吶・   */
+   * GitHubのindex.htmlに対する最新コミットSHAを毎回確認し、
+   * そのSHAのHTMLをRaw経由で取得して適用します。
+   */
   const GitHubLoader = (() => {
     "use strict";
 
@@ -674,9 +694,9 @@
     const PATH = "index.html";
     const TIMEOUT_MS = 20000;
 
-    const CACHE_HTML_KEY = "ST_REMOTE_HTML_CACHE_V68NIGHT";
-    const CACHE_META_KEY = "ST_REMOTE_HTML_META_V68NIGHT";
-    const APPLIED_SHA_KEY = "ST_REMOTE_APPLIED_SHA_V68NIGHT";
+    const CACHE_HTML_KEY = "ST_REMOTE_HTML_CACHE_V69NIGHT";
+    const CACHE_META_KEY = "ST_REMOTE_HTML_META_V69NIGHT";
+    const APPLIED_SHA_KEY = "ST_REMOTE_APPLIED_SHA_V69NIGHT";
 
     function updateStatus(text, state = "idle") {
       const textEl = document.getElementById("ghStatusText");
@@ -740,14 +760,14 @@
     function validateHtml(html) {
       const source = String(html || "");
       const lower = source.toLowerCase();
-      if (source.length < 10000) throw new Error("蜿門ｾ幽TML縺檎洒縺吶℃縺ｾ縺・);
+      if (source.length < 10000) throw new Error("取得HTMLが短すぎます");
       if (!lower.includes("<!doctype html") || !lower.includes("</html>")) {
-        throw new Error("蜿門ｾ怜・螳ｹ縺悟ｮ梧・HTML縺ｧ縺ｯ縺ゅｊ縺ｾ縺帙ｓ");
+        throw new Error("取得内容が完成HTMLではありません");
       }
       if (!source.includes("SleepTracker") || !source.includes("const App")) {
-        throw new Error("SleepTracker譛ｬ菴薙ｒ遒ｺ隱阪〒縺阪∪縺帙ｓ");
+        throw new Error("SleepTracker本体を確認できません");
       }
-      if (lower.includes("404: not found")) throw new Error("GitHub荳翫↓index.html縺後≠繧翫∪縺帙ｓ");
+      if (lower.includes("404: not found")) throw new Error("GitHub上にindex.htmlがありません");
       return source;
     }
 
@@ -763,7 +783,7 @@
     async function latestCommit() {
       const commits = await fetchJson(commitApiUrl());
       if (!Array.isArray(commits) || !commits[0]?.sha) {
-        throw new Error("譛譁ｰ繧ｳ繝溘ャ繝医ｒ蜿門ｾ励〒縺阪∪縺帙ｓ");
+        throw new Error("最新コミットを取得できません");
       }
       return {
         sha:String(commits[0].sha),
@@ -786,6 +806,15 @@
     function currentAppliedSha() {
       try { return sessionStorage.getItem(APPLIED_SHA_KEY) || ""; }
       catch (error) { return ""; }
+    }
+
+    function currentDocumentSha() {
+      return document.querySelector('meta[name="st-applied-sha"]')?.content || "";
+    }
+
+    function stampHtml(html, sha) {
+      const marker = '<meta name="st-applied-sha" content="' + String(sha).replace(/["<>]/g, "") + '">';
+      return String(html).replace(/<head([^>]*)>/i, '<head$1>\n' + marker);
     }
 
     function markApplied(sha) {
@@ -819,22 +848,22 @@
 
     function replaceDocument(html, sha, label) {
       markApplied(sha);
-      updateStatus("GitHub譛譁ｰ迚医ｒ驕ｩ逕ｨ: " + label, "live");
+      updateStatus("GitHub最新版を適用: " + label, "live");
       document.open();
-      document.write(validateHtml(html));
+      document.write(stampHtml(validateHtml(html), sha));
       document.close();
     }
 
     async function directRawFallback() {
-      updateStatus("GitHub Raw縺九ｉ譛譁ｰ迚医ｒ遒ｺ隱堺ｸｭ...", "idle");
+      updateStatus("GitHub Rawから最新版を確認中...", "idle");
       const html = validateHtml(await fetchText(rawUrl(BRANCH)));
       const stamp = "raw-" + String(html.length) + "-" + simpleHash(html);
-      if (currentAppliedSha() === stamp) {
-        updateStatus("GitHub譛譁ｰ迚医〒襍ｷ蜍穂ｸｭ", "live");
+      if (currentDocumentSha() === stamp) {
+        updateStatus("GitHub最新版で起動中", "live");
         return {replaced:false, version:stamp};
       }
-      saveCache(html, {sha:stamp, shortSha:"Raw譛譁ｰ"});
-      replaceDocument(html, stamp, "Raw譛譁ｰ");
+      saveCache(html, {sha:stamp, shortSha:"Raw最新"});
+      replaceDocument(html, stamp, "Raw最新");
       return {replaced:true, version:stamp};
     }
 
@@ -849,15 +878,15 @@
 
     async function init() {
       try {
-        updateStatus("GitHub縺ｮ譛譁ｰ繧ｳ繝溘ャ繝医ｒ遒ｺ隱堺ｸｭ...", "idle");
+        updateStatus("GitHubの最新コミットを確認中...", "idle");
         const commit = await latestCommit();
 
-        if (currentAppliedSha() === commit.sha) {
-          updateStatus("V6.8 / GitHub譛譁ｰ迚・ " + commit.shortSha + formatCommitDate(commit.date), "live");
+        if (currentDocumentSha() === commit.sha) {
+          updateStatus("V6.9 / GitHub最新版: " + commit.shortSha + formatCommitDate(commit.date), "live");
           return {replaced:false, version:commit.sha};
         }
 
-        updateStatus("譛譁ｰ迚・" + commit.shortSha + " 繧貞叙蠕嶺ｸｭ...", "idle");
+        updateStatus("最新版 " + commit.shortSha + " を取得中...", "idle");
         const html = validateHtml(await fetchText(rawUrl(commit.sha)));
         saveCache(html, commit);
         replaceDocument(html, commit.sha, commit.shortSha);
@@ -870,14 +899,14 @@
           console.warn("[DynamicFetch Raw]", rawError);
           const cached = loadCache();
           if (cached) {
-            if (currentAppliedSha() === cached.meta.sha) {
-              updateStatus("繧ｪ繝輔Λ繧､繝ｳ・壻ｿ晏ｭ俶ｸ医∩迚医〒襍ｷ蜍・, "cache");
+            if (currentDocumentSha() === cached.meta.sha) {
+              updateStatus("オフライン：保存済み版で起動", "cache");
               return {replaced:false, cached:true};
             }
-            replaceDocument(cached.html, cached.meta.sha, "菫晏ｭ俶ｸ医∩迚・);
+            replaceDocument(cached.html, cached.meta.sha, "保存済み版");
             return {replaced:true, cached:true};
           }
-          updateStatus("GitHub謗･邯壼､ｱ謨暦ｼ壼・阡ｵ迚医〒襍ｷ蜍・, "error");
+          updateStatus("GitHub接続失敗：内蔵版で起動", "error");
           return {replaced:false, offline:true};
         }
       }
@@ -885,18 +914,20 @@
 
     function forceReload() {
       const message = [
-        "GitHub縺ｮ譛譁ｰ迚医ｒ蜀咲｢ｺ隱阪＠縺ｾ縺吶・,
+        "GitHubの最新版を再確認します。",
         "",
-        "繝ｪ繝昴ず繝医Μ: " + OWNER + "/" + REPO,
-        "繝悶Λ繝ｳ繝・ " + BRANCH,
-        "繝輔ぃ繧､繝ｫ: " + PATH,
+        "リポジトリ: " + OWNER + "/" + REPO,
+        "ブランチ: " + BRANCH,
+        "ファイル: " + PATH,
         "",
-        "貂ｬ螳壻ｸｭ縺ｯ螳溯｡後＠縺ｪ縺・〒縺上□縺輔＞縲らｶ夊｡後＠縺ｾ縺吶°・・
+        "測定中は実行しないでください。続行しますか？"
       ].join("\n");
       if (!confirm(message)) return;
       try { sessionStorage.removeItem(APPLIED_SHA_KEY); }
       catch (error) {}
-      location.reload();
+      const url = new URL(location.href);
+      url.searchParams.set("st_update", Date.now().toString());
+      location.replace(url.toString());
     }
 
     return {init, forceReload};
@@ -975,14 +1006,18 @@
     let profileAccumulator = null;
     let lastProfileFlushMs = 0;
 
-    // V6.8 NIGHT SCREEN・郁｡ｨ遉ｺ蛻ｶ蠕｡縺ｮ縺ｿ・・    const NIGHT_AUTO_DELAY_MS = 5000;
+    // V6.9 NIGHT SCREEN（表示制御のみ）
+    const NIGHT_AUTO_DELAY_MS = 5000;
     const NIGHT_PEEK_MS = 5000;
-    const NIGHT_HOLD_MS = 2000;
+    const NIGHT_HOLD_MS = 3000;
     let nightAutoTimer = null;
     let nightPeekTimer = null;
     let nightHoldTimer = null;
     let nightModeActive = false;
     let nightHoldCompleted = false;
+    let nightPointerId = null;
+    let nightPointerStartX = 0;
+    let nightPointerStartY = 0;
 
     const counts = {
       snore:0,
@@ -1043,8 +1078,8 @@
         const track = stream?.getAudioTracks?.()[0];
         const healthy = isTracking && !stopRequested && track?.readyState === "live";
         state.textContent = healthy
-          ? "髻ｳ螢ｰ繝ｻ菴灘虚繧ｨ繝ｳ繧ｸ繝ｳ豁｣蟶ｸ遞ｼ蜒堺ｸｭ"
-          : "貂ｬ螳夂憾諷九ｒ遒ｺ隱堺ｸｭ";
+          ? "音声・体動エンジン正常稼働中"
+          : "測定状態を確認中";
       }
     }
 
@@ -1085,12 +1120,11 @@
       nightModeActive = false;
       nightHoldCompleted = false;
       const screen = document.getElementById("nightScreen");
-      const stopButton = document.getElementById("nightStopButton");
       if (screen) {
-        screen.classList.remove("active", "peek");
+        screen.classList.remove("active", "peek", "holding");
         screen.setAttribute("aria-hidden", "true");
       }
-      if (stopButton) stopButton.classList.remove("holding");
+      nightPointerId = null;
       document.body.classList.remove("night-screen-active");
       const theme = document.querySelector('meta[name="theme-color"]');
       if (theme) theme.setAttribute("content", "#090d16");
@@ -1101,55 +1135,64 @@
       nightAutoTimer = setTimeout(enterNightScreen, NIGHT_AUTO_DELAY_MS);
     }
 
-    function cancelNightHold() {
+    function cancelNightHold(showPeekAfterCancel = false) {
       clearTimeout(nightHoldTimer);
       nightHoldTimer = null;
-      if (!nightHoldCompleted) {
-        document.getElementById("nightStopButton")?.classList.remove("holding");
-      }
+      const screen = document.getElementById("nightScreen");
+      screen?.classList.remove("holding");
+      nightPointerId = null;
+      if (showPeekAfterCancel && !nightHoldCompleted) showNightPeek();
+      nightHoldCompleted = false;
     }
 
     function beginNightHold(event) {
-      if (!nightModeActive || !isTracking || stopRequested) return;
+      if (!nightModeActive || !isTracking || stopRequested || event.button > 0) return;
       event.preventDefault();
-      event.stopPropagation();
       nightHoldCompleted = false;
+      nightPointerId = event.pointerId;
+      nightPointerStartX = event.clientX;
+      nightPointerStartY = event.clientY;
+      const screen = document.getElementById("nightScreen");
+      clearTimeout(nightPeekTimer);
+      screen?.classList.remove("peek", "holding");
+      void screen?.offsetWidth;
+      screen?.classList.add("holding");
+      try { screen?.setPointerCapture(event.pointerId); } catch (error) {}
       clearTimeout(nightHoldTimer);
-      const button = document.getElementById("nightStopButton");
-      button?.classList.remove("holding");
-      void button?.offsetWidth;
-      button?.classList.add("holding");
-      nightHoldTimer = setTimeout(async () => {
+      nightHoldTimer = setTimeout(() => {
         nightHoldTimer = null;
         nightHoldCompleted = true;
-        button?.classList.remove("holding");
-        if (!isTracking || stopRequested) return;
-        const approved = confirm("逹｡逵貂ｬ螳壹ｒ邨ゆｺ・＠縺ｾ縺吶°・・);
-        if (approved) {
-          exitNightScreen();
-          await stopTracking();
-        } else {
-          nightHoldCompleted = false;
-          enterNightScreen();
-        }
+        screen?.classList.remove("holding");
+        if (!isTracking || stopRequested || !nightModeActive) return;
+        exitNightScreen();
+        toast("通常画面に戻りました。測定は継続中です");
       }, NIGHT_HOLD_MS);
+    }
+
+    function moveNightHold(event) {
+      if (nightPointerId !== event.pointerId || !nightHoldTimer) return;
+      const distance = Math.hypot(
+        event.clientX - nightPointerStartX,
+        event.clientY - nightPointerStartY
+      );
+      if (distance > 28) cancelNightHold(false);
+    }
+
+    function endNightHold(event) {
+      if (nightPointerId !== null && event.pointerId !== nightPointerId) return;
+      const completed = nightHoldCompleted;
+      cancelNightHold(!completed);
     }
 
     function bindNightScreenControls() {
       const screen = document.getElementById("nightScreen");
-      const button = document.getElementById("nightStopButton");
-      if (!screen || !button || screen.dataset.bound === "1") return;
+      if (!screen || screen.dataset.bound === "1") return;
       screen.dataset.bound = "1";
-
-      screen.addEventListener("pointerdown", event => {
-        if (event.target === button || button.contains(event.target)) return;
-        showNightPeek();
-      });
-      button.addEventListener("pointerdown", beginNightHold);
-      button.addEventListener("pointerup", cancelNightHold);
-      button.addEventListener("pointercancel", cancelNightHold);
-      button.addEventListener("pointerleave", cancelNightHold);
-      button.addEventListener("contextmenu", event => event.preventDefault());
+      screen.addEventListener("pointerdown", beginNightHold);
+      screen.addEventListener("pointermove", moveNightHold);
+      screen.addEventListener("pointerup", endNightHold);
+      screen.addEventListener("pointercancel", () => cancelNightHold(false));
+      screen.addEventListener("contextmenu", event => event.preventDefault());
     }
 
     function initDB() {
@@ -1268,7 +1311,7 @@
         const notice = document.getElementById("recoveryNotice");
         if (notice) {
           notice.textContent =
-            "蜑榊屓縺ｮ貂ｬ螳壹・豁｣蟶ｸ邨ゆｺ・＠縺ｦ縺・↑縺・庄閭ｽ諤ｧ縺後≠繧翫∪縺吶よ怙邨りｨ倬鹸譎らせ: 髢句ｧ九°繧・" +
+            "前回の測定は正常終了していない可能性があります。最終記録時点: 開始から " +
             formatHMS(duration);
           notice.classList.remove("hidden");
         }
@@ -1330,16 +1373,16 @@
       try {
         const result = await DeviceMotionEvent.requestPermission();
         if (result !== "granted") {
-          toast("繝｢繝ｼ繧ｷ繝ｧ繝ｳ繧ｻ繝ｳ繧ｵ繝ｼ縺瑚ｨｱ蜿ｯ縺輔ｌ縺ｾ縺帙ｓ縺ｧ縺励◆");
+          toast("モーションセンサーが許可されませんでした");
           return false;
         }
         motionPermissionGranted = true;
         bindMotionListener();
         document.getElementById("iosMotionBanner")?.classList.add("hidden");
-        toast("繝｢繝ｼ繧ｷ繝ｧ繝ｳ繧ｻ繝ｳ繧ｵ繝ｼ繧定ｨｱ蜿ｯ縺励∪縺励◆");
+        toast("モーションセンサーを許可しました");
         return true;
       } catch (error) {
-        toast("繧ｻ繝ｳ繧ｵ繝ｼ隱崎ｨｼ繧ｨ繝ｩ繝ｼ: " + error.message);
+        toast("センサー認証エラー: " + error.message);
         return false;
       }
     }
@@ -1409,13 +1452,13 @@
 
       if (stopRequested) {
         newStream.getTracks().forEach(track => track.stop());
-        throw new Error("貂ｬ螳夂ｵゆｺ・・逅・ｸｭ");
+        throw new Error("測定終了処理中");
       }
 
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextClass) {
         newStream.getTracks().forEach(track => track.stop());
-        throw new Error("AudioContext髱槫ｯｾ蠢・);
+        throw new Error("AudioContext非対応");
       }
 
       if (!audioCtx || audioCtx.state === "closed") {
@@ -1437,7 +1480,7 @@
       stream = newStream;
       sourceNode = audioCtx.createMediaStreamSource(stream);
 
-      // 笘・髻ｳ螢ｰ蠅怜ｹ・ご繧､繝ｳ・・.8蛟搾ｼ峨→髻ｳ蜑ｲ繧碁亟豁｢繝ｪ繝溘ャ繧ｿ繝ｼ
+      // ★ 音声増幅ゲイン（2.8倍）と音割れ防止リミッター
       gainNode = audioCtx.createGain();
       gainNode.gain.setValueAtTime(2.8, audioCtx.currentTime);
 
@@ -1465,7 +1508,7 @@
       stream.getAudioTracks().forEach(track => {
         track.addEventListener("ended", () => {
           if (isTracking && !stopRequested) {
-            recoverAudioPipeline("繝槭う繧ｯ謗･邯壹′邨ゆｺ・＠縺ｾ縺励◆");
+            recoverAudioPipeline("マイク接続が終了しました");
           }
         });
       });
@@ -1474,14 +1517,14 @@
     async function recoverAudioPipeline(reason) {
       if (!isTracking || stopRequested || isRecoveringAudio) return;
       isRecoveringAudio = true;
-      setEngineText("髻ｳ螢ｰ繧ｨ繝ｳ繧ｸ繝ｳ繧貞ｾｩ譌ｧ荳ｭ...", "var(--warn)");
+      setEngineText("音声エンジンを復旧中...", "var(--warn)");
 
       try {
         await createAudioPipeline();
-        setEngineText("髻ｳ螢ｰ繧ｨ繝ｳ繧ｸ繝ｳ蠕ｩ譌ｧ螳御ｺ・, "var(--success)");
-        toast("髻ｳ螢ｰ逶｣隕悶ｒ閾ｪ蜍募ｾｩ譌ｧ縺励∪縺励◆");
+        setEngineText("音声エンジン復旧完了", "var(--success)");
+        toast("音声監視を自動復旧しました");
       } catch (error) {
-        setEngineText("髻ｳ螢ｰ蠕ｩ譌ｧ螟ｱ謨励ら判髱｢繧帝幕縺・※蜀肴ｸｬ螳壹＠縺ｦ縺上□縺輔＞", "var(--danger)");
+        setEngineText("音声復旧失敗。画面を開いて再測定してください", "var(--danger)");
         console.warn("[AudioRecovery]", reason, error);
       } finally {
         isRecoveringAudio = false;
@@ -1538,7 +1581,7 @@
       const breathingLow = spectrum.subLowRatio + spectrum.lowRatio;
 
       if (motionG >= 0.12) {
-        return classResult("roll", "売 蟇晁ｿ斐ｊ繝ｻ菴灘虚", "tag-roll", "菴灘虚 " + motionG.toFixed(2) + "G");
+        return classResult("roll", "🔄 寝返り・体動", "tag-roll", "体動 " + motionG.toFixed(2) + "G");
       }
 
       if (deltaDb < 5) return null;
@@ -1548,8 +1591,8 @@
         spectrum.subLowRatio >= 0.20 ||
         (spectrum.centroid >= 120 && spectrum.centroid <= 950 && breathingLow >= 0.27)
       ) {
-        return classResult("snore", "亢 縺・・縺・, "tag-snore",
-          "蜻ｼ蜷ｸ菴主沺 " + Math.round(breathingLow * 100) + "% / 驥榊ｿ・" + spectrum.centroid + "Hz");
+        return classResult("snore", "😴 いびき", "tag-snore",
+          "呼吸低域 " + Math.round(breathingLow * 100) + "% / 重心 " + spectrum.centroid + "Hz");
       }
 
       if (
@@ -1559,8 +1602,8 @@
         breathingLow < 0.24 &&
         spectrum.subLowRatio < 0.10
       ) {
-        return classResult("bruxism", "豫 豁ｯ縺弱＠繧翫・遑ｬ髻ｳ", "tag-brux",
-          "鬮伜沺 " + Math.round(spectrum.highRatio * 100) + "% / 驥榊ｿ・" + spectrum.centroid + "Hz");
+        return classResult("bruxism", "😬 歯ぎしり・硬音", "tag-brux",
+          "高域 " + Math.round(spectrum.highRatio * 100) + "% / 重心 " + spectrum.centroid + "Hz");
       }
 
       if (
@@ -1569,8 +1612,8 @@
         spectrum.centroid <= 2100 &&
         breathingLow < 0.34
       ) {
-        return classResult("talk", "離・・蟇晁ｨ", "tag-talk",
-          "髻ｳ螢ｰ荳ｭ蝓・" + Math.round(spectrum.midRatio * 100) + "% / 驥榊ｿ・" + spectrum.centroid + "Hz");
+        return classResult("talk", "🗣️ 寝言", "tag-talk",
+          "音声中域 " + Math.round(spectrum.midRatio * 100) + "% / 重心 " + spectrum.centroid + "Hz");
       }
 
       if (
@@ -1578,10 +1621,10 @@
         spectrum.centroid < 180 &&
         deltaDb >= 8
       ) {
-        return classResult("fart", "暢 縺翫↑繧・, "tag-fart", "讌ｵ菴主沺 " + Math.round(spectrum.subLowRatio * 100) + "%");
+        return classResult("fart", "💨 おなら", "tag-fart", "極低域 " + Math.round(spectrum.subLowRatio * 100) + "%");
       }
 
-      return classResult("env", "寥 迺ｰ蠅・浹", "tag-env", "譌｢遏･蛻・｡槭・迚ｹ蠕ｴ荳崎ｶｳ / 驥榊ｿ・" + spectrum.centroid + "Hz");
+      return classResult("env", "🛌 環境音", "tag-env", "既知分類の特徴不足 / 重心 " + spectrum.centroid + "Hz");
     }
 
     function addClipVote(result) {
@@ -1606,19 +1649,19 @@
       else if (score("snore") >= 1) category = "snore";
 
       const defs = {
-        snore:["亢 縺・・縺・, "tag-snore"],
-        roll:["売 蟇晁ｿ斐ｊ繝ｻ菴灘虚", "tag-roll"],
-        bruxism:["豫 豁ｯ縺弱＠繧翫・遑ｬ髻ｳ", "tag-brux"],
-        talk:["離・・蟇晁ｨ", "tag-talk"],
-        fart:["暢 縺翫↑繧・, "tag-fart"],
-        apnea:["笞・・辟｡蜻ｼ蜷ｸ逍代＞", "tag-snore"],
-        env:["寥 迺ｰ蠅・浹", "tag-env"]
+        snore:["😴 いびき", "tag-snore"],
+        roll:["🔄 寝返り・体動", "tag-roll"],
+        bruxism:["😬 歯ぎしり・硬音", "tag-brux"],
+        talk:["🗣️ 寝言", "tag-talk"],
+        fart:["💨 おなら", "tag-fart"],
+        apnea:["⚠️ 無呼吸疑い", "tag-snore"],
+        env:["🛌 環境音", "tag-env"]
       };
       meta.category = category;
       meta.label = defs[category][0];
       meta.tagClass = defs[category][1];
       meta.reason = (meta.reasons && meta.reasons[category]) ||
-        "10遘呈兜逾ｨ snore:" + score("snore") + " brux:" + score("bruxism") + " env:" + score("env");
+        "10秒投票 snore:" + score("snore") + " brux:" + score("bruxism") + " env:" + score("env");
       meta.voteSummary = Object.entries(votes).map(([k,v]) => k + ":" + v).join(" / ");
       return meta;
     }
@@ -1675,7 +1718,7 @@
         forceCategory:result.category === "apnea" ? "apnea" : "",
         waveformDb:[],
         votes:{ [result.category]:1 },
-        reasons:{ [result.category]:result.reason || "蛻晄悄蛻､螳・ },
+        reasons:{ [result.category]:result.reason || "初期判定" },
         reason:result.reason || ""
       };
 
@@ -1721,7 +1764,7 @@
               counts[meta.category] = (counts[meta.category] || 0) + 1;
               updateCountUI();
             } else {
-              toast("骭ｲ髻ｳ菫晏ｭ倥↓螟ｱ謨励＠縺ｾ縺励◆縲ら屮隕悶・邯咏ｶ壹＠縺ｾ縺・);
+              toast("録音保存に失敗しました。監視は継続します");
             }
           }
 
@@ -1873,7 +1916,7 @@
 
       function saveSessionHistory(items) {
         try { localStorage.setItem(SESSION_HISTORY_KEY, JSON.stringify(items.slice(0, 60))); return true; }
-        catch (error) { toast("繝ｬ繝昴・繝井ｿ晏ｭ伜ｮｹ驥上′荳崎ｶｳ縺励※縺・∪縺・); return false; }
+        catch (error) { toast("レポート保存容量が不足しています"); return false; }
       }
 
       function qualityFromSession(session) {
@@ -1892,7 +1935,7 @@
         const score = Math.round(durationPct * .25 + continuityPct * .25 + snorePct * .18 + breathingPct * .17 + motionPct * .15);
         return {
           score, awakeSec, stableSec, durationPct, continuityPct, snorePct, breathingPct, motionPct,
-          label:score>=85?"濶ｯ螂ｽ":score>=70?"豈碑ｼ・噪濶ｯ螂ｽ":score>=50?"繧・ｄ荳榊ｮ牙ｮ・:"隕∫｢ｺ隱・
+          label:score>=85?"良好":score>=70?"比較的良好":score>=50?"やや不安定":"要確認"
         };
       }
 
@@ -1921,7 +1964,7 @@
       function formatDurationJP(sec) {
         sec = Math.max(0, Math.round(sec || 0));
         const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
-        return h ? h + "譎る俣" + m + "蛻・ : m + "蛻・;
+        return h ? h + "時間" + m + "分" : m + "分";
       }
 
       function loadReportSessions() {
@@ -1930,7 +1973,7 @@
         const sessions = loadSessionHistory();
         select.textContent = "";
         if (!sessions.length) {
-          const op = document.createElement("option"); op.textContent = "菫晏ｭ俶ｸ医∩繝ｬ繝昴・繝医↑縺・; op.value = ""; select.appendChild(op);
+          const op = document.createElement("option"); op.textContent = "保存済みレポートなし"; op.value = ""; select.appendChild(op);
           document.getElementById("reportEmpty")?.classList.remove("hidden");
           document.getElementById("reportContent")?.classList.remove("hidden");
           resetEmptySleepReport();
@@ -1938,7 +1981,7 @@
         }
         sessions.forEach(s => {
           const op = document.createElement("option"); op.value = s.id;
-          op.textContent = s.dateStr + " " + s.startTime + "縲・ + s.endTime;
+          op.textContent = s.dateStr + " " + s.startTime + "〜" + s.endTime;
           select.appendChild(op);
         });
         renderSleepReport(select.value);
@@ -1948,10 +1991,10 @@
         const ring = document.getElementById("qualityRing");
         if (ring) ring.style.background = "conic-gradient(#334155 0deg,#263247 0deg)";
         const values = {
-          qualityScore:"--", qualityLabel:"譛ｪ貂ｬ螳・,
-          qualityReason:"貂ｬ螳夂ｵゆｺ・ｾ後・浹螢ｰ繝ｻ菴灘虚縺ｮ30遘貞腰菴阪ョ繝ｼ繧ｿ縺九ｉ逹｡逵蜩∬ｳｪ繧呈耳螳壹＠縺ｾ縺吶・,
+          qualityScore:"--", qualityLabel:"未測定",
+          qualityReason:"測定終了後、音声・体動の30秒単位データから睡眠品質を推定します。",
           rStart:"--:--", rEnd:"--:--", rBed:"--", rSleep:"--",
-          rLatency:"--", rDeep:"--", rSnore:"--蝗・, rApnea:"--蝗・
+          rLatency:"--", rDeep:"--", rSnore:"--回", rApnea:"--回"
         };
         Object.entries(values).forEach(([id,value]) => {
           const el = document.getElementById(id);
@@ -1960,7 +2003,7 @@
         ["Duration","Continuity","Snore","Breathing","Motion"].forEach(key => {
           const label = document.getElementById("e" + key);
           const bar = document.getElementById("e" + key + "Bar");
-          if (label) label.textContent = "譛ｪ貂ｬ螳・;
+          if (label) label.textContent = "未測定";
           if (bar) bar.style.width = "0%";
         });
         drawEmptySleepChart();
@@ -1971,7 +2014,7 @@
         if (!wrap) return;
         const w=900,h=270,left=55,right=18,top=18,bottom=38,pw=w-left-right;
         const ys=[35,85,135,185];
-        const labels=["隕夐・","豬・＞","荳ｭ蠎ｦ","豺ｱ縺・];
+        const labels=["覚醒","浅い","中度","深い"];
         let grid="";
         ys.forEach((y,i) => {
           grid += `<line x1="${left}" y1="${y}" x2="${w-right}" y2="${y}" stroke="#1e293b"/>` +
@@ -1984,8 +2027,8 @@
         }
         wrap.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" height="100%" preserveAspectRatio="none">
           ${grid}
-          <text x="${w/2}" y="${h/2-6}" text-anchor="middle" fill="#e2e8f0" font-size="16" font-weight="700">逹｡逵謗ｨ遘ｻ繝ｻ髻ｳ髻ｿ繧ｰ繝ｩ繝・/text>
-          <text x="${w/2}" y="${h/2+17}" text-anchor="middle" fill="#94a3b8" font-size="12">貂ｬ螳夂ｵゆｺ・ｾ後∝ｮ滓ｸｬ繝・・繧ｿ繧定｡ｨ遉ｺ縺励∪縺・/text>
+          <text x="${w/2}" y="${h/2-6}" text-anchor="middle" fill="#e2e8f0" font-size="16" font-weight="700">睡眠推移・音響グラフ</text>
+          <text x="${w/2}" y="${h/2+17}" text-anchor="middle" fill="#94a3b8" font-size="12">測定終了後、実測データを表示します</text>
         </svg>`;
       }
 
@@ -2000,7 +2043,7 @@
         ring.style.background = `conic-gradient(${q.score>=70?"var(--success)":"var(--warn)"} ${q.score*3.6}deg,#263247 0deg)`;
         document.getElementById("qualityScore").textContent = q.score;
         document.getElementById("qualityLabel").textContent = q.label;
-        document.getElementById("qualityReason").textContent = "貂ｬ螳壽凾髢薙・騾｣邯壽ｧ繝ｻ縺・・縺阪・蜻ｼ蜷ｸ繝ｻ菴灘虚縺ｮ5鬆・岼縺九ｉ邂怜・縺励◆蜿り・ｩ穂ｾ｡縺ｧ縺吶・;
+        document.getElementById("qualityReason").textContent = "測定時間・連続性・いびき・呼吸・体動の5項目から算出した参考評価です。";
         const evaluations = [
           ["eDuration", "eDurationBar", q.durationPct],
           ["eContinuity", "eContinuityBar", q.continuityPct],
@@ -2011,7 +2054,7 @@
         evaluations.forEach(([textId, barId, value]) => {
           const text = document.getElementById(textId);
           const bar = document.getElementById(barId);
-          if (text) text.textContent = value + "轤ｹ";
+          if (text) text.textContent = value + "点";
           if (bar) bar.style.width = value + "%";
         });
         const bins = s.profileBins || [];
@@ -2024,23 +2067,24 @@
         document.getElementById("rSleep").textContent = formatDurationJP(sleepSec);
         document.getElementById("rLatency").textContent = formatDurationJP(latency);
         document.getElementById("rDeep").textContent = formatDurationJP(q.stableSec);
-        document.getElementById("rSnore").textContent = (s.counts?.snore || 0) + "蝗・/ " + formatDurationJP(s.snoreDurationSec || 0);
-        document.getElementById("rApnea").textContent = (s.counts?.apnea || 0) + "蝗・;
+        document.getElementById("rSnore").textContent = (s.counts?.snore || 0) + "回 / " + formatDurationJP(s.snoreDurationSec || 0);
+        document.getElementById("rApnea").textContent = (s.counts?.apnea || 0) + "回";
         drawSleepChart(s);
       }
 
       function drawSleepChart(session) {
         const wrap = document.getElementById("sleepChart");
         const bins = session.profileBins || [];
-        if (!bins.length) { wrap.innerHTML = '<div class="notice" style="margin:20px">繧ｰ繝ｩ繝慕畑繝・・繧ｿ縺後≠繧翫∪縺帙ｓ縲・/div>'; return; }
+        if (!bins.length) { wrap.innerHTML = '<div class="notice" style="margin:20px">グラフ用データがありません。</div>'; return; }
         const w=900,h=270,left=50,right=20,top=20,bottom=38, pw=w-left-right, ph=h-top-bottom;
         const total=Math.max(1,session.durationSec);
-        const ys=[28,74,120,168]; // 隕夐・, 豬・＞, 荳ｭ蠎ｦ, 豺ｱ縺・        const colors=["#fb7185","#38bdf8","#6366f1","#a78bfa"];
+        const ys=[28,74,120,168]; // 覚醒, 浅い, 中度, 深い
+        const colors=["#fb7185","#38bdf8","#6366f1","#a78bfa"];
 
         let grid="";
         for(let i=0;i<4;i++) {
           grid += `<line x1="${left}" y1="${ys[i]}" x2="${w-right}" y2="${ys[i]}" stroke="#1e293b" stroke-dasharray="2,2"/>` +
-                  `<text x="6" y="${ys[i]+4}" fill="#94a3b8" font-size="10">${["隕夐・","豬・＞","荳ｭ蠎ｦ","豺ｱ縺・][i]}</text>`;
+                  `<text x="6" y="${ys[i]+4}" fill="#94a3b8" font-size="10">${["覚醒","浅い","中度","深い"][i]}</text>`;
         }
 
         let marks="";
@@ -2051,29 +2095,32 @@
                    `<text x="${x-10}" y="${h-12}" fill="#94a3b8" font-size="10">${i}h</text>`; 
         }
 
-        // 逹｡逵繧ｹ繝・・繧ｸ縺ｮ繝昴Μ繝ｩ繧､繝ｳ
+        // 睡眠ステージのポリライン
         const stagePoints = bins.map(b => {
           const cx = left + Math.min(1, (b.startSec + b.durationSec/2)/total) * pw;
           return `${cx},${ys[b.state]}`;
         }).join(" ");
 
-        // 縺・・縺阪・辟｡蜻ｼ蜷ｸ繧ｪ繝ｼ繝舌・繝ｬ繧､
+        // いびき・無呼吸オーバーレイ
         let eventElements = "";
         bins.forEach(b => {
           const cx = left + Math.min(1, (b.startSec + b.durationSec/2)/total) * pw;
-          // 縺・・縺埼浹蝨ｧ繝励Ο繝・ヨ・医が繝ｬ繝ｳ繧ｸ蜀・ｼ・          if (b.snoreRatio > 0 && b.maxDb) {
+          // いびき音圧プロット（オレンジ円）
+          if (b.snoreRatio > 0 && b.maxDb) {
             const snoreY = h - bottom - Math.min(60, Math.max(10, (b.maxDb - 20) * 1.5));
             const r = Math.min(7, Math.max(2.5, b.snoreRatio * 6));
             eventElements += `<circle cx="${cx}" cy="${snoreY}" r="${r}" fill="#f59e0b" opacity="0.8"/>`;
           }
-          // 辟｡蜻ｼ蜷ｸ逍代＞繝槭・繧ｫ繝ｼ・遺國・上・襍､濶ｲ笨包ｼ・          if (b.apneaCount > 0) {
+          // 無呼吸疑いマーカー（⚠️・赤色✕）
+          if (b.apneaCount > 0) {
             eventElements += `<line x1="${cx-5}" y1="${ys[1]-5}" x2="${cx+5}" y2="${ys[1]+5}" stroke="#f43f5e" stroke-width="2.5"/>` +
                              `<line x1="${cx+5}" y1="${ys[1]-5}" x2="${cx-5}" y2="${ys[1]+5}" stroke="#f43f5e" stroke-width="2.5"/>` +
                              `<circle cx="${cx}" cy="${ys[1]}" r="8" fill="none" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="2,2"/>`;
           }
         });
 
-        // 逹｡逵繧ｹ繝・・繧ｸ縺ｮ繝峨ャ繝・        const stageDots = bins.map(b => {
+        // 睡眠ステージのドット
+        const stageDots = bins.map(b => {
           const cx = left + Math.min(1, (b.startSec + b.durationSec/2)/total) * pw;
           return `<circle cx="${cx}" cy="${ys[b.state]}" r="3" fill="${colors[b.state]}"/>`;
         }).join("");
@@ -2093,9 +2140,9 @@
       }
 
       const APP_BUILD = Object.freeze({
-        version:"6.8",
-        build:"2026-09-18-night-screen",
-        feature:"MEMORY_SAFE_FULL_LOG_NIGHT_SCREEN"
+        version:"6.9",
+        build:"2026-09-18-night-screen-fixed",
+        feature:"MEMORY_SAFE_FULL_LOG_NIGHT_SCREEN_FIXED"
       });
 
       let exportBusy = false;
@@ -2108,8 +2155,8 @@
         if (button) {
           button.disabled = exportBusy;
           button.textContent = exportBusy
-            ? (message || "螳悟・繝ｭ繧ｰ菴懈・荳ｭ") + " " + safeDone + "/" + safeTotal
-            : "螳悟・繝ｭ繧ｰZIP蜃ｺ蜉・;
+            ? (message || "完全ログ作成中") + " " + safeDone + "/" + safeTotal
+            : "完全ログZIP出力";
         }
         if (shareButton) shareButton.disabled = exportBusy;
       }
@@ -2233,7 +2280,7 @@
       }
 
       async function createStoredZip(entries, progress) {
-        if (entries.length > 65535) throw new Error("ZIP繝輔ぃ繧､繝ｫ謨ｰ縺ｮ荳企剞繧定ｶ・∴縺ｾ縺励◆");
+        if (entries.length > 65535) throw new Error("ZIPファイル数の上限を超えました");
         const encoder = new TextEncoder();
         const parts = [];
         const centralParts = [];
@@ -2244,7 +2291,7 @@
           const nameBytes = encoder.encode(entry.name);
           const blob = entry.data instanceof Blob ? entry.data : new Blob([entry.data]);
           if (blob.size > 0xffffffff || offset > 0xffffffff) {
-            throw new Error("螳悟・繝ｭ繧ｰ縺兄IP32縺ｮ4GB荳企剞繧定ｶ・∴縺ｦ縺・∪縺・);
+            throw new Error("完全ログがZIP32の4GB上限を超えています");
           }
           const crc = entry.crc == null
             ? (entry.data instanceof Blob ? await crc32Blob(blob) : crc32Bytes(new Uint8Array(await blob.arrayBuffer())))
@@ -2292,7 +2339,7 @@
             app:"SleepTracker AI Stable", version:APP_BUILD.version,
             build:APP_BUILD.build, exportedAt:new Date().toISOString(),
             format:"json-lite", fullAudio:false,
-            notice:"逹｡逵谿ｵ髫弱・逹｡逵蜩∬ｳｪ繝ｻ辟｡蜻ｼ蜷ｸ縺ｯ髻ｳ螢ｰ縺ｨ菴灘虚縺ｫ繧医ｋ蜿り・耳螳壹〒縲∝現蟄ｦ逧・ｨｺ譁ｭ縺ｧ縺ｯ縺ゅｊ縺ｾ縺帙ｓ縲・
+            notice:"睡眠段階・睡眠品質・無呼吸は音声と体動による参考推定で、医学的診断ではありません。"
           },
           session:{...session, quality:qualityFromSession(session)},
           clips:clips.map(clip => clipMetadata(clip, null))
@@ -2327,25 +2374,25 @@
             fullAudio:true, clipCount:metadata.length,
             audioFileCount:entries.length,
             profileBinCount:Array.isArray(session.profileBins) ? session.profileBins.length : 0,
-            notice:"逹｡逵谿ｵ髫弱・逹｡逵蜩∬ｳｪ繝ｻ辟｡蜻ｼ蜷ｸ縺ｯ髻ｳ螢ｰ縺ｨ菴灘虚縺ｫ繧医ｋ蜿り・耳螳壹〒縲∝現蟄ｦ逧・ｨｺ譁ｭ縺ｧ縺ｯ縺ゅｊ縺ｾ縺帙ｓ縲・
+            notice:"睡眠段階・睡眠品質・無呼吸は音声と体動による参考推定で、医学的診断ではありません。"
           },
           session:{...session, quality:qualityFromSession(session)},
           clips:metadata
         };
         const logText = JSON.stringify(log, null, 2);
         const readme = [
-          "SleepTracker AI 螳悟・繝ｭ繧ｰ", "Version: " + APP_BUILD.version,
+          "SleepTracker AI 完全ログ", "Version: " + APP_BUILD.version,
           "Build: " + APP_BUILD.build,
-          "log.json: 繧ｻ繝・す繝ｧ繝ｳ縲∝・30遘偵・繝ｭ繝輔ぃ繧､繝ｫ縲∝・繧ｯ繝ｪ繝・・諠・ｱ",
-          "audio/: 讀懷・繧ｯ繝ｪ繝・・縺ｮ髻ｳ螢ｰ・・ase64蛹悶○縺壼次髻ｳ螢ｰ繧呈ｼ邏搾ｼ・,
-          "髻ｳ螢ｰ蜀咲函繝ｻ骭ｲ髻ｳ蜃ｦ逅・・V6.6螳梧・迚医°繧牙､画峩縺励※縺・∪縺帙ｓ縲・
+          "log.json: セッション、全30秒プロファイル、全クリップ情報",
+          "audio/: 検出クリップの音声（Base64化せず原音声を格納）",
+          "音声再生・録音処理はV6.6完成版から変更していません。"
         ].join("\n");
         entries.unshift(
           {name:"log.json", data:logText, date:new Date()},
           {name:"README.txt", data:readme, date:new Date()}
         );
         return createStoredZip(entries, (done, total, name) => {
-          setFullExportProgress(done, total, "ZIP菴懈・荳ｭ");
+          setFullExportProgress(done, total, "ZIP作成中");
         });
       }
 
@@ -2374,25 +2421,25 @@
 
       async function exportSessionLog(withAudio) {
         const session = selectedReportSession();
-        if (!session) { toast("菫晏ｭ俶ｸ医∩繧ｻ繝・す繝ｧ繝ｳ縺後≠繧翫∪縺帙ｓ"); return; }
-        if (exportBusy) { toast("螳悟・繝ｭ繧ｰ繧貞・逅・ｸｭ縺ｧ縺・); return; }
+        if (!session) { toast("保存済みセッションがありません"); return; }
+        if (exportBusy) { toast("完全ログを処理中です"); return; }
         try {
           if (withAudio) {
             exportBusy = true;
-            setFullExportProgress(0, 0, "貅門ｙ荳ｭ");
-            toast("逵√Γ繝｢繝ｪ譁ｹ蠑上〒螳悟・繝ｭ繧ｰZIP繧剃ｽ懈・縺励∪縺・);
+            setFullExportProgress(0, 0, "準備中");
+            toast("省メモリ方式で完全ログZIPを作成します");
             const zip = await buildFullSessionZip(session);
             downloadBlob(zip, safeSessionFilename(session, true));
-            toast("螳悟・繝ｭ繧ｰZIP縺ｮ繝繧ｦ繝ｳ繝ｭ繝ｼ繝峨ｒ髢句ｧ九＠縺ｾ縺励◆");
+            toast("完全ログZIPのダウンロードを開始しました");
           } else {
-            toast("霆ｽ驥上Ο繧ｰ繧剃ｽ懈・荳ｭ...");
+            toast("軽量ログを作成中...");
             const data = await buildLiteSessionExport(session);
             downloadJsonObject(data, safeSessionFilename(session, false));
-            toast("霆ｽ驥上Ο繧ｰ縺ｮ繝繧ｦ繝ｳ繝ｭ繝ｼ繝峨ｒ髢句ｧ九＠縺ｾ縺励◆");
+            toast("軽量ログのダウンロードを開始しました");
           }
         } catch (error) {
           console.error("[SessionExport]", error);
-          toast("繝ｭ繧ｰ菴懈・縺ｫ螟ｱ謨励＠縺ｾ縺励◆: " + (error?.message || error));
+          toast("ログ作成に失敗しました: " + (error?.message || error));
         } finally {
           exportBusy = false;
           setFullExportProgress(0, 0, "");
@@ -2401,28 +2448,28 @@
 
       async function shareSessionLog(withAudio) {
         const session = selectedReportSession();
-        if (!session) { toast("菫晏ｭ俶ｸ医∩繧ｻ繝・す繝ｧ繝ｳ縺後≠繧翫∪縺帙ｓ"); return; }
-        if (exportBusy) { toast("螳悟・繝ｭ繧ｰ繧貞・逅・ｸｭ縺ｧ縺・); return; }
+        if (!session) { toast("保存済みセッションがありません"); return; }
+        if (exportBusy) { toast("完全ログを処理中です"); return; }
         try {
           exportBusy = true;
-          setFullExportProgress(0, 0, withAudio ? "蜈ｱ譛瓜IP貅門ｙ荳ｭ" : "蜈ｱ譛画ｺ門ｙ荳ｭ");
+          setFullExportProgress(0, 0, withAudio ? "共有ZIP準備中" : "共有準備中");
           const filename = safeSessionFilename(session, withAudio);
           const blob = withAudio
             ? await buildFullSessionZip(session)
             : new Blob([JSON.stringify(await buildLiteSessionExport(session), null, 2)], {type:"application/json;charset=utf-8"});
           const file = new File([blob], filename, {type:withAudio ? "application/zip" : "application/json"});
           if (navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))) {
-            await navigator.share({title:"SleepTracker 逹｡逵繝ｭ繧ｰ V" + APP_BUILD.version, text:"逹｡逵貂ｬ螳壹Ο繧ｰ", files:[file]});
-            toast("蜈ｱ譛峨＠縺ｾ縺励◆");
+            await navigator.share({title:"SleepTracker 睡眠ログ V" + APP_BUILD.version, text:"睡眠測定ログ", files:[file]});
+            toast("共有しました");
           } else {
             downloadBlob(blob, filename);
-            toast("蜈ｱ譛蛾撼蟇ｾ蠢懊・縺溘ａ繝繧ｦ繝ｳ繝ｭ繝ｼ繝峨＠縺ｾ縺励◆");
+            toast("共有非対応のためダウンロードしました");
           }
         } catch (error) {
-          if (error?.name === "AbortError") toast("蜈ｱ譛峨ｒ繧ｭ繝｣繝ｳ繧ｻ繝ｫ縺励∪縺励◆");
+          if (error?.name === "AbortError") toast("共有をキャンセルしました");
           else {
             console.error("[SessionShare]", error);
-            toast("蜈ｱ譛峨↓螟ｱ謨励＠縺ｾ縺励◆: " + (error?.message || error));
+            toast("共有に失敗しました: " + (error?.message || error));
           }
         } finally {
           exportBusy = false;
@@ -2535,12 +2582,12 @@
         ) {
           triggerClipRecording({
             category:"apnea",
-            label:"笞・・辟｡蜻ｼ蜷ｸ逍代＞・磯撕蟇・ +
-              Math.round(silenceSeconds) + "遘貞ｾ鯉ｼ・,
+            label:"⚠️ 無呼吸疑い（静寂" +
+              Math.round(silenceSeconds) + "秒後）",
             tagClass:"tag-snore"
           }, currentDb, motionSnapshot, 14000);
 
-          toast("辟｡蜻ｼ蜷ｸ逍代＞繧定ｨ倬鹸縺励∪縺励◆");
+          toast("無呼吸疑いを記録しました");
           snoreTimestamps = [];
         }
 
@@ -2604,7 +2651,7 @@
             delta < 3 &&
             motionSnapshot < 0.05
           ) {
-            liveClass.textContent = "髱吝ｯゅ・豁｣蟶ｸ蜻ｼ蜷ｸ";
+            liveClass.textContent = "静寂・正常呼吸";
           }
 
           processApneaCandidate(now, delta, motionSnapshot);
@@ -2644,7 +2691,7 @@
 
           if (staleFor > MONITOR_STALE_MS) {
             setEngineText(
-              "逶｣隕門●豁｢繧呈､懷・縲ゅお繝ｳ繧ｸ繝ｳ繧貞・襍ｷ蜍輔＠縺ｾ縺励◆",
+              "監視停止を検出。エンジンを再起動しました",
               "var(--warn)"
             );
             scheduleMonitor();
@@ -2660,7 +2707,7 @@
           const audioTrack = stream?.getAudioTracks()?.[0];
 
           if (!audioTrack || audioTrack.readyState !== "live") {
-            await recoverAudioPipeline("繧ｦ繧ｩ繝・メ繝峨ャ繧ｰ讀懷・");
+            await recoverAudioPipeline("ウォッチドッグ検出");
           }
 
           if (!wakeLock && document.visibilityState === "visible") {
@@ -2685,7 +2732,7 @@
         try {
           await createAudioPipeline();
         } catch (error) {
-          alert("繝槭う繧ｯ繧帝幕蟋九〒縺阪∪縺帙ｓ: " + (error.message || error.name));
+          alert("マイクを開始できません: " + (error.message || error.name));
           return;
         }
 
@@ -2704,13 +2751,14 @@
         profileAccumulator = null;
         lastProfileFlushMs = sessionStartMs;
 
-        document.getElementById("statusBadge").textContent = "菴灘虚繝ｻ髻ｳ螢ｰ逶｣隕紋ｸｭ";
+        document.getElementById("statusBadge").textContent = "体動・音声監視中";
         document.getElementById("statusBadge").className = "badge b-green";
         document.getElementById("btnStart").disabled = true;
+        document.getElementById("btnNight").disabled = false;
         document.getElementById("btnStop").disabled = false;
         document.getElementById("recoveryNotice")?.classList.add("hidden");
 
-        setEngineText("髻ｳ螢ｰ繝ｻ菴灘虚繧ｨ繝ｳ繧ｸ繝ｳ豁｣蟶ｸ遞ｼ蜒堺ｸｭ", "var(--success)");
+        setEngineText("音声・体動エンジン正常稼働中", "var(--success)");
 
         await requestWakeLock();
 
@@ -2725,7 +2773,7 @@
         heartbeatInterval = setInterval(saveSessionHeartbeat, 5000);
         saveSessionHeartbeat();
 
-        toast("逹｡逵貂ｬ螳壹ｒ髢句ｧ九＠縺ｾ縺励◆");
+        toast("睡眠測定を開始しました");
         scheduleNightScreen();
       }
 
@@ -2778,15 +2826,16 @@
         await saveCompletedSession();
         clearSessionHeartbeat();
 
-        document.getElementById("statusBadge").textContent = "螳御ｺ・;
+        document.getElementById("statusBadge").textContent = "完了";
         document.getElementById("statusBadge").className = "badge b-gray";
         document.getElementById("btnStart").disabled = false;
+        document.getElementById("btnNight").disabled = true;
         document.getElementById("btnStop").disabled = true;
 
-        setEngineText("貂ｬ螳夂ｵゆｺ・, "var(--muted)");
+        setEngineText("測定終了", "var(--muted)");
         stopRequested = false;
 
-        toast("貂ｬ螳壹ｒ邨ゆｺ・＠縺ｾ縺励◆");
+        toast("測定を終了しました");
         switchTab("report");
       }
 
@@ -2828,7 +2877,7 @@
         if (!clips.length) {
           list.innerHTML =
             '<div style="text-align:center;padding:30px;font-size:12px;color:var(--muted)">' +
-            "隧ｲ蠖薙☆繧矩鹸髻ｳ繝・・繧ｿ縺ｯ縺ゅｊ縺ｾ縺帙ｓ縲・ +
+            "該当する録音データはありません。" +
             "</div>";
           return;
         }
@@ -2839,8 +2888,8 @@
 
           const play = document.createElement("button");
           play.className = "play-btn";
-          play.textContent = "笆ｶ";
-          play.setAttribute("aria-label", "蜀咲函");
+          play.textContent = "▶";
+          play.setAttribute("aria-label", "再生");
 
           const info = document.createElement("div");
           info.className = "clip-info";
@@ -2850,7 +2899,7 @@
 
           const tag = document.createElement("span");
           tag.className = "badge " + (clip.tagClass || "tag-env");
-          tag.textContent = clip.label || "譛ｪ蛻・｡・;
+          tag.textContent = clip.label || "未分類";
 
           const value = document.createElement("span");
           value.style.cssText =
@@ -2864,15 +2913,15 @@
           const sub = document.createElement("div");
           sub.className = "clip-sub";
           sub.textContent =
-            "譎ょ綾: " + (clip.realClock || "--") +
-            "・磯幕蟋句ｾ・" + (clip.timeStr || "--") + "・・ +
-            " / 邏・ + (clip.durationSec || 0) + "遘・;
+            "時刻: " + (clip.realClock || "--") +
+            "（開始後 " + (clip.timeStr || "--") + "）" +
+            " / 約" + (clip.durationSec || 0) + "秒";
 
           title.append(tag, value);
           const reason = document.createElement("div");
           reason.className = "clip-sub";
           reason.style.color = "#64748b";
-          reason.textContent = "蛻､螳壽ｹ諡: " + (clip.reason || clip.voteSummary || "譌ｧ繝・・繧ｿ繝ｻ譬ｹ諡縺ｪ縺・);
+          reason.textContent = "判定根拠: " + (clip.reason || clip.voteSummary || "旧データ・根拠なし");
 
           info.append(title, sub, reason);
 
@@ -2880,7 +2929,7 @@
           download.className = "btn btn-soft";
           download.style.cssText =
             "padding:6px 10px;font-size:11px;text-decoration:none";
-          download.textContent = "菫晏ｭ・;
+          download.textContent = "保存";
 
           const audioUrl = URL.createObjectURL(clip.blob);
           activeObjectUrls.push(audioUrl);
@@ -2906,8 +2955,8 @@
               currentAudioPlayer.currentTime = 0;
               currentAudioPlayer = null;
               currentAudioButton = null;
-              play.textContent = "笆ｶ";
-              play.setAttribute("aria-label", "蜀咲函");
+              play.textContent = "▶";
+              play.setAttribute("aria-label", "再生");
               return;
             }
 
@@ -2916,27 +2965,27 @@
               currentAudioPlayer.currentTime = 0;
             }
             if (currentAudioButton) {
-              currentAudioButton.textContent = "笆ｶ";
-              currentAudioButton.setAttribute("aria-label", "蜀咲函");
+              currentAudioButton.textContent = "▶";
+              currentAudioButton.setAttribute("aria-label", "再生");
             }
 
             const audio = new Audio(audioUrl);
             currentAudioPlayer = audio;
             currentAudioButton = play;
-            play.textContent = "笆";
-            play.setAttribute("aria-label", "蛛懈ｭ｢");
+            play.textContent = "■";
+            play.setAttribute("aria-label", "停止");
 
             const resetPlayer = () => {
               if (currentAudioPlayer === audio) currentAudioPlayer = null;
               if (currentAudioButton === play) currentAudioButton = null;
-              play.textContent = "笆ｶ";
-              play.setAttribute("aria-label", "蜀咲函");
+              play.textContent = "▶";
+              play.setAttribute("aria-label", "再生");
             };
 
             audio.onended = resetPlayer;
             audio.onerror = () => {
               resetPlayer();
-              toast("髻ｳ螢ｰ繧貞・逕溘〒縺阪∪縺帙ｓ縺ｧ縺励◆");
+              toast("音声を再生できませんでした");
             };
             const progress = waveform.querySelector(".waveform-progress");
             audio.ontimeupdate = () => {
@@ -2947,7 +2996,7 @@
               await audio.play();
             } catch (error) {
               resetPlayer();
-              toast("蜀咲函繧ｨ繝ｩ繝ｼ: " + error.message);
+              toast("再生エラー: " + error.message);
             }
           };
 
@@ -2957,7 +3006,7 @@
       }
 
       async function clearClips() {
-        if (!confirm("縺吶∋縺ｦ縺ｮ骭ｲ髻ｳ繧ｯ繝ｪ繝・・繧呈ｶ亥悉縺励∪縺吶°・・)) return;
+        if (!confirm("すべての録音クリップを消去しますか？")) return;
 
         if (currentAudioPlayer) {
           currentAudioPlayer.pause();
@@ -2970,7 +3019,7 @@
         const cleared = await clearClipsFromDB();
 
         if (!cleared) {
-          toast("骭ｲ髻ｳ繝・・繧ｿ繧呈ｶ亥悉縺ｧ縺阪∪縺帙ｓ縺ｧ縺励◆");
+          toast("録音データを消去できませんでした");
           return;
         }
 
@@ -2980,13 +3029,13 @@
 
         updateCountUI();
         await renderClipList();
-        toast("骭ｲ髻ｳ繝・・繧ｿ繧貞・豸亥悉縺励∪縺励◆");
+        toast("録音データを全消去しました");
       }
 
       async function handleVisibilityChange() {
         if (!isTracking || document.visibilityState !== "visible") return;
 
-        setEngineText("逕ｻ髱｢蠕ｩ蟶ｰ蠕後・逶｣隕也憾諷九ｒ遒ｺ隱堺ｸｭ...", "var(--warn)");
+        setEngineText("画面復帰後の監視状態を確認中...", "var(--warn)");
 
         try {
           if (audioCtx?.state === "suspended") {
@@ -3001,10 +3050,10 @@
 
         const track = stream?.getAudioTracks()?.[0];
         if (!track || track.readyState !== "live") {
-          await recoverAudioPipeline("逕ｻ髱｢蠕ｩ蟶ｰ");
+          await recoverAudioPipeline("画面復帰");
         }
 
-        setEngineText("髻ｳ螢ｰ繝ｻ菴灘虚繧ｨ繝ｳ繧ｸ繝ｳ豁｣蟶ｸ遞ｼ蜒堺ｸｭ", "var(--success)");
+        setEngineText("音声・体動エンジン正常稼働中", "var(--success)");
       }
 
       async function init() {
@@ -3015,6 +3064,7 @@
         if (buildBadge) buildBadge.textContent = "V" + APP_BUILD.version + " NIGHT SCREEN";
         document.documentElement.dataset.sleepTrackerBuild = APP_BUILD.build;
         bindNightScreenControls();
+        exitNightScreen();
 
         showInterruptedSessionNotice();
         checkIosMotionBanner();
@@ -3074,8 +3124,8 @@
       } catch (error) {
         console.error("[SleepTracker Init]", error);
         const status = document.getElementById("ghStatusText");
-        if (status) status.textContent = "蛻晄悄蛹悶お繝ｩ繝ｼ: " + (error?.message || String(error));
-        alert("SleepTracker縺ｮ蛻晄悄蛹紋ｸｭ縺ｫ繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆縲・n\n" + (error?.message || String(error)));
+        if (status) status.textContent = "初期化エラー: " + (error?.message || String(error));
+        alert("SleepTrackerの初期化中にエラーが発生しました。\n\n" + (error?.message || String(error)));
       }
     });
   </script>
