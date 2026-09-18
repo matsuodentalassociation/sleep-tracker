@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#090d16">
-<title>SleepTracker AI Stable V7.0 TIMESTAMP DATA</title>
+<title>SleepTracker AI Stable V6.9 NIGHT SCREEN</title>
 
 <style>
   :root {
@@ -355,7 +355,7 @@
   .score-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#6366f1,#22d3ee); }
   .quality-note { color:#94a3b8; font-size:10px; line-height:1.6; }
 
-  /* V7.0 NIGHT SCREEN: 表示のみ。測定・録音・再生経路には影響しません */
+  /* V6.9 NIGHT SCREEN: 表示のみ。測定・録音・再生経路には影響しません */
   #nightScreen {
     position:fixed;
     inset:0;
@@ -494,7 +494,7 @@
 
 <header class="top">
   <div class="top-inner">
-    <div class="brand">🌙 SleepTracker <span id="buildBadge">V7.0 TIMESTAMP DATA</span></div>
+    <div class="brand">🌙 SleepTracker <span id="buildBadge">V6.9 NIGHT SCREEN</span></div>
     <div id="statusBadge" class="badge b-gray">待機中</div>
   </div>
 </header>
@@ -694,9 +694,9 @@
     const PATH = "index.html";
     const TIMEOUT_MS = 20000;
 
-    const CACHE_HTML_KEY = "ST_REMOTE_HTML_CACHE_V70TIMESTAMP";
-    const CACHE_META_KEY = "ST_REMOTE_HTML_META_V70TIMESTAMP";
-    const APPLIED_SHA_KEY = "ST_REMOTE_APPLIED_SHA_V70TIMESTAMP";
+    const CACHE_HTML_KEY = "ST_REMOTE_HTML_CACHE_V69NIGHT";
+    const CACHE_META_KEY = "ST_REMOTE_HTML_META_V69NIGHT";
+    const APPLIED_SHA_KEY = "ST_REMOTE_APPLIED_SHA_V69NIGHT";
 
     function updateStatus(text, state = "idle") {
       const textEl = document.getElementById("ghStatusText");
@@ -882,7 +882,7 @@
         const commit = await latestCommit();
 
         if (currentDocumentSha() === commit.sha) {
-          updateStatus("V7.0 / GitHub最新版: " + commit.shortSha + formatCommitDate(commit.date), "live");
+          updateStatus("V6.9 / GitHub最新版: " + commit.shortSha + formatCommitDate(commit.date), "live");
           return {replaced:false, version:commit.sha};
         }
 
@@ -937,7 +937,7 @@
 <script>
   const App = (() => {
     const DB_NAME = "SleepTrackerClassifierV6DB";
-    const DB_VERSION = 2;
+    const DB_VERSION = 1;
     const SESSION_KEY = "ST_ACTIVE_SESSION_V6";
 
     const MONITOR_INTERVAL_MS = 500;
@@ -1005,17 +1005,10 @@
     let profileBins = [];
     let profileAccumulator = null;
     let lastProfileFlushMs = 0;
+    let timeSeriesLogs = [];
+    let lastTimeSeriesSec = -1;
 
-    // V7.0: PCタイムライン用の時刻付き生データ
-    let soundLevelBuffer = [];
-    let motionSampleBuffer = [];
-    let telemetryWriteChain = Promise.resolve();
-    let telemetrySequence = 0;
-    let lastMotionStoredMs = 0;
-    const MOTION_STORE_INTERVAL_MS = 100;
-    const TELEMETRY_BATCH_SIZE = 50;
-
-    // V7.0 NIGHT SCREEN（表示制御のみ）
+    // V6.9 NIGHT SCREEN（表示制御のみ）
     const NIGHT_AUTO_DELAY_MS = 5000;
     const NIGHT_PEEK_MS = 5000;
     const NIGHT_HOLD_MS = 3000;
@@ -1227,119 +1220,11 @@
             if (!database.objectStoreNames.contains("clips")) {
               database.createObjectStore("clips", { keyPath:"id" });
             }
-            if (!database.objectStoreNames.contains("soundLevels")) {
-              const soundStore = database.createObjectStore("soundLevels", { keyPath:"id" });
-              soundStore.createIndex("sessionId", "sessionId", { unique:false });
-              soundStore.createIndex("timestamp", "timestamp", { unique:false });
-            }
-            if (!database.objectStoreNames.contains("motionSamples")) {
-              const motionStore = database.createObjectStore("motionSamples", { keyPath:"id" });
-              motionStore.createIndex("sessionId", "sessionId", { unique:false });
-              motionStore.createIndex("timestamp", "timestamp", { unique:false });
-            }
           };
         } catch (error) {
           resolve(null);
         }
       });
-    }
-
-    function telemetryId(timestamp) {
-      telemetrySequence = (telemetrySequence + 1) % 1000000;
-      return String(sessionStartMs) + "_" + String(timestamp).padStart(13, "0") + "_" + String(telemetrySequence).padStart(6, "0");
-    }
-
-    function enqueueTelemetryWrite(storeName, records) {
-      if (!records.length) return telemetryWriteChain;
-      const batch = records.slice();
-      telemetryWriteChain = telemetryWriteChain.then(async () => {
-        if (!db) await initDB();
-        if (!db || !db.objectStoreNames.contains(storeName)) return false;
-        return new Promise(resolve => {
-          try {
-            const tx = db.transaction(storeName, "readwrite");
-            const store = tx.objectStore(storeName);
-            batch.forEach(record => store.put(record));
-            tx.oncomplete = () => resolve(true);
-            tx.onerror = () => resolve(false);
-            tx.onabort = () => resolve(false);
-          } catch (error) {
-            console.warn("[TelemetryWrite]", error);
-            resolve(false);
-          }
-        });
-      }).catch(error => {
-        console.warn("[TelemetryWriteChain]", error);
-        return false;
-      });
-      return telemetryWriteChain;
-    }
-
-    function queueSoundLevel(timestamp, dbValue) {
-      if (!isTracking || !sessionStartMs) return;
-      soundLevelBuffer.push({
-        id:telemetryId(timestamp), sessionId:String(sessionStartMs),
-        timestamp, timestampIso:new Date(timestamp).toISOString(),
-        soundPressureDb:+Number(dbValue).toFixed(2)
-      });
-      if (soundLevelBuffer.length >= TELEMETRY_BATCH_SIZE) {
-        enqueueTelemetryWrite("soundLevels", soundLevelBuffer.splice(0));
-      }
-    }
-
-    function queueMotionSample(timestamp, current, deltaG) {
-      if (!isTracking || !sessionStartMs || timestamp - lastMotionStoredMs < MOTION_STORE_INTERVAL_MS) return;
-      lastMotionStoredMs = timestamp;
-      motionSampleBuffer.push({
-        id:telemetryId(timestamp), sessionId:String(sessionStartMs),
-        timestamp, timestampIso:new Date(timestamp).toISOString(),
-        x:+current.x.toFixed(6), y:+current.y.toFixed(6), z:+current.z.toFixed(6),
-        deltaG:+Number(deltaG || 0).toFixed(6)
-      });
-      if (motionSampleBuffer.length >= TELEMETRY_BATCH_SIZE) {
-        enqueueTelemetryWrite("motionSamples", motionSampleBuffer.splice(0));
-      }
-    }
-
-    async function flushTelemetryBuffers() {
-      if (soundLevelBuffer.length) enqueueTelemetryWrite("soundLevels", soundLevelBuffer.splice(0));
-      if (motionSampleBuffer.length) enqueueTelemetryWrite("motionSamples", motionSampleBuffer.splice(0));
-      await telemetryWriteChain;
-    }
-
-    async function sessionCsvBlob(storeName, sessionId, header, rowBuilder) {
-      if (!db) await initDB();
-      const parts = [header + "\n"];
-      if (!db || !db.objectStoreNames.contains(storeName)) return new Blob(parts, {type:"text/csv;charset=utf-8"});
-      await new Promise(resolve => {
-        try {
-          const tx = db.transaction(storeName, "readonly");
-          const store = tx.objectStore(storeName);
-          const source = store.indexNames.contains("sessionId") ? store.index("sessionId") : store;
-          const request = source.openCursor(IDBKeyRange.only(String(sessionId)));
-          let lines = [];
-          request.onsuccess = event => {
-            const cursor = event.target.result;
-            if (!cursor) {
-              if (lines.length) parts.push(lines.join("\n") + "\n");
-              resolve();
-              return;
-            }
-            lines.push(rowBuilder(cursor.value));
-            if (lines.length >= 2000) {
-              parts.push(lines.join("\n") + "\n");
-              lines = [];
-            }
-            cursor.continue();
-          };
-          request.onerror = () => resolve();
-          tx.onabort = () => resolve();
-        } catch (error) {
-          console.warn("[TelemetryRead]", error);
-          resolve();
-        }
-      });
-      return new Blob(parts, {type:"text/csv;charset=utf-8"});
     }
 
     async function saveClipToDB(clip) {
@@ -1535,7 +1420,6 @@
       const deltaG = Math.sqrt(dx*dx + dy*dy + dz*dz) / 9.80665;
       if (!Number.isFinite(deltaG) || deltaG > 4) return;
 
-      queueMotionSample(Date.now(), current, deltaG);
       currentMotionG = currentMotionG * 0.72 + deltaG * 0.28;
       peakMotionG = Math.max(peakMotionG, currentMotionG);
     }
@@ -1661,19 +1545,39 @@
     }
 
     function analyzeFrequencySpectrum() {
-      const empty = { centroid:0, subLowRatio:0, lowRatio:0, midRatio:0, highRatio:0 };
+      const empty = {
+        centroid:0,
+        peakHz:0,
+        subLowRatio:0,
+        lowRatio:0,
+        midRatio:0,
+        highRatio:0
+      };
       if (!analyser || !freqBuf || !audioCtx) return empty;
 
       analyser.getByteFrequencyData(freqBuf);
       const binHz = (audioCtx.sampleRate / 2) / analyser.frequencyBinCount;
 
-      let totalPower = 0, weighted = 0, subLow = 0, low = 0, mid = 0, high = 0;
+      let totalPower = 0;
+      let weighted = 0;
+      let subLow = 0;
+      let low = 0;
+      let mid = 0;
+      let high = 0;
+      let peakPower = -1;
+      let peakBinIndex = 0;
+
       for (let i = 0; i < freqBuf.length; i++) {
         const frequency = i * binHz;
         const amplitude = freqBuf[i];
         const power = amplitude * amplitude;
         totalPower += power;
         weighted += frequency * power;
+
+        if (power > peakPower) {
+          peakPower = power;
+          peakBinIndex = i;
+        }
 
         if (frequency >= 40 && frequency < 200) subLow += power;
         else if (frequency < 600) low += power;
@@ -1684,6 +1588,7 @@
       if (!totalPower) return empty;
       return {
         centroid:Math.round(weighted / totalPower),
+        peakHz:Math.round(peakBinIndex * binHz),
         subLowRatio:subLow / totalPower,
         lowRatio:low / totalPower,
         midRatio:mid / totalPower,
@@ -1832,7 +1737,6 @@
         }),
         durationSec:0,
         startedAt:now,
-        startedAtIso:new Date(now).toISOString(),
         lastSnoreAt:result.category === "snore" ? now : 0,
         forceCategory:result.category === "apnea" ? "apnea" : "",
         waveformDb:[],
@@ -1985,9 +1889,10 @@
 
       function collectProfileSample(now, dbValue, delta, motion, result, spectrum) {
         if (!profileAccumulator) {
-          profileAccumulator = { 
-            startMs:now, n:0, dbSum:0, dbSq:0, motionSum:0, motionMax:0, 
-            loud:0, snore:0, apnea:0, maxDb:dbValue, centroidSum:0 
+          profileAccumulator = {
+            startMs:now, n:0, dbSum:0, dbSq:0, motionSum:0, motionMax:0,
+            loud:0, snore:0, apnea:0, maxDb:dbValue, centroidSum:0,
+            peakHzMax:0
           };
         }
         const a = profileAccumulator;
@@ -1998,6 +1903,7 @@
         a.motionMax = Math.max(a.motionMax, motion);
         a.maxDb = Math.max(a.maxDb, dbValue);
         if (spectrum?.centroid) a.centroidSum += spectrum.centroid;
+        if (spectrum?.peakHz) a.peakHzMax = Math.max(a.peakHzMax, spectrum.peakHz);
         if (delta >= 8) a.loud++;
         if (result?.category === "snore") a.snore++;
         if (result?.category === "apnea") a.apnea++;
@@ -2021,7 +1927,8 @@
           state, avgDb:+avgDb.toFixed(1), maxDb:+a.maxDb.toFixed(1), dbVariation:+Math.sqrt(variance).toFixed(1),
           avgMotion:+avgMotion.toFixed(3), maxMotion:+a.motionMax.toFixed(2),
           snoreRatio:+(a.snore / a.n).toFixed(2), apneaCount:a.apnea,
-          avgCentroid: a.centroidSum ? Math.round(a.centroidSum / a.n) : 0,
+          avgCentroid:a.centroidSum ? Math.round(a.centroidSum / a.n) : 0,
+          peakHzMax:Math.round(a.peakHzMax || 0),
           disturbance:+disturbance.toFixed(2)
         });
         profileAccumulator = null;
@@ -2072,7 +1979,8 @@
           startTime:new Date(start).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
           endTime:new Date(end).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
           durationSec:Math.max(1,Math.round((end-start)/1000)), baselineDb:+baselineDb.toFixed(1),
-          counts:c, snoreDurationSec, profileBins:[...profileBins]
+          counts:c, snoreDurationSec, profileBins:[...profileBins],
+          timeSeriesLogs:[...timeSeriesLogs]
         };
         session.quality = qualityFromSession(session);
         const history = loadSessionHistory().filter(x => x.id !== session.id);
@@ -2259,9 +2167,9 @@
       }
 
       const APP_BUILD = Object.freeze({
-        version:"7.0",
-        build:"2026-09-18-timestamp-audio-pressure-motion",
-        feature:"TIMESTAMPED_AUDIO_PRESSURE_MOTION_LOG"
+        version:"6.9.1",
+        build:"2026-09-18-record-viewer-timeseries",
+        feature:"PEAK_HZ_ONE_SECOND_TIMESERIES_FULL_LOG"
       });
 
       let exportBusy = false;
@@ -2460,81 +2368,67 @@
             format:"json-lite", fullAudio:false,
             notice:"睡眠段階・睡眠品質・無呼吸は音声と体動による参考推定で、医学的診断ではありません。"
           },
-          session:{...session, quality:qualityFromSession(session)},
+          session:{
+            ...session,
+            quality:qualityFromSession(session),
+            timeSeriesLogs:Array.isArray(session.timeSeriesLogs) ? session.timeSeriesLogs : []
+          },
           clips:clips.map(clip => clipMetadata(clip, null))
         };
       }
 
-      function csvCell(value) {
-        const text = String(value == null ? "" : value);
-        return /[",\n\r]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
-      }
-
-      function timestampFilePart(value) {
-        const d = new Date(Number(value) || Date.now());
-        const p = n => String(n).padStart(2, "0");
-        const ms = String(d.getMilliseconds()).padStart(3, "0");
-        return d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) + "_" +
-          p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) + ms;
-      }
-
       async function buildFullSessionZip(session) {
-        await flushTelemetryBuffers();
         const clips = await clipsForSession(session);
         const entries = [];
-        const audioRows = [
-          "timestamp_iso,epoch_ms,audio_file,duration_sec,sound_pressure_peak_db,mime_type,audio_bytes"
-        ];
+        const metadata = [];
         const usedNames = new Set();
 
         clips.forEach((clip, index) => {
-          if (!(clip.blob instanceof Blob) || clip.blob.size <= 0) return;
-          const ext = audioExtension(clip.blob.type);
-          const epoch = Number(clip.startedAt || clip.id);
-          let audioFile = "audio/" + timestampFilePart(epoch) + "." + ext;
-          while (usedNames.has(audioFile)) {
-            audioFile = "audio/" + timestampFilePart(epoch) + "_" + String(index + 1) + "." + ext;
+          let audioFile = null;
+          if (clip.blob instanceof Blob && clip.blob.size > 0) {
+            const ext = audioExtension(clip.blob.type);
+            const clock = sanitizeZipName(clip.realClock || clip.timeStr || clip.id);
+            let base = "audio/" + String(index + 1).padStart(4, "0") + "_" + clock;
+            audioFile = base + "." + ext;
+            while (usedNames.has(audioFile)) audioFile = base + "_" + index + "." + ext;
+            usedNames.add(audioFile);
+            entries.push({name:audioFile, data:clip.blob, date:new Date(Number(clip.id) || Date.now())});
           }
-          usedNames.add(audioFile);
-          entries.push({name:audioFile, data:clip.blob, date:new Date(epoch || Date.now())});
-          audioRows.push([
-            new Date(epoch).toISOString(), epoch, audioFile,
-            Number(clip.durationSec || 0), Number(clip.peakDb || 0).toFixed(2),
-            clip.blob.type || "", clip.blob.size
-          ].map(csvCell).join(","));
+          metadata.push(clipMetadata(clip, audioFile));
         });
 
-        const soundCsv = await sessionCsvBlob(
-          "soundLevels", session.id,
-          "timestamp_iso,epoch_ms,sound_pressure_db",
-          r => [r.timestampIso, r.timestamp, Number(r.soundPressureDb).toFixed(2)].map(csvCell).join(",")
-        );
-        const motionCsv = await sessionCsvBlob(
-          "motionSamples", session.id,
-          "timestamp_iso,epoch_ms,x_m_s2,y_m_s2,z_m_s2,delta_g",
-          r => [r.timestampIso, r.timestamp, r.x, r.y, r.z, r.deltaG].map(csvCell).join(",")
-        );
-
+        const log = {
+          meta:{
+            app:"SleepTracker AI Stable", version:APP_BUILD.version,
+            build:APP_BUILD.build, feature:APP_BUILD.feature,
+            exportedAt:new Date().toISOString(), format:"zip-store-v1",
+            fullAudio:true, clipCount:metadata.length,
+            audioFileCount:entries.length,
+            profileBinCount:Array.isArray(session.profileBins) ? session.profileBins.length : 0,
+            timeSeriesLogCount:Array.isArray(session.timeSeriesLogs) ? session.timeSeriesLogs.length : 0,
+            timeSeriesIntervalSec:1,
+            notice:"睡眠段階・睡眠品質・無呼吸は音声と体動による参考推定で、医学的診断ではありません。"
+          },
+          session:{
+            ...session,
+            quality:qualityFromSession(session),
+            timeSeriesLogs:Array.isArray(session.timeSeriesLogs) ? session.timeSeriesLogs : []
+          },
+          clips:metadata
+        };
+        const logText = JSON.stringify(log, null, 2);
+        const readme = [
+          "SleepTracker AI 完全ログ", "Version: " + APP_BUILD.version,
+          "Build: " + APP_BUILD.build,
+          "log.json: セッション、1秒時系列ログ、全30秒プロファイル、全クリップ情報",
+          "audio/: 検出クリップの音声（Base64化せず原音声を格納）",
+          "音声再生・録音処理はV6.6完成版から変更していません。"
+        ].join("\n");
         entries.unshift(
-          {name:"audio/index.csv", data:audioRows.join("\n") + "\n", date:new Date()},
-          {name:"audio/sound_pressure.csv", data:soundCsv, date:new Date()},
-          {name:"motion/motion.csv", data:motionCsv, date:new Date()},
-          {name:"README.txt", data:[
-            "SleepTracker AI V7.0 時刻付きデータログ",
-            "",
-            "audio/: 取得時刻付き音声ファイル",
-            "audio/index.csv: 音声ファイル、取得時刻、各録音のピーク音圧",
-            "audio/sound_pressure.csv: 測定中の時刻付き音圧データ",
-            "motion/motion.csv: 時刻付きモーションセンサー値",
-            "",
-            "PC側で各timestamp_isoまたはepoch_msを同じ時間軸へ配置してください。",
-            "独立したタイムラインおよびスマホ側分類結果は完全ログに含めていません。",
-            "sound_pressure_dbはアプリ内尺度です。校正済みdB SPLではありません。",
-            "録音には固定の2.8倍ゲインとDynamics Compressorが適用されています。"
-          ].join("\n"), date:new Date()}
+          {name:"log.json", data:logText, date:new Date()},
+          {name:"README.txt", data:readme, date:new Date()}
         );
-
-        return createStoredZip(entries, (done, total) => {
+        return createStoredZip(entries, (done, total, name) => {
           setFullExportProgress(done, total, "ZIP作成中");
         });
       }
@@ -2767,7 +2661,18 @@
           updateBaseline();
 
           const now = Date.now();
-          queueSoundLevel(now, currentDb);
+          const currentSec = Math.max(0, Math.floor((now - sessionStartMs) / 1000));
+          if (currentSec !== lastTimeSeriesSec) {
+            timeSeriesLogs.push({
+              sec:currentSec,
+              epochMs:now,
+              db:+currentDb.toFixed(1),
+              peakHz:spectrum.peakHz || 0,
+              motionG:+motionSnapshot.toFixed(3)
+            });
+            lastTimeSeriesSec = currentSec;
+          }
+
           const delta = currentDb - baselineDb;
           const result =
             classifySoundAndMotion(delta, spectrum, motionSnapshot);
@@ -2894,11 +2799,8 @@
         profileBins = [];
         profileAccumulator = null;
         lastProfileFlushMs = sessionStartMs;
-        soundLevelBuffer = [];
-        motionSampleBuffer = [];
-        telemetryWriteChain = Promise.resolve();
-        telemetrySequence = 0;
-        lastMotionStoredMs = 0;
+        timeSeriesLogs = [];
+        lastTimeSeriesSec = -1;
 
         document.getElementById("statusBadge").textContent = "体動・音声監視中";
         document.getElementById("statusBadge").className = "badge b-green";
@@ -2972,7 +2874,6 @@
         freqBuf = null;
 
         flushProfileBin(true);
-        await flushTelemetryBuffers();
         await saveCompletedSession();
         clearSessionHeartbeat();
 
@@ -3211,7 +3112,7 @@
         initialized = true;
 
         const buildBadge = document.getElementById("buildBadge");
-        if (buildBadge) buildBadge.textContent = "V" + APP_BUILD.version + " TIMESTAMP DATA";
+        if (buildBadge) buildBadge.textContent = "V" + APP_BUILD.version + " NIGHT SCREEN";
         document.documentElement.dataset.sleepTrackerBuild = APP_BUILD.build;
         bindNightScreenControls();
         exitNightScreen();
