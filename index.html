@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#090d16">
-<title>SleepTracker AI Stable V6.6</title>
+<title>SleepTracker AI Stable V6.7.3 FullLog</title>
 
 <style>
   :root {
@@ -368,7 +368,7 @@
 
 <header class="top">
   <div class="top-inner">
-    <div class="brand">🌙 SleepTracker <span>STABLE V6.6</span></div>
+    <div class="brand">🌙 SleepTracker <span id="buildBadge">V6.7.3 FULLLOG</span></div>
     <div id="statusBadge" class="badge b-gray">待機中</div>
   </div>
 </header>
@@ -499,8 +499,8 @@
       <div class="export-grid">
         <button class="btn btn-primary" onclick="App.exportSessionLog(false)">軽量ログ出力</button>
         <button class="btn btn-soft" onclick="App.shareSessionLog(false)">軽量ログ共有</button>
-        <button class="btn btn-primary" onclick="App.exportSessionLog(true)">音声付き完全ログ出力</button>
-        <button class="btn btn-soft" onclick="App.shareSessionLog(true)">音声付き完全ログ共有</button>
+        <button id="btnFullExport" class="btn btn-primary" onclick="App.exportSessionLog(true)">完全ログZIP出力</button>
+        <button id="btnFullShare" class="btn btn-soft" onclick="App.shareSessionLog(true)">完全ログZIP共有</button>
       </div>
       <div id="reportEmpty" class="notice">保存済みレポートはありません。下のグラフは表示例です。測定終了後、実測データに自動更新されます。</div>
       <div id="reportContent" class="col">
@@ -564,9 +564,9 @@
     const PATH = "index.html";
     const TIMEOUT_MS = 20000;
 
-    const CACHE_HTML_KEY = "ST_REMOTE_HTML_CACHE_V66";
-    const CACHE_META_KEY = "ST_REMOTE_HTML_META_V66";
-    const APPLIED_SHA_KEY = "ST_REMOTE_APPLIED_SHA_V66";
+    const CACHE_HTML_KEY = "ST_REMOTE_HTML_CACHE_V673";
+    const CACHE_META_KEY = "ST_REMOTE_HTML_META_V673";
+    const APPLIED_SHA_KEY = "ST_REMOTE_APPLIED_SHA_V673";
 
     function updateStatus(text, state = "idle") {
       const textEl = document.getElementById("ghStatusText");
@@ -663,6 +663,16 @@
       };
     }
 
+    function formatCommitDate(value) {
+      if (!value) return "";
+      const date = new Date(value);
+      if (!Number.isFinite(date.getTime())) return "";
+      return " / " + date.toLocaleString("ja-JP", {
+        year:"numeric", month:"2-digit", day:"2-digit",
+        hour:"2-digit", minute:"2-digit"
+      });
+    }
+
     function currentAppliedSha() {
       try { return sessionStorage.getItem(APPLIED_SHA_KEY) || ""; }
       catch (error) { return ""; }
@@ -733,7 +743,7 @@
         const commit = await latestCommit();
 
         if (currentAppliedSha() === commit.sha) {
-          updateStatus("GitHub最新版: " + commit.shortSha, "live");
+          updateStatus("V6.7.3 / GitHub最新版: " + commit.shortSha + formatCommitDate(commit.date), "live");
           return {replaced:false, version:commit.sha};
         }
 
@@ -1850,62 +1860,270 @@
         return sessions.find(x => String(x.id) === String(id)) || sessions[0] || null;
       }
 
-      function blobToDataUrl(blob) {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
+      const APP_BUILD = Object.freeze({
+        version:"6.7.3",
+        build:"2026-09-18-full-log-zip",
+        feature:"MEMORY_SAFE_FULL_LOG"
+      });
+
+      let exportBusy = false;
+
+      function setFullExportProgress(done, total, message) {
+        const button = document.getElementById("btnFullExport");
+        const shareButton = document.getElementById("btnFullShare");
+        const safeTotal = Math.max(0, Number(total || 0));
+        const safeDone = Math.max(0, Number(done || 0));
+        if (button) {
+          button.disabled = exportBusy;
+          button.textContent = exportBusy
+            ? (message || "完全ログ作成中") + " " + safeDone + "/" + safeTotal
+            : "完全ログZIP出力";
+        }
+        if (shareButton) shareButton.disabled = exportBusy;
       }
 
-      async function buildSessionExport(session, withAudio) {
+      function yieldToBrowser() {
+        return new Promise(resolve => setTimeout(resolve, 0));
+      }
+
+      function sanitizeZipName(value) {
+        return String(value || "file")
+          .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "-")
+          .replace(/\s+/g, "_")
+          .slice(0, 120);
+      }
+
+      function audioExtension(type) {
+        const mime = String(type || "").toLowerCase();
+        if (mime.includes("mp4") || mime.includes("m4a")) return "m4a";
+        if (mime.includes("ogg")) return "ogg";
+        if (mime.includes("wav")) return "wav";
+        return "webm";
+      }
+
+      const CRC32_TABLE = (() => {
+        const table = new Uint32Array(256);
+        for (let n = 0; n < 256; n++) {
+          let c = n;
+          for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+          table[n] = c >>> 0;
+        }
+        return table;
+      })();
+
+      async function crc32Blob(blob) {
+        let crc = 0xffffffff;
+        const chunkSize = 1024 * 1024;
+        for (let offset = 0; offset < blob.size; offset += chunkSize) {
+          const bytes = new Uint8Array(await blob.slice(offset, offset + chunkSize).arrayBuffer());
+          for (let i = 0; i < bytes.length; i++) {
+            crc = CRC32_TABLE[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+          }
+          if (offset && offset % (chunkSize * 8) === 0) await yieldToBrowser();
+        }
+        return (crc ^ 0xffffffff) >>> 0;
+      }
+
+      function crc32Bytes(bytes) {
+        let crc = 0xffffffff;
+        for (let i = 0; i < bytes.length; i++) {
+          crc = CRC32_TABLE[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+        }
+        return (crc ^ 0xffffffff) >>> 0;
+      }
+
+      function writeU16(view, offset, value) { view.setUint16(offset, value & 0xffff, true); }
+      function writeU32(view, offset, value) { view.setUint32(offset, value >>> 0, true); }
+
+      function dosDateTime(value) {
+        const date = value instanceof Date ? value : new Date(value || Date.now());
+        const year = Math.max(1980, date.getFullYear());
+        return {
+          time:((date.getHours() & 31) << 11) | ((date.getMinutes() & 63) << 5) | ((date.getSeconds() / 2) & 31),
+          date:((year - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate()
+        };
+      }
+
+      function localZipHeader(nameBytes, crc, size, stamp) {
+        const buffer = new ArrayBuffer(30 + nameBytes.length);
+        const view = new DataView(buffer);
+        writeU32(view, 0, 0x04034b50);
+        writeU16(view, 4, 20);
+        writeU16(view, 6, 0x0800);
+        writeU16(view, 8, 0);
+        writeU16(view, 10, stamp.time);
+        writeU16(view, 12, stamp.date);
+        writeU32(view, 14, crc);
+        writeU32(view, 18, size);
+        writeU32(view, 22, size);
+        writeU16(view, 26, nameBytes.length);
+        writeU16(view, 28, 0);
+        new Uint8Array(buffer, 30).set(nameBytes);
+        return buffer;
+      }
+
+      function centralZipHeader(nameBytes, crc, size, offset, stamp) {
+        const buffer = new ArrayBuffer(46 + nameBytes.length);
+        const view = new DataView(buffer);
+        writeU32(view, 0, 0x02014b50);
+        writeU16(view, 4, 20);
+        writeU16(view, 6, 20);
+        writeU16(view, 8, 0x0800);
+        writeU16(view, 10, 0);
+        writeU16(view, 12, stamp.time);
+        writeU16(view, 14, stamp.date);
+        writeU32(view, 16, crc);
+        writeU32(view, 20, size);
+        writeU32(view, 24, size);
+        writeU16(view, 28, nameBytes.length);
+        writeU16(view, 30, 0);
+        writeU16(view, 32, 0);
+        writeU16(view, 34, 0);
+        writeU16(view, 36, 0);
+        writeU32(view, 38, 0);
+        writeU32(view, 42, offset);
+        new Uint8Array(buffer, 46).set(nameBytes);
+        return buffer;
+      }
+
+      function endZipRecord(count, centralSize, centralOffset) {
+        const buffer = new ArrayBuffer(22);
+        const view = new DataView(buffer);
+        writeU32(view, 0, 0x06054b50);
+        writeU16(view, 4, 0);
+        writeU16(view, 6, 0);
+        writeU16(view, 8, count);
+        writeU16(view, 10, count);
+        writeU32(view, 12, centralSize);
+        writeU32(view, 16, centralOffset);
+        writeU16(view, 20, 0);
+        return buffer;
+      }
+
+      async function createStoredZip(entries, progress) {
+        if (entries.length > 65535) throw new Error("ZIPファイル数の上限を超えました");
+        const encoder = new TextEncoder();
+        const parts = [];
+        const centralParts = [];
+        let offset = 0;
+
+        for (let index = 0; index < entries.length; index++) {
+          const entry = entries[index];
+          const nameBytes = encoder.encode(entry.name);
+          const blob = entry.data instanceof Blob ? entry.data : new Blob([entry.data]);
+          if (blob.size > 0xffffffff || offset > 0xffffffff) {
+            throw new Error("完全ログがZIP32の4GB上限を超えています");
+          }
+          const crc = entry.crc == null
+            ? (entry.data instanceof Blob ? await crc32Blob(blob) : crc32Bytes(new Uint8Array(await blob.arrayBuffer())))
+            : entry.crc;
+          const stamp = dosDateTime(entry.date);
+          const local = localZipHeader(nameBytes, crc, blob.size, stamp);
+          parts.push(local, blob);
+          centralParts.push(centralZipHeader(nameBytes, crc, blob.size, offset, stamp));
+          offset += local.byteLength + blob.size;
+          progress?.(index + 1, entries.length, entry.name);
+          if (index % 3 === 0) await yieldToBrowser();
+        }
+
+        const centralOffset = offset;
+        const centralSize = centralParts.reduce((sum, part) => sum + part.byteLength, 0);
+        parts.push(...centralParts, endZipRecord(entries.length, centralSize, centralOffset));
+        return new Blob(parts, {type:"application/zip"});
+      }
+
+      async function clipsForSession(session) {
         const all = await getClipsFromDB();
         const start = Number(session.startedAt || session.id);
         const end = Number(session.endedAt || start + session.durationSec * 1000);
-        const clips = all.filter(c => Number(c.id) >= start && Number(c.id) <= end + 5000);
-        const exportedClips = [];
-        
-        let count = 0;
-        for (const clip of clips) {
-          count++;
-          if (withAudio && count % 5 === 0) {
-            toast(`音声変換中... (${count}/${clips.length})`);
-          }
-          const item = {
-            id:clip.id, category:clip.category, label:clip.label,
-            timeStr:clip.timeStr, realClock:clip.realClock,
-            durationSec:clip.durationSec, peakDb:clip.peakDb,
-            motionG:clip.motionG, reason:clip.reason,
-            voteSummary:clip.voteSummary, waveform:clip.waveform || [],
-            mimeType:clip.blob?.type || ""
-          };
-          if (withAudio && clip.blob) {
-            try {
-              item.audioBase64 = await blobToDataUrl(clip.blob);
-            } catch (err) {
-              console.warn("Base64変換スキップ", err);
-            }
-          }
-          exportedClips.push(item);
-        }
+        return all
+          .filter(clip => Number(clip.id) >= start && Number(clip.id) <= end + 5000)
+          .sort((a, b) => Number(a.id) - Number(b.id));
+      }
+
+      function clipMetadata(clip, audioFile) {
         return {
-          meta:{ 
-            app:"SleepTracker AI Stable", version:"6.6", exportedAt:new Date().toISOString(), fullAudio:withAudio,
-            notice:"睡眠段階・睡眠品質・無呼吸は音声と体動による参考推定で、医学的診断ではありません。" 
-          },
-          session:{...session, quality:qualityFromSession(session)}, clips:exportedClips
+          id:clip.id, category:clip.category, label:clip.label,
+          timeStr:clip.timeStr, realClock:clip.realClock,
+          durationSec:clip.durationSec, peakDb:clip.peakDb,
+          motionG:clip.motionG, reason:clip.reason,
+          voteSummary:clip.voteSummary, waveform:clip.waveform || [],
+          mimeType:clip.blob?.type || "", audioFile:audioFile || null,
+          audioBytes:Number(clip.blob?.size || 0)
         };
+      }
+
+      async function buildLiteSessionExport(session) {
+        const clips = await clipsForSession(session);
+        return {
+          meta:{
+            app:"SleepTracker AI Stable", version:APP_BUILD.version,
+            build:APP_BUILD.build, exportedAt:new Date().toISOString(),
+            format:"json-lite", fullAudio:false,
+            notice:"睡眠段階・睡眠品質・無呼吸は音声と体動による参考推定で、医学的診断ではありません。"
+          },
+          session:{...session, quality:qualityFromSession(session)},
+          clips:clips.map(clip => clipMetadata(clip, null))
+        };
+      }
+
+      async function buildFullSessionZip(session) {
+        const clips = await clipsForSession(session);
+        const entries = [];
+        const metadata = [];
+        const usedNames = new Set();
+
+        clips.forEach((clip, index) => {
+          let audioFile = null;
+          if (clip.blob instanceof Blob && clip.blob.size > 0) {
+            const ext = audioExtension(clip.blob.type);
+            const clock = sanitizeZipName(clip.realClock || clip.timeStr || clip.id);
+            let base = "audio/" + String(index + 1).padStart(4, "0") + "_" + clock;
+            audioFile = base + "." + ext;
+            while (usedNames.has(audioFile)) audioFile = base + "_" + index + "." + ext;
+            usedNames.add(audioFile);
+            entries.push({name:audioFile, data:clip.blob, date:new Date(Number(clip.id) || Date.now())});
+          }
+          metadata.push(clipMetadata(clip, audioFile));
+        });
+
+        const log = {
+          meta:{
+            app:"SleepTracker AI Stable", version:APP_BUILD.version,
+            build:APP_BUILD.build, feature:APP_BUILD.feature,
+            exportedAt:new Date().toISOString(), format:"zip-store-v1",
+            fullAudio:true, clipCount:metadata.length,
+            audioFileCount:entries.length,
+            profileBinCount:Array.isArray(session.profileBins) ? session.profileBins.length : 0,
+            notice:"睡眠段階・睡眠品質・無呼吸は音声と体動による参考推定で、医学的診断ではありません。"
+          },
+          session:{...session, quality:qualityFromSession(session)},
+          clips:metadata
+        };
+        const logText = JSON.stringify(log, null, 2);
+        const readme = [
+          "SleepTracker AI 完全ログ", "Version: " + APP_BUILD.version,
+          "Build: " + APP_BUILD.build,
+          "log.json: セッション、全30秒プロファイル、全クリップ情報",
+          "audio/: 検出クリップの音声（Base64化せず原音声を格納）",
+          "音声再生・録音処理はV6.6完成版から変更していません。"
+        ].join("\n");
+        entries.unshift(
+          {name:"log.json", data:logText, date:new Date()},
+          {name:"README.txt", data:readme, date:new Date()}
+        );
+        return createStoredZip(entries, (done, total, name) => {
+          setFullExportProgress(done, total, "ZIP作成中");
+        });
       }
 
       function safeSessionFilename(session, full) {
         const date = String(session.dateStr || "session").replace(/[\\/:*?"<>|]/g,"-");
         const time = String(session.startTime || "").replace(/:/g,"");
-        return `SleepTracker_${full?"full":"lite"}_${date}_${time}.json`;
+        return `SleepTracker_V${APP_BUILD.version}_${full?"full":"lite"}_${date}_${time}.${full?"zip":"json"}`;
       }
 
-      function downloadJsonObject(data, filename) {
-        const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json;charset=utf-8"});
+      function downloadBlob(blob, filename) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -1913,40 +2131,70 @@
         document.body.appendChild(a);
         a.click();
         a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      }
+
+      function downloadJsonObject(data, filename) {
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json;charset=utf-8"});
+        downloadBlob(blob, filename);
         return blob;
       }
 
       async function exportSessionLog(withAudio) {
         const session = selectedReportSession();
         if (!session) { toast("保存済みセッションがありません"); return; }
-        toast(withAudio ? "音声付き完全ログを作成中..." : "軽量ログを作成中...");
+        if (exportBusy) { toast("完全ログを処理中です"); return; }
         try {
-          const data = await buildSessionExport(session, withAudio);
-          downloadJsonObject(data, safeSessionFilename(session, withAudio));
-          toast("ログのダウンロードを開始しました");
-        } catch (error) { toast("ログ作成に失敗しました: " + error.message); }
+          if (withAudio) {
+            exportBusy = true;
+            setFullExportProgress(0, 0, "準備中");
+            toast("省メモリ方式で完全ログZIPを作成します");
+            const zip = await buildFullSessionZip(session);
+            downloadBlob(zip, safeSessionFilename(session, true));
+            toast("完全ログZIPのダウンロードを開始しました");
+          } else {
+            toast("軽量ログを作成中...");
+            const data = await buildLiteSessionExport(session);
+            downloadJsonObject(data, safeSessionFilename(session, false));
+            toast("軽量ログのダウンロードを開始しました");
+          }
+        } catch (error) {
+          console.error("[SessionExport]", error);
+          toast("ログ作成に失敗しました: " + (error?.message || error));
+        } finally {
+          exportBusy = false;
+          setFullExportProgress(0, 0, "");
+        }
       }
 
       async function shareSessionLog(withAudio) {
         const session = selectedReportSession();
         if (!session) { toast("保存済みセッションがありません"); return; }
-        toast(withAudio ? "音声付き共有ファイルを作成中..." : "共有ファイルを作成中...");
+        if (exportBusy) { toast("完全ログを処理中です"); return; }
         try {
-          const data = await buildSessionExport(session, withAudio);
+          exportBusy = true;
+          setFullExportProgress(0, 0, withAudio ? "共有ZIP準備中" : "共有準備中");
           const filename = safeSessionFilename(session, withAudio);
-          const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json;charset=utf-8"});
-          const file = new File([blob], filename, {type:"application/json"});
+          const blob = withAudio
+            ? await buildFullSessionZip(session)
+            : new Blob([JSON.stringify(await buildLiteSessionExport(session), null, 2)], {type:"application/json;charset=utf-8"});
+          const file = new File([blob], filename, {type:withAudio ? "application/zip" : "application/json"});
           if (navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))) {
-            await navigator.share({title:"SleepTracker 睡眠ログ", text:"睡眠測定ログ", files:[file]});
+            await navigator.share({title:"SleepTracker 睡眠ログ V" + APP_BUILD.version, text:"睡眠測定ログ", files:[file]});
             toast("共有しました");
           } else {
-            downloadJsonObject(data, filename);
+            downloadBlob(blob, filename);
             toast("共有非対応のためダウンロードしました");
           }
         } catch (error) {
           if (error?.name === "AbortError") toast("共有をキャンセルしました");
-          else toast("共有に失敗しました: " + error.message);
+          else {
+            console.error("[SessionShare]", error);
+            toast("共有に失敗しました: " + (error?.message || error));
+          }
+        } finally {
+          exportBusy = false;
+          setFullExportProgress(0, 0, "");
         }
       }
 
@@ -2528,6 +2776,10 @@
       async function init() {
         if (initialized) return;
         initialized = true;
+
+        const buildBadge = document.getElementById("buildBadge");
+        if (buildBadge) buildBadge.textContent = "V" + APP_BUILD.version + " FULLLOG";
+        document.documentElement.dataset.sleepTrackerBuild = APP_BUILD.build;
 
         showInterruptedSessionNotice();
         checkIosMotionBanner();
