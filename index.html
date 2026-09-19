@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#090d16">
-<title>SleepTracker AI Stable V6.9 NIGHT SCREEN</title>
+<title>SleepTracker AI Stable V7.0 NIGHT SCREEN</title>
 
 <style>
   :root {
@@ -1007,6 +1007,9 @@
     let lastProfileFlushMs = 0;
     let timeSeriesLogs = [];
     let lastTimeSeriesSec = -1;
+    // ★追加: 1秒間の最大Peak dBおよび最大セントロイド周波数を保持するラッチバッファ
+    let secondPeakDbLatch = 20.0;
+    let secondPeakHzLatch = 0;
 
     // V6.9 NIGHT SCREEN（表示制御のみ）
     const NIGHT_AUTO_DELAY_MS = 5000;
@@ -1722,27 +1725,31 @@
       isClipRecording = true;
       currentRecordingChunks = [];
 
+      // ★修正: トリガー判定成立時の厳密なセッション相対秒を固定算出
+      const exactStartSec = Math.max(0, Math.floor((now - sessionStartMs) / 1000));
+
       currentClipMeta = {
-        id:String(now),
-        category:result.category,
-        label:result.label,
-        tagClass:result.tagClass,
-        peakDb:Number(peakDb),
-        motionG:Number(motionG).toFixed(2),
-        timeStr:formatHMS(elapsedSeconds()),
-        realClock:new Date().toLocaleTimeString("ja-JP", {
-          hour:"2-digit",
-          minute:"2-digit",
-          second:"2-digit"
+        id: String(now),
+        startSec: exactStartSec, // ★追加: グラフX軸/Y軸と1ミリ秒の狂いもなく完全同期する基準秒
+        category: result.category,
+        label: result.label,
+        tagClass: result.tagClass,
+        peakDb: Number(peakDb),
+        motionG: Number(motionG).toFixed(2),
+        timeStr: formatHMS(exactStartSec),
+        realClock: new Date(now).toLocaleTimeString("ja-JP", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit"
         }),
-        durationSec:0,
-        startedAt:now,
-        lastSnoreAt:result.category === "snore" ? now : 0,
-        forceCategory:result.category === "apnea" ? "apnea" : "",
-        waveformDb:[],
-        votes:{ [result.category]:1 },
-        reasons:{ [result.category]:result.reason || "初期判定" },
-        reason:result.reason || ""
+        durationSec: 0,
+        startedAt: now,
+        lastSnoreAt: result.category === "snore" ? now : 0,
+        forceCategory: result.category === "apnea" ? "apnea" : "",
+        waveformDb: [],
+        votes: { [result.category]: 1 },
+        reasons: { [result.category]: result.reason || "初期判定" },
+        reason: result.reason || ""
       };
 
       clipFinalizePromise = new Promise(resolve => {
@@ -2378,56 +2385,95 @@
       }
 
       async function buildFullSessionZip(session) {
+        // IndexedDBから該当セッションの全クリップ（Blob実体含む）を取得
         const clips = await clipsForSession(session);
         const entries = [];
         const metadata = [];
+        const audioManifest = []; // ★追加: オシロスコープ同期用音声マニフェスト
         const usedNames = new Set();
 
-        clips.forEach((clip, index) => {
+        for (let index = 0; index < clips.length; index++) {
+          const clip = clips[index];
           let audioFile = null;
-          if (clip.blob instanceof Blob && clip.blob.size > 0) {
-            const ext = audioExtension(clip.blob.type);
-            const clock = sanitizeZipName(clip.realClock || clip.timeStr || clip.id);
-            let base = "audio/" + String(index + 1).padStart(4, "0") + "_" + clock;
+          
+          // Blob実体の確実な取得 (blob / audioBlob / rawData すべてを網羅)
+          const rawBlob = clip.blob || clip.audioBlob || clip.rawData;
+
+          if (rawBlob instanceof Blob && rawBlob.size > 0) {
+            const ext = audioExtension(rawBlob.type);
+            // 命名形式: audio/{インデックス4桁}_{開始秒}s_{ID}_{カテゴリ}.{拡張子}
+            const startSec = clip.startSec !== undefined ? clip.startSec : Math.max(0, Math.floor((Number(clip.id) - Number(session.startedAt || clip.id)) / 1000));
+            const base = "audio/" + String(index + 1).padStart(4, "0") + "_" + String(startSec) + "s_" + clip.category;
             audioFile = base + "." + ext;
-            while (usedNames.has(audioFile)) audioFile = base + "_" + index + "." + ext;
+            
+            while (usedNames.has(audioFile)) {
+              audioFile = base + "_" + index + "." + ext;
+            }
             usedNames.add(audioFile);
-            entries.push({name:audioFile, data:clip.blob, date:new Date(Number(clip.id) || Date.now())});
+
+            // ZIPアーカイブエントリーへ確実に追加
+            entries.push({
+              name: audioFile,
+              data: rawBlob,
+              date: new Date(Number(clip.id) || Date.now())
+            });
+
+            // オシロスコープ用マニフェストに登録
+            audioManifest.push({
+              fileName: audioFile,
+              startSec: startSec,
+              durationSec: Number(clip.durationSec) || 10,
+              category: clip.category,
+              peakDb: Number(clip.peakDb) || 0
+            });
           }
+
           metadata.push(clipMetadata(clip, audioFile));
-        });
+        }
 
         const log = {
-          meta:{
-            app:"SleepTracker AI Stable", version:APP_BUILD.version,
-            build:APP_BUILD.build, feature:APP_BUILD.feature,
-            exportedAt:new Date().toISOString(), format:"zip-store-v1",
-            fullAudio:true, clipCount:metadata.length,
-            audioFileCount:entries.length,
-            profileBinCount:Array.isArray(session.profileBins) ? session.profileBins.length : 0,
-            timeSeriesLogCount:Array.isArray(session.timeSeriesLogs) ? session.timeSeriesLogs.length : 0,
-            timeSeriesIntervalSec:1,
-            notice:"睡眠段階・睡眠品質・無呼吸は音声と体動による参考推定で、医学的診断ではありません。"
+          meta: {
+            app: "SleepTracker AI Stable",
+            version: APP_BUILD.version,
+            build: APP_BUILD.build,
+            feature: APP_BUILD.feature,
+            exportedAt: new Date().toISOString(),
+            format: "zip-store-v1",
+            fullAudio: true,
+            clipCount: metadata.length,
+            audioFileCount: entries.length,
+            profileBinCount: Array.isArray(session.profileBins) ? session.profileBins.length : 0,
+            timeSeriesLogCount: Array.isArray(session.timeSeriesLogs) ? session.timeSeriesLogs.length : 0,
+            timeSeriesIntervalSec: 1,
+            notice: "睡眠段階・睡眠品質・無呼吸は音声と体動による参考推定で、医学的診断ではありません。"
           },
-          session:{
+          session: {
             ...session,
-            quality:qualityFromSession(session),
-            timeSeriesLogs:Array.isArray(session.timeSeriesLogs) ? session.timeSeriesLogs : []
+            quality: qualityFromSession(session),
+            timeSeriesLogs: Array.isArray(session.timeSeriesLogs) ? session.timeSeriesLogs : [],
+            audioManifest: audioManifest // ★追加: 音声区間マニフェストを完全統合
           },
-          clips:metadata
+          clips: metadata
         };
+
         const logText = JSON.stringify(log, null, 2);
         const readme = [
-          "SleepTracker AI 完全ログ", "Version: " + APP_BUILD.version,
+          "SleepTracker AI 完全ログ (Full Archive)",
+          "Version: " + APP_BUILD.version,
           "Build: " + APP_BUILD.build,
-          "log.json: セッション、1秒時系列ログ、全30秒プロファイル、全クリップ情報",
-          "audio/: 検出クリップの音声（Base64化せず原音声を格納）",
-          "音声再生・録音処理はV6.6完成版から変更していません。"
+          "--------------------------------------------------",
+          "log.json: 1秒時系列(Peak-dBラッチ済)、全30秒プロファイル、音声マニフェスト",
+          "audio/   : 検出クリップの生音声ファイル群 (.webm / .m4a)",
+          "--------------------------------------------------",
+          "添付音声ファイル数: " + entries.length + " 件",
+          "総時系列データ点数: " + (session.timeSeriesLogs ? session.timeSeriesLogs.length : 0) + " 点"
         ].join("\n");
+
         entries.unshift(
-          {name:"log.json", data:logText, date:new Date()},
-          {name:"README.txt", data:readme, date:new Date()}
+          { name: "log.json", data: logText, date: new Date() },
+          { name: "README.txt", data: readme, date: new Date() }
         );
+
         return createStoredZip(entries, (done, total, name) => {
           setFullExportProgress(done, total, "ZIP作成中");
         });
@@ -2660,17 +2706,35 @@
           updateMeters(motionSnapshot);
           updateBaseline();
 
+          // ★修正: 1秒間の中の最高音圧(Peak)と周波数を常にラッチ保持する
+          if (currentDb > secondPeakDbLatch) {
+            secondPeakDbLatch = currentDb;
+          }
+          if ((spectrum.peakHz || 0) > secondPeakHzLatch) {
+            secondPeakHzLatch = spectrum.peakHz || 0;
+          }
+
           const now = Date.now();
           const currentSec = Math.max(0, Math.floor((now - sessionStartMs) / 1000));
+          
+          // 1秒が経過したタイミングでコミット
           if (currentSec !== lastTimeSeriesSec) {
+            // 測定谷間の20dBではなく、ラッチされた最大音圧を出力する
+            const committedDb = Math.max(20.0, secondPeakDbLatch);
+            const committedHz = secondPeakHzLatch > 0 ? secondPeakHzLatch : (spectrum.centroid || 0);
+
             timeSeriesLogs.push({
-              sec:currentSec,
-              epochMs:now,
-              db:+currentDb.toFixed(1),
-              peakHz:spectrum.peakHz || 0,
-              motionG:+motionSnapshot.toFixed(3)
+              sec: currentSec,
+              epochMs: now,
+              db: +committedDb.toFixed(1),
+              peakHz: Math.round(committedHz),
+              motionG: +motionSnapshot.toFixed(3)
             });
+
             lastTimeSeriesSec = currentSec;
+            // 次の1秒のためにラッチを現在の瞬時値でリセット
+            secondPeakDbLatch = currentDb;
+            secondPeakHzLatch = spectrum.peakHz || 0;
           }
 
           const delta = currentDb - baselineDb;
