@@ -646,7 +646,8 @@
           <span><i class="legend-dot" style="background:#38bdf8"></i>浅い睡眠</span>
           <span><i class="legend-dot" style="background:#6366f1"></i>中度睡眠</span>
           <span><i class="legend-dot" style="background:#a78bfa"></i>深い睡眠</span>
-          <span><i class="legend-dot" style="background:#ec4899"></i>体動ピーク</span>
+          <span><i class="legend-dot" style="background:#22d3ee"></i>拡大体動</span>
+          <span><i class="legend-dot" style="background:#f59e0b"></i>端末操作候補</span>
         </div>
         <div class="report-section-title">🛌 睡眠詳細</div>
         <div class="report-grid">
@@ -659,7 +660,7 @@
           <div class="report-tile"><div class="report-k">いびき録音</div><div id="rSnore" class="report-v">--回</div></div>
           <div class="report-tile"><div class="report-k">無呼吸疑い</div><div id="rApnea" class="report-v">--回</div></div>
         </div>
-        <div class="quality-note">※ 睡眠構造・品質・入眠・安定睡眠は、30分以上の測定時に端末のマイクとモーションセンサーから算出する参考推定です。体動グラフはセンサーの実測記録です。医療機器による診断ではありません。</div>
+        <div class="quality-note">※ 睡眠構造・品質・入眠・安定睡眠は、30分以上の測定時に端末のマイクとモーションセンサーから算出する参考推定です。体動は睡眠中央区間の分布で拡大表示し、開始・終了付近の突出値は端末操作候補として分離します。医療機器による診断ではありません。</div>
       </div>
     </div>
   </section>
@@ -1963,7 +1964,7 @@
       }
 
       function qualityFromSession(session) {
-        const bins = Array.isArray(session.profileBins) ? session.profileBins : [];
+        const bins = improvedProfileBins(session);
         const total = Math.max(1, Number(session.durationSec || 1));
         const eligible = total >= MIN_REPORT_DURATION_SEC;
         const awakeSec = bins.filter(b => b.state === 0)
@@ -2134,7 +2135,7 @@
             "30分以上の音声・体動記録から算出した参考評価です。";
         }
 
-        const bins = Array.isArray(s.profileBins) ? s.profileBins : [];
+        const bins = improvedProfileBins(s);
         const firstSleep = q.eligible ? bins.find(b => Number(b.state) > 0) : null;
         const latency = firstSleep ? Number(firstSleep.startSec || 0) : 0;
         const sleepSec = q.eligible
@@ -2153,115 +2154,226 @@
         drawSleepChart(s, q.eligible);
       }
 
-      function aggregateMotionSamples(session, total, maxPoints = 280) {
-        let source = Array.isArray(session.timeSeriesLogs)
-          ? session.timeSeriesLogs.map(item => ({
-              sec:Number(item.sec || 0),
-              value:Math.max(0, Number(item.motionG || 0))
-            }))
-          : [];
+      // V11.1: 端末操作ピークを分離し、1秒ログから睡眠構造を再推定する。
+      // 医学的睡眠段階ではなく、音・体動の相対変化に基づく参考推定。
+      function percentile(values, ratio, fallback = 0) {
+        const sorted = values.filter(Number.isFinite).sort((a,b) => a-b);
+        if (!sorted.length) return fallback;
+        const pos = Math.max(0, Math.min(sorted.length - 1, (sorted.length - 1) * ratio));
+        const lo = Math.floor(pos), hi = Math.ceil(pos), t = pos - lo;
+        return sorted[lo] * (1 - t) + sorted[hi] * t;
+      }
 
-        if (!source.length) {
-          source = (Array.isArray(session.profileBins) ? session.profileBins : [])
-            .map(item => ({
-              sec:Number(item.startSec || 0) + Number(item.durationSec || 0) / 2,
-              value:Math.max(0, Number(item.maxMotion || 0))
-            }));
+      function clamp01(value) {
+        return Math.max(0, Math.min(1, Number(value) || 0));
+      }
+
+      function improvedProfileBins(session) {
+        const total = Math.max(1, Number(session.durationSec || 1));
+        const logs = (Array.isArray(session.timeSeriesLogs) ? session.timeSeriesLogs : [])
+          .map(v => ({
+            sec:Number(v.sec),
+            motion:Math.max(0, Number(v.motionG || 0)),
+            db:Number(v.db)
+          }))
+          .filter(v => Number.isFinite(v.sec) && v.sec >= 0 && v.sec <= total)
+          .sort((a,b) => a.sec-b.sec);
+
+        // 1秒ログがない旧記録では従来の30秒ビンを利用する。
+        if (logs.length < 30) {
+          return (Array.isArray(session.profileBins) ? session.profileBins : []).map(v => ({
+            ...v,
+            state:Math.max(0, Math.min(3, Number(v.state) || 0)),
+            depth:Math.max(0, Math.min(3, Number(v.state) || 0)),
+            operation:false,
+            gap:false,
+            source:"legacy"
+          }));
         }
-        if (!source.length) return [];
 
-        const bucketCount = Math.min(maxPoints, Math.max(1, Math.ceil(total)));
-        const buckets = Array.from({length:bucketCount}, () => null);
-        source.forEach(item => {
-          const index = Math.min(bucketCount - 1,
-            Math.max(0, Math.floor(item.sec / total * bucketCount)));
-          const current = buckets[index];
-          if (!current || item.value > current.value) buckets[index] = item;
+        const BIN_SEC = 30;
+        const count = Math.ceil(total / BIN_SEC);
+        const groups = Array.from({length:count}, () => []);
+        logs.forEach(v => groups[Math.min(count-1, Math.floor(v.sec/BIN_SEC))].push(v));
+
+        const preliminary = groups.map((items,index) => {
+          if (!items.length) return {
+            startSec:index*BIN_SEC, durationSec:Math.min(BIN_SEC,total-index*BIN_SEC),
+            gap:true, operation:false, state:1, depth:1, avgMotion:0, maxMotion:0,
+            dbVariation:0, disturbance:0
+          };
+          const motions=items.map(v=>v.motion);
+          const dbs=items.map(v=>v.db).filter(Number.isFinite);
+          const avgDb=dbs.length ? dbs.reduce((a,b)=>a+b,0)/dbs.length : 0;
+          const dbVar=dbs.length ? Math.sqrt(dbs.reduce((n,v)=>n+(v-avgDb)**2,0)/dbs.length) : 0;
+          return {
+            startSec:index*BIN_SEC,
+            durationSec:Math.min(BIN_SEC,total-index*BIN_SEC),
+            gap:items.length < 8,
+            operation:false,
+            state:1, depth:1,
+            avgMotion:motions.reduce((a,b)=>a+b,0)/motions.length,
+            motionP90:percentile(motions,.90,0),
+            maxMotion:Math.max(0,...motions),
+            avgDb, dbVariation:dbVar,
+            loudDb:percentile(dbs,.90,avgDb),
+            sampleCount:items.length
+          };
         });
-        return buckets.map((item,index) => item && ({
-          sec:(index + .5) / bucketCount * total,
-          value:item.value
-        })).filter(Boolean);
+
+        const central = preliminary.filter(b => !b.gap && b.startSec >= 300 && b.startSec+b.durationSec <= total-300);
+        const reference = central.length >= 4 ? central : preliminary.filter(b=>!b.gap);
+        const motionBase=percentile(reference.map(b=>b.motionP90),.50,.005);
+        const motionHigh=Math.max(motionBase+.004,percentile(reference.map(b=>b.motionP90),.90,.04));
+        const peakRef=Math.max(.015,percentile(reference.map(b=>b.maxMotion),.95,.08));
+        const varBase=percentile(reference.map(b=>b.dbVariation),.50,2);
+        const varHigh=Math.max(varBase+1,percentile(reference.map(b=>b.dbVariation),.90,7));
+        const loudBase=percentile(reference.map(b=>b.loudDb),.50,30);
+        const loudHigh=Math.max(loudBase+3,percentile(reference.map(b=>b.loudDb),.90,45));
+
+        preliminary.forEach(b => {
+          if (b.gap) return;
+          const edge = b.startSec < 300 || b.startSec+b.durationSec > total-300;
+          // 端の区間でも、突出した体動だけを端末操作として分離する。
+          b.operation = edge && (b.maxMotion >= Math.max(.10,peakRef*1.8) ||
+            b.motionP90 >= Math.max(.045,motionHigh*1.8));
+          const motionN=clamp01((b.motionP90-motionBase)/(motionHigh-motionBase));
+          const varN=clamp01((b.dbVariation-varBase)/(varHigh-varBase));
+          const loudN=clamp01((b.loudDb-loudBase)/(loudHigh-loudBase));
+          const peakN=clamp01(b.maxMotion/Math.max(.06,peakRef));
+          b.disturbance=clamp01(motionN*.52+peakN*.18+varN*.20+loudN*.10);
+        });
+
+        // 前後5分（11ビン）の重み付き平滑化。端末操作と欠測は基準から除外。
+        preliminary.forEach((b,index) => {
+          if (b.gap) return;
+          if (b.operation) { b.state=0; b.depth=0; return; }
+          let sum=0, weights=0;
+          for (let j=Math.max(0,index-5);j<=Math.min(preliminary.length-1,index+5);j++) {
+            const n=preliminary[j];
+            if (n.gap || n.operation) continue;
+            const weight=6-Math.abs(index-j);
+            sum+=n.disturbance*weight; weights+=weight;
+          }
+          const d=weights ? sum/weights : b.disturbance;
+          // 静かな状態ほど深い方向へ。連続値を残して不自然な階段・V字を避ける。
+          b.depth=d>=.72 ? 0 : d>=.46 ? 1 : d>=.23 ? 2 : 3;
+          b.state=Math.round(b.depth);
+          b.smoothedDisturbance=d;
+        });
+
+        // 生理的に不自然な2段階以上の瞬間移動を抑制する。
+        let previous=null;
+        preliminary.forEach(b => {
+          if (b.gap || b.operation) { previous=null; return; }
+          if (previous !== null) b.depth=Math.max(previous-1,Math.min(previous+1,b.depth));
+          b.state=Math.round(b.depth); previous=b.depth;
+        });
+        for (let i=preliminary.length-2;i>=0;i--) {
+          const b=preliminary[i], next=preliminary[i+1];
+          if (b.gap || b.operation || next.gap || next.operation) continue;
+          b.depth=Math.max(next.depth-1,Math.min(next.depth+1,b.depth));
+          b.state=Math.round(b.depth);
+        }
+        return preliminary;
+      }
+
+      function aggregateMotionSamples(session, total, maxPoints = 300) {
+        let source=(Array.isArray(session.timeSeriesLogs)?session.timeSeriesLogs:[])
+          .map(v=>({sec:Number(v.sec),value:Math.max(0,Number(v.motionG||0))}))
+          .filter(v=>Number.isFinite(v.sec)&&v.sec>=0&&v.sec<=total);
+        if (!source.length) source=(Array.isArray(session.profileBins)?session.profileBins:[])
+          .map(v=>({sec:Number(v.startSec||0)+Number(v.durationSec||0)/2,value:Math.max(0,Number(v.maxMotion||0))}));
+        if (!source.length) return {points:[],scaleMax:.05,operationLimit:.1};
+        const interior=source.filter(v=>v.sec>=300&&v.sec<=total-300);
+        const ref=interior.length>=10?interior:source;
+        const scaleMax=Math.max(.012,percentile(ref.map(v=>v.value),.97,.05));
+        const operationLimit=Math.max(.10,scaleMax*2.2);
+        const bucketCount=Math.min(maxPoints,Math.max(1,Math.ceil(total/10)));
+        const buckets=Array.from({length:bucketCount},()=>null);
+        source.forEach(v=>{
+          const i=Math.min(bucketCount-1,Math.max(0,Math.floor(v.sec/total*bucketCount)));
+          if (!buckets[i]||v.value>buckets[i].value) buckets[i]=v;
+        });
+        return {scaleMax,operationLimit,points:buckets.map((v,i)=>v&&({
+          sec:(i+.5)/bucketCount*total,
+          value:v.value,
+          operation:((i+.5)/bucketCount*total<300||(i+.5)/bucketCount*total>total-300)&&v.value>=operationLimit
+        })).filter(Boolean)};
+      }
+
+      function clockLabel(session, sec) {
+        const match=String(session.startTime||"").match(/(\d{1,2}):(\d{2})/);
+        if (!match) return Math.round(sec/3600)+"h";
+        const minutes=(Number(match[1])*60+Number(match[2])+Math.round(sec/60))%(24*60);
+        return String(Math.floor(minutes/60)).padStart(2,"0")+":"+String(minutes%60).padStart(2,"0");
+      }
+
+      function smoothPath(points) {
+        if (!points.length) return "";
+        if (points.length===1) return `M ${points[0][0]} ${points[0][1]}`;
+        let d=`M ${points[0][0]} ${points[0][1]}`;
+        for (let i=1;i<points.length;i++) {
+          const a=points[i-1],b=points[i],mx=(a[0]+b[0])/2;
+          d+=` C ${mx} ${a[1]}, ${mx} ${b[1]}, ${b[0]} ${b[1]}`;
+        }
+        return d;
       }
 
       function drawSleepChart(session, stageEligible) {
-        const wrap = document.getElementById("sleepChart");
+        const wrap=document.getElementById("sleepChart");
         if (!wrap) return;
-
-        const bins = Array.isArray(session.profileBins) ? session.profileBins : [];
-        const total = Math.max(1, Number(session.durationSec || 1));
-        const motion = aggregateMotionSamples(session, total);
-        const w = 900, h = 360, left = 62, right = 20;
-        const plotWidth = w - left - right;
-        const stageY = [34, 78, 122, 166];
-        const stageColors = ["#fb7185", "#38bdf8", "#6366f1", "#a78bfa"];
-        const motionTop = 235;
-        const motionBase = 320;
-
-        let grid = "";
-        ["覚醒", "浅い", "中度", "深い"].forEach((text,index) => {
-          grid += `<line x1="${left}" y1="${stageY[index]}" x2="${w-right}" y2="${stageY[index]}" stroke="#1e293b" stroke-dasharray="3,3"/>`;
-          grid += `<text x="8" y="${stageY[index]+4}" fill="#94a3b8" font-size="11">${text}</text>`;
+        const total=Math.max(1,Number(session.durationSec||1));
+        const bins=improvedProfileBins(session);
+        const motionData=aggregateMotionSamples(session,total);
+        const motion=motionData.points;
+        const w=900,h=360,left=64,right=18,plotWidth=w-left-right;
+        const stageY=[34,78,122,166],motionTop=235,motionBase=318;
+        let grid="",timeMarks="";
+        ["覚醒","浅い","中度","深い"].forEach((text,i)=>{
+          grid+=`<line x1="${left}" y1="${stageY[i]}" x2="${w-right}" y2="${stageY[i]}" stroke="#1e293b" stroke-dasharray="3,3"/>`+
+            `<text x="8" y="${stageY[i]+4}" fill="#94a3b8" font-size="11">${text}</text>`;
         });
-        grid += `<line x1="${left}" y1="215" x2="${w-right}" y2="215" stroke="#334155" stroke-width="2"/>`;
-        grid += `<text x="8" y="${motionTop+5}" fill="#ec4899" font-size="11" font-weight="700">体動</text>`;
-        grid += `<line x1="${left}" y1="${motionBase}" x2="${w-right}" y2="${motionBase}" stroke="#334155"/>`;
-
-        const tickCount = total >= 3600 ? Math.ceil(total / 3600) : 6;
-        let timeMarks = "";
-        for (let i = 0; i <= tickCount; i++) {
-          const ratio = i / tickCount;
-          const sec = ratio * total;
-          const x = left + ratio * plotWidth;
-          const label = total >= 3600
-            ? (sec / 3600).toFixed(sec % 3600 ? 1 : 0) + "h"
-            : Math.round(sec / 60) + "m";
-          timeMarks += `<line x1="${x}" y1="20" x2="${x}" y2="${motionBase}" stroke="#162235"/>`;
-          timeMarks += `<text x="${x}" y="346" text-anchor="middle" fill="#94a3b8" font-size="10">${label}</text>`;
+        grid+=`<line x1="${left}" y1="215" x2="${w-right}" y2="215" stroke="#334155" stroke-width="2"/>`+
+          `<text x="8" y="${motionTop+5}" fill="#22d3ee" font-size="11" font-weight="700">体動</text>`+
+          `<line x1="${left}" y1="${motionBase}" x2="${w-right}" y2="${motionBase}" stroke="#334155"/>`;
+        const tickCount=Math.max(4,Math.min(8,Math.ceil(total/3600)));
+        for(let i=0;i<=tickCount;i++){
+          const ratio=i/tickCount,x=left+ratio*plotWidth,sec=ratio*total;
+          timeMarks+=`<line x1="${x}" y1="20" x2="${x}" y2="${motionBase}" stroke="#162235"/>`+
+            `<text x="${x}" y="346" text-anchor="middle" fill="#94a3b8" font-size="10">${clockLabel(session,sec)}</text>`;
         }
-
-        let stageElements = "";
-        if (stageEligible && bins.length) {
-          const validBins = bins.filter(b => Number(b.state) >= 0 && Number(b.state) <= 3);
-          const points = validBins.map(b => {
-            const x = left + Math.min(1,
-              (Number(b.startSec || 0) + Number(b.durationSec || 0) / 2) / total
-            ) * plotWidth;
-            return `${x},${stageY[Number(b.state)]}`;
-          }).join(" ");
-          if (points) {
-            stageElements += `<polyline points="${points}" fill="none" stroke="#c4b5fd" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>`;
-          }
-          validBins.forEach(b => {
-            const state = Number(b.state);
-            const x = left + Math.min(1,
-              (Number(b.startSec || 0) + Number(b.durationSec || 0) / 2) / total
-            ) * plotWidth;
-            stageElements += `<circle cx="${x}" cy="${stageY[state]}" r="5" fill="${stageColors[state]}"/>`;
+        let stages="";
+        if(stageEligible&&bins.some(b=>!b.gap)){
+          const operationBins=bins.filter(b=>b.operation);
+          operationBins.forEach(b=>{
+            const x=left+b.startSec/total*plotWidth,width=Math.max(2,b.durationSec/total*plotWidth);
+            stages+=`<rect x="${x}" y="20" width="${width}" height="190" fill="#f59e0b" opacity=".10"/>`;
           });
-        } else {
-          stageElements = `<text x="${left + plotWidth/2}" y="105" text-anchor="middle" fill="#e2e8f0" font-size="15" font-weight="700">測定時間不足</text>` +
-            `<text x="${left + plotWidth/2}" y="129" text-anchor="middle" fill="#94a3b8" font-size="11">30分未満のため推定睡眠構造は表示しません</text>`;
+          let segment=[];
+          const flush=()=>{if(segment.length>1) stages+=`<path d="${smoothPath(segment)}" fill="none" stroke="#67e8f9" stroke-width="4" stroke-linecap="round" opacity=".95"/>`;segment=[];};
+          bins.forEach(b=>{
+            if(b.gap){flush();return;}
+            const x=left+(b.startSec+b.durationSec/2)/total*plotWidth;
+            const y=stageY[0]+Math.max(0,Math.min(3,b.depth))*(stageY[3]-stageY[0])/3;
+            segment.push([x,y]);
+          }); flush();
+          if(bins.some(b=>b.gap)) stages+=`<text x="${w-right-4}" y="207" text-anchor="end" fill="#64748b" font-size="9">線の切れ目＝欠測</text>`;
+        }else{
+          stages=`<text x="${left+plotWidth/2}" y="105" text-anchor="middle" fill="#e2e8f0" font-size="15" font-weight="700">測定時間不足</text>`+
+            `<text x="${left+plotWidth/2}" y="129" text-anchor="middle" fill="#94a3b8" font-size="11">30分未満のため推定睡眠構造は表示しません</text>`;
         }
-
-        const maxMotion = Math.max(.12, ...motion.map(item => item.value));
-        let motionElements = "";
-        motion.forEach(item => {
-          const x = left + Math.min(1, item.sec / total) * plotWidth;
-          const normalized = Math.min(1, item.value / maxMotion);
-          const y = motionBase - normalized * (motionBase - motionTop);
-          const strong = item.value >= Math.max(.04, maxMotion * .35);
-          const strokeWidth = strong ? 9 : 5;
-          motionElements += `<line x1="${x}" y1="${motionBase}" x2="${x}" y2="${y}" stroke="#ec4899" stroke-width="${strokeWidth}" stroke-linecap="round" opacity="${strong ? .95 : .62}"/>`;
-          if (strong) motionElements += `<circle cx="${x}" cy="${y}" r="6" fill="#f9a8d4" stroke="#ec4899" stroke-width="2"/>`;
-        });
-        if (!motion.length) {
-          motionElements = `<text x="${left + plotWidth/2}" y="282" text-anchor="middle" fill="#64748b" font-size="11">体動データなし</text>`;
-        }
-
-        wrap.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" height="100%" preserveAspectRatio="none" role="img" aria-label="推定睡眠構造と体動ピークのグラフ">
-          ${grid}${timeMarks}${stageElements}${motionElements}
-        </svg>`;
+        let motionElements="";
+        if(motion.length){
+          const wave=[];
+          motion.forEach(v=>{
+            const x=left+v.sec/total*plotWidth,n=Math.min(1,v.value/motionData.scaleMax),y=motionBase-n*(motionBase-motionTop);
+            if(!v.operation) wave.push([x,y]);
+            if(v.operation) motionElements+=`<line x1="${x}" y1="${motionBase}" x2="${x}" y2="${Math.max(motionTop,y)}" stroke="#f59e0b" stroke-width="7" stroke-linecap="round" opacity=".95"/>`;
+          });
+          if(wave.length>1) motionElements+=`<path d="${smoothPath(wave)}" fill="none" stroke="#22d3ee" stroke-width="3" stroke-linecap="round" opacity=".9"/>`;
+        }else motionElements=`<text x="${left+plotWidth/2}" y="282" text-anchor="middle" fill="#64748b" font-size="11">体動データなし</text>`;
+        wrap.innerHTML=`<svg viewBox="0 0 ${w} ${h}" width="100%" height="100%" preserveAspectRatio="none" role="img" aria-label="推定睡眠構造と拡大体動波形">${grid}${timeMarks}${stages}${motionElements}</svg>`;
       }
 
       function selectedReportSession() {
@@ -2272,8 +2384,8 @@
 
       const APP_BUILD = Object.freeze({
         version:"11.0",
-        build:"2026-09-20-min30-motion-profile",
-        feature:"PEAK_DB_FRAME_SYNC_TIMESERIES_FULL_LOG"
+        build:"2026-09-20-adaptive-sleep-profile-v11.1",
+        feature:"ADAPTIVE_SLEEP_PROFILE_OPERATION_SEPARATION"
       });
 
       let exportBusy = false;
