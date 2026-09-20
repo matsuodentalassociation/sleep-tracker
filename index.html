@@ -342,7 +342,7 @@
   .quality-ring::after { content:""; position:absolute; inset:12px; background:var(--card); border-radius:50%; }
   .quality-ring-inner { position:relative; z-index:1; text-align:center; font-weight:900; }
   
-  .sleep-chart { width:100%; height:270px; background:#08111f; border-radius:12px; overflow:hidden; border:1px solid #1e293b; position:relative; }
+  .sleep-chart { width:100%; height:360px; background:#08111f; border-radius:12px; overflow:hidden; border:1px solid #1e293b; position:relative; }
   .legend-row { display:flex; flex-wrap:wrap; gap:12px; color:var(--muted); font-size:11px; padding:4px 0; }
   .legend-dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:4px; vertical-align:middle; }
   .report-section-title { font-size:15px; font-weight:900; display:flex; align-items:center; gap:7px; margin-top:6px; }
@@ -471,7 +471,7 @@
   @media (max-width:520px) {
     .stat-grid { grid-template-columns:repeat(2,1fr); }
     .clip-item { align-items:flex-start; }
-    .sleep-chart { height:250px; }
+    .sleep-chart { height:340px; }
   }
 </style>
 </head>
@@ -627,11 +627,8 @@
         <select id="reportSessionSelect" class="btn btn-soft" style="max-width:300px" onchange="App.renderSleepReport(this.value)"></select>
       </div>
       <div class="export-grid">
-        <button class="btn btn-primary" onclick="App.exportSessionLog(false)">軽量ログ出力</button>
-        <button class="btn btn-soft" onclick="App.shareSessionLog(false)">軽量ログ共有</button>
-        <button id="btnFullExport" class="btn btn-primary" onclick="App.exportSessionLog(true)">完全ログZIP出力</button>
-        <button id="btnFullShare" class="btn btn-soft" onclick="App.shareSessionLog(true)">完全ログZIP共有</button>
-        <button id="btnDeleteSession" class="btn btn-danger" style="grid-column:1/-1" onclick="App.deleteSelectedSession()">選択したログを削除</button>
+        <button id="btnFullExport" class="btn btn-primary" style="min-height:52px" onclick="App.exportSessionLog(true)">完全ログZIPを保存</button>
+        <button id="btnDeleteSession" class="btn btn-danger" style="min-height:52px" onclick="App.deleteSelectedSession()">このログを削除</button>
       </div>
       <div id="reportEmpty" class="notice">保存済みレポートはありません。下のグラフは表示例です。測定終了後、実測データに自動更新されます。</div>
       <div id="reportContent" class="col">
@@ -642,24 +639,14 @@
           <div><div id="qualityLabel" style="font-size:20px;font-weight:900">--</div><div id="qualityReason" class="stat-k" style="max-width:340px;margin-top:6px"></div></div>
         </div>
         </div>
-        <table class="evaluation-table" aria-label="睡眠品質の評価表">
-          <tbody>
-            <tr><td>睡眠時間</td><td><span id="eDuration">--</span><div class="score-track"><div id="eDurationBar" class="score-fill" style="width:0%"></div></div></td></tr>
-            <tr><td>睡眠の連続性</td><td><span id="eContinuity">--</span><div class="score-track"><div id="eContinuityBar" class="score-fill" style="width:0%"></div></div></td></tr>
-            <tr><td>いびきの少なさ</td><td><span id="eSnore">--</span><div class="score-track"><div id="eSnoreBar" class="score-fill" style="width:0%"></div></div></td></tr>
-            <tr><td>呼吸の安定性</td><td><span id="eBreathing">--</span><div class="score-track"><div id="eBreathingBar" class="score-fill" style="width:0%"></div></div></td></tr>
-            <tr><td>体動の少なさ</td><td><span id="eMotion">--</span><div class="score-track"><div id="eMotionBar" class="score-fill" style="width:0%"></div></div></td></tr>
-          </tbody>
-        </table>
-        <div class="report-section-title">🌙 睡眠構造・音響同期プロファイル</div>
+        <div class="report-section-title">🌙 推定睡眠構造・体動プロファイル</div>
         <div id="sleepChart" class="sleep-chart"></div>
         <div class="legend-row">
           <span><i class="legend-dot" style="background:#fb7185"></i>覚醒</span>
           <span><i class="legend-dot" style="background:#38bdf8"></i>浅い睡眠</span>
           <span><i class="legend-dot" style="background:#6366f1"></i>中度睡眠</span>
           <span><i class="legend-dot" style="background:#a78bfa"></i>深い睡眠</span>
-          <span><i class="legend-dot" style="background:#f59e0b"></i>いびき音圧(dB)</span>
-          <span><i class="legend-dot" style="background:#f43f5e"></i>無呼吸疑い(⚠️)</span>
+          <span><i class="legend-dot" style="background:#ec4899"></i>体動ピーク</span>
         </div>
         <div class="report-section-title">🛌 睡眠詳細</div>
         <div class="report-grid">
@@ -672,7 +659,7 @@
           <div class="report-tile"><div class="report-k">いびき録音</div><div id="rSnore" class="report-v">--回</div></div>
           <div class="report-tile"><div class="report-k">無呼吸疑い</div><div id="rApnea" class="report-v">--回</div></div>
         </div>
-        <div class="quality-note">※ 睡眠状態・品質・入眠・安定睡眠・無呼吸疑いは、端末のマイクとモーションセンサーから算出する参考推定です。医療機器による診断ではありません。</div>
+        <div class="quality-note">※ 睡眠構造・品質・入眠・安定睡眠は、30分以上の測定時に端末のマイクとモーションセンサーから算出する参考推定です。体動グラフはセンサーの実測記録です。医療機器による診断ではありません。</div>
       </div>
     </div>
   </section>
@@ -950,6 +937,7 @@
     const TRIGGER_COOLDOWN_MS = 2500;
     const SESSION_HISTORY_KEY = "ST_SESSION_HISTORY_V63";
     const PROFILE_BIN_MS = 30000;
+    const MIN_REPORT_DURATION_SEC = 30 * 60; // 睡眠評価に必要な最低測定時間（30分）
 
     let db = null;
     let initialized = false;
@@ -1975,22 +1963,66 @@
       }
 
       function qualityFromSession(session) {
-        const bins = session.profileBins || [];
+        const bins = Array.isArray(session.profileBins) ? session.profileBins : [];
         const total = Math.max(1, Number(session.durationSec || 1));
-        const awakeSec = bins.filter(b => b.state === 0).reduce((n,b) => n + Number(b.durationSec || 0), 0);
-        const stableSec = bins.filter(b => b.state >= 2).reduce((n,b) => n + Number(b.durationSec || 0), 0);
+        const eligible = total >= MIN_REPORT_DURATION_SEC;
+        const awakeSec = bins.filter(b => b.state === 0)
+          .reduce((n,b) => n + Number(b.durationSec || 0), 0);
+        const stableSec = bins.filter(b => b.state >= 2)
+          .reduce((n,b) => n + Number(b.durationSec || 0), 0);
+
+        // 30分未満では「異常がなかった」ことを満点として扱わず、採点自体を行わない。
+        if (!eligible) {
+          return {
+            eligible:false,
+            score:null,
+            awakeSec,
+            stableSec,
+            durationPct:null,
+            continuityPct:null,
+            snorePct:null,
+            breathingPct:null,
+            motionPct:null,
+            label:"測定時間不足"
+          };
+        }
+
         const durationHours = total / 3600;
-        const durationPct = Math.round(Math.max(0, Math.min(100, 100 - Math.abs(7.5 - durationHours) * 20)));
-        const continuityPct = Math.round(Math.max(0, Math.min(100, 100 * (1 - awakeSec / total))));
-        const snoreImpact = (session.counts?.snore || 0) * 4 + (session.snoreDurationSec || 0) / total * 100;
+        const durationPct = Math.round(Math.max(0, Math.min(100,
+          100 - Math.abs(7.5 - durationHours) * 20
+        )));
+        const continuityPct = Math.round(Math.max(0, Math.min(100,
+          100 * (1 - awakeSec / total)
+        )));
+        const snoreImpact = (session.counts?.snore || 0) * 4 +
+          (session.snoreDurationSec || 0) / total * 100;
         const snorePct = Math.round(Math.max(0, Math.min(100, 100 - snoreImpact)));
-        const breathingPct = Math.round(Math.max(0, Math.min(100, 100 - (session.counts?.apnea || 0) * 15)));
-        const motionAvg = bins.length ? bins.reduce((n,b) => n + Number(b.avgMotion || 0), 0) / bins.length : 0;
-        const motionPct = Math.round(Math.max(0, Math.min(100, 100 - motionAvg * 250)));
-        const score = Math.round(durationPct * .25 + continuityPct * .25 + snorePct * .18 + breathingPct * .17 + motionPct * .15);
+        const breathingPct = Math.round(Math.max(0, Math.min(100,
+          100 - (session.counts?.apnea || 0) * 15
+        )));
+        const motionAvg = bins.length
+          ? bins.reduce((n,b) => n + Number(b.avgMotion || 0), 0) / bins.length
+          : 0;
+        const motionPct = Math.round(Math.max(0, Math.min(100,
+          100 - motionAvg * 250
+        )));
+        const score = Math.round(
+          durationPct * .25 + continuityPct * .25 + snorePct * .18 +
+          breathingPct * .17 + motionPct * .15
+        );
         return {
-          score, awakeSec, stableSec, durationPct, continuityPct, snorePct, breathingPct, motionPct,
-          label:score>=85?"良好":score>=70?"比較的良好":score>=50?"やや不安定":"要確認"
+          eligible:true,
+          score,
+          awakeSec,
+          stableSec,
+          durationPct,
+          continuityPct,
+          snorePct,
+          breathingPct,
+          motionPct,
+          label:score >= 85 ? "良好" :
+            score >= 70 ? "比較的良好" :
+            score >= 50 ? "やや不安定" : "要確認"
         };
       }
 
@@ -2058,136 +2090,177 @@
           const el = document.getElementById(id);
           if (el) el.textContent = value;
         });
-        ["Duration","Continuity","Snore","Breathing","Motion"].forEach(key => {
-          const label = document.getElementById("e" + key);
-          const bar = document.getElementById("e" + key + "Bar");
-          if (label) label.textContent = "未測定";
-          if (bar) bar.style.width = "0%";
-        });
         drawEmptySleepChart();
       }
 
       function drawEmptySleepChart() {
         const wrap = document.getElementById("sleepChart");
         if (!wrap) return;
-        const w=900,h=270,left=55,right=18,top=18,bottom=38,pw=w-left-right;
-        const ys=[35,85,135,185];
-        const labels=["覚醒","浅い","中度","深い"];
-        let grid="";
-        ys.forEach((y,i) => {
-          grid += `<line x1="${left}" y1="${y}" x2="${w-right}" y2="${y}" stroke="#1e293b"/>` +
-                  `<text x="8" y="${y+4}" fill="#94a3b8" font-size="11">${labels[i]}</text>`;
-        });
-        for(let i=0;i<=6;i++){
-          const x=left+i*pw/6;
-          grid += `<line x1="${x}" y1="${top}" x2="${x}" y2="${h-bottom}" stroke="#1e293b"/>` +
-                  `<text x="${x-8}" y="${h-12}" fill="#64748b" font-size="10">${i}h</text>`;
-        }
-        wrap.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" height="100%" preserveAspectRatio="none">
-          ${grid}
-          <text x="${w/2}" y="${h/2-6}" text-anchor="middle" fill="#e2e8f0" font-size="16" font-weight="700">睡眠推移・音響グラフ</text>
-          <text x="${w/2}" y="${h/2+17}" text-anchor="middle" fill="#94a3b8" font-size="12">測定終了後、実測データを表示します</text>
-        </svg>`;
+        wrap.innerHTML = `
+          <div style="height:100%;display:grid;place-items:center;text-align:center;padding:24px">
+            <div>
+              <div style="font-size:16px;font-weight:800;color:#e2e8f0">推定睡眠構造・体動グラフ</div>
+              <div style="margin-top:8px;font-size:12px;color:#94a3b8">測定終了後、実測データを表示します</div>
+            </div>
+          </div>`;
       }
 
       function renderSleepReport(id) {
         const sessions = loadSessionHistory();
         const s = sessions.find(x => String(x.id) === String(id)) || sessions[0];
         if (!s) return;
-        document.getElementById("reportEmpty").classList.add("hidden");
-        document.getElementById("reportContent").classList.remove("hidden");
+
+        document.getElementById("reportEmpty")?.classList.add("hidden");
+        document.getElementById("reportContent")?.classList.remove("hidden");
+
         const q = qualityFromSession(s);
         const ring = document.getElementById("qualityRing");
-        ring.style.background = `conic-gradient(${q.score>=70?"var(--success)":"var(--warn)"} ${q.score*3.6}deg,#263247 0deg)`;
-        document.getElementById("qualityScore").textContent = q.score;
-        document.getElementById("qualityLabel").textContent = q.label;
-        document.getElementById("qualityReason").textContent = "測定時間・連続性・いびき・呼吸・体動の5項目から算出した参考評価です。";
-        const evaluations = [
-          ["eDuration", "eDurationBar", q.durationPct],
-          ["eContinuity", "eContinuityBar", q.continuityPct],
-          ["eSnore", "eSnoreBar", q.snorePct],
-          ["eBreathing", "eBreathingBar", q.breathingPct],
-          ["eMotion", "eMotionBar", q.motionPct]
-        ];
-        evaluations.forEach(([textId, barId, value]) => {
-          const text = document.getElementById(textId);
-          const bar = document.getElementById(barId);
-          if (text) text.textContent = value + "点";
-          if (bar) bar.style.width = value + "%";
-        });
-        const bins = s.profileBins || [];
-        const firstSleep = bins.find(b => b.state > 0);
-        const latency = firstSleep ? firstSleep.startSec : 0;
-        const sleepSec = Math.max(0, s.durationSec - q.awakeSec - latency);
+        const score = document.getElementById("qualityScore");
+        const label = document.getElementById("qualityLabel");
+        const reason = document.getElementById("qualityReason");
+
+        if (!q.eligible) {
+          if (ring) ring.style.background = "conic-gradient(#334155 0deg,#263247 0deg)";
+          if (score) score.textContent = "--";
+          if (label) label.textContent = "測定時間不足";
+          if (reason) reason.textContent =
+            "睡眠評価には30分以上の測定が必要です。短時間の記録は採点しません。";
+        } else {
+          if (ring) ring.style.background = `conic-gradient(${q.score >= 70 ?
+            "var(--success)" : "var(--warn)"} ${q.score * 3.6}deg,#263247 0deg)`;
+          if (score) score.textContent = q.score;
+          if (label) label.textContent = q.label;
+          if (reason) reason.textContent =
+            "30分以上の音声・体動記録から算出した参考評価です。";
+        }
+
+        const bins = Array.isArray(s.profileBins) ? s.profileBins : [];
+        const firstSleep = q.eligible ? bins.find(b => Number(b.state) > 0) : null;
+        const latency = firstSleep ? Number(firstSleep.startSec || 0) : 0;
+        const sleepSec = q.eligible
+          ? Math.max(0, Number(s.durationSec || 0) - q.awakeSec - latency)
+          : 0;
+
         document.getElementById("rStart").textContent = s.startTime;
         document.getElementById("rEnd").textContent = s.endTime;
         document.getElementById("rBed").textContent = formatDurationJP(s.durationSec);
-        document.getElementById("rSleep").textContent = formatDurationJP(sleepSec);
-        document.getElementById("rLatency").textContent = formatDurationJP(latency);
-        document.getElementById("rDeep").textContent = formatDurationJP(q.stableSec);
-        document.getElementById("rSnore").textContent = (s.counts?.snore || 0) + "回 / " + formatDurationJP(s.snoreDurationSec || 0);
+        document.getElementById("rSleep").textContent = q.eligible ? formatDurationJP(sleepSec) : "--";
+        document.getElementById("rLatency").textContent = q.eligible ? formatDurationJP(latency) : "--";
+        document.getElementById("rDeep").textContent = q.eligible ? formatDurationJP(q.stableSec) : "--";
+        document.getElementById("rSnore").textContent =
+          (s.counts?.snore || 0) + "回 / " + formatDurationJP(s.snoreDurationSec || 0);
         document.getElementById("rApnea").textContent = (s.counts?.apnea || 0) + "回";
-        drawSleepChart(s);
+        drawSleepChart(s, q.eligible);
       }
 
-      function drawSleepChart(session) {
-        const wrap = document.getElementById("sleepChart");
-        const bins = session.profileBins || [];
-        if (!bins.length) { wrap.innerHTML = '<div class="notice" style="margin:20px">グラフ用データがありません。</div>'; return; }
-        const w=900,h=270,left=50,right=20,top=20,bottom=38, pw=w-left-right, ph=h-top-bottom;
-        const total=Math.max(1,session.durationSec);
-        const ys=[28,74,120,168]; // 覚醒, 浅い, 中度, 深い
-        const colors=["#fb7185","#38bdf8","#6366f1","#a78bfa"];
+      function aggregateMotionSamples(session, total, maxPoints = 280) {
+        let source = Array.isArray(session.timeSeriesLogs)
+          ? session.timeSeriesLogs.map(item => ({
+              sec:Number(item.sec || 0),
+              value:Math.max(0, Number(item.motionG || 0))
+            }))
+          : [];
 
-        let grid="";
-        for(let i=0;i<4;i++) {
-          grid += `<line x1="${left}" y1="${ys[i]}" x2="${w-right}" y2="${ys[i]}" stroke="#1e293b" stroke-dasharray="2,2"/>` +
-                  `<text x="6" y="${ys[i]+4}" fill="#94a3b8" font-size="10">${["覚醒","浅い","中度","深い"][i]}</text>`;
+        if (!source.length) {
+          source = (Array.isArray(session.profileBins) ? session.profileBins : [])
+            .map(item => ({
+              sec:Number(item.startSec || 0) + Number(item.durationSec || 0) / 2,
+              value:Math.max(0, Number(item.maxMotion || 0))
+            }));
         }
+        if (!source.length) return [];
 
-        let marks="";
-        const hourCount=Math.max(1,Math.ceil(total/3600));
-        for(let i=0;i<=hourCount;i++){ 
-          const x=left+Math.min(1,i*3600/total)*pw; 
-          marks += `<line x1="${x}" y1="${top}" x2="${x}" y2="${h-bottom}" stroke="#1e293b"/>` +
-                   `<text x="${x-10}" y="${h-12}" fill="#94a3b8" font-size="10">${i}h</text>`; 
-        }
-
-        // 睡眠ステージのポリライン
-        const stagePoints = bins.map(b => {
-          const cx = left + Math.min(1, (b.startSec + b.durationSec/2)/total) * pw;
-          return `${cx},${ys[b.state]}`;
-        }).join(" ");
-
-        // いびき・無呼吸オーバーレイ
-        let eventElements = "";
-        bins.forEach(b => {
-          const cx = left + Math.min(1, (b.startSec + b.durationSec/2)/total) * pw;
-          // いびき音圧プロット（オレンジ円）
-          if (b.snoreRatio > 0 && b.maxDb) {
-            const snoreY = h - bottom - Math.min(60, Math.max(10, (b.maxDb - 20) * 1.5));
-            const r = Math.min(7, Math.max(2.5, b.snoreRatio * 6));
-            eventElements += `<circle cx="${cx}" cy="${snoreY}" r="${r}" fill="#f59e0b" opacity="0.8"/>`;
-          }
-          // 無呼吸疑いマーカー（⚠️・赤色✕）
-          if (b.apneaCount > 0) {
-            eventElements += `<line x1="${cx-5}" y1="${ys[1]-5}" x2="${cx+5}" y2="${ys[1]+5}" stroke="#f43f5e" stroke-width="2.5"/>` +
-                             `<line x1="${cx+5}" y1="${ys[1]-5}" x2="${cx-5}" y2="${ys[1]+5}" stroke="#f43f5e" stroke-width="2.5"/>` +
-                             `<circle cx="${cx}" cy="${ys[1]}" r="8" fill="none" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="2,2"/>`;
-          }
+        const bucketCount = Math.min(maxPoints, Math.max(1, Math.ceil(total)));
+        const buckets = Array.from({length:bucketCount}, () => null);
+        source.forEach(item => {
+          const index = Math.min(bucketCount - 1,
+            Math.max(0, Math.floor(item.sec / total * bucketCount)));
+          const current = buckets[index];
+          if (!current || item.value > current.value) buckets[index] = item;
         });
+        return buckets.map((item,index) => item && ({
+          sec:(index + .5) / bucketCount * total,
+          value:item.value
+        })).filter(Boolean);
+      }
 
-        // 睡眠ステージのドット
-        const stageDots = bins.map(b => {
-          const cx = left + Math.min(1, (b.startSec + b.durationSec/2)/total) * pw;
-          return `<circle cx="${cx}" cy="${ys[b.state]}" r="3" fill="${colors[b.state]}"/>`;
-        }).join("");
+      function drawSleepChart(session, stageEligible) {
+        const wrap = document.getElementById("sleepChart");
+        if (!wrap) return;
 
-        wrap.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" height="100%" preserveAspectRatio="none">
-          ${grid}${marks}
-          <polyline points="${stagePoints}" fill="none" stroke="#6366f1" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
-          ${stageDots}
-          ${eventElements}
+        const bins = Array.isArray(session.profileBins) ? session.profileBins : [];
+        const total = Math.max(1, Number(session.durationSec || 1));
+        const motion = aggregateMotionSamples(session, total);
+        const w = 900, h = 360, left = 62, right = 20;
+        const plotWidth = w - left - right;
+        const stageY = [34, 78, 122, 166];
+        const stageColors = ["#fb7185", "#38bdf8", "#6366f1", "#a78bfa"];
+        const motionTop = 235;
+        const motionBase = 320;
+
+        let grid = "";
+        ["覚醒", "浅い", "中度", "深い"].forEach((text,index) => {
+          grid += `<line x1="${left}" y1="${stageY[index]}" x2="${w-right}" y2="${stageY[index]}" stroke="#1e293b" stroke-dasharray="3,3"/>`;
+          grid += `<text x="8" y="${stageY[index]+4}" fill="#94a3b8" font-size="11">${text}</text>`;
+        });
+        grid += `<line x1="${left}" y1="215" x2="${w-right}" y2="215" stroke="#334155" stroke-width="2"/>`;
+        grid += `<text x="8" y="${motionTop+5}" fill="#ec4899" font-size="11" font-weight="700">体動</text>`;
+        grid += `<line x1="${left}" y1="${motionBase}" x2="${w-right}" y2="${motionBase}" stroke="#334155"/>`;
+
+        const tickCount = total >= 3600 ? Math.ceil(total / 3600) : 6;
+        let timeMarks = "";
+        for (let i = 0; i <= tickCount; i++) {
+          const ratio = i / tickCount;
+          const sec = ratio * total;
+          const x = left + ratio * plotWidth;
+          const label = total >= 3600
+            ? (sec / 3600).toFixed(sec % 3600 ? 1 : 0) + "h"
+            : Math.round(sec / 60) + "m";
+          timeMarks += `<line x1="${x}" y1="20" x2="${x}" y2="${motionBase}" stroke="#162235"/>`;
+          timeMarks += `<text x="${x}" y="346" text-anchor="middle" fill="#94a3b8" font-size="10">${label}</text>`;
+        }
+
+        let stageElements = "";
+        if (stageEligible && bins.length) {
+          const validBins = bins.filter(b => Number(b.state) >= 0 && Number(b.state) <= 3);
+          const points = validBins.map(b => {
+            const x = left + Math.min(1,
+              (Number(b.startSec || 0) + Number(b.durationSec || 0) / 2) / total
+            ) * plotWidth;
+            return `${x},${stageY[Number(b.state)]}`;
+          }).join(" ");
+          if (points) {
+            stageElements += `<polyline points="${points}" fill="none" stroke="#c4b5fd" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>`;
+          }
+          validBins.forEach(b => {
+            const state = Number(b.state);
+            const x = left + Math.min(1,
+              (Number(b.startSec || 0) + Number(b.durationSec || 0) / 2) / total
+            ) * plotWidth;
+            stageElements += `<circle cx="${x}" cy="${stageY[state]}" r="5" fill="${stageColors[state]}"/>`;
+          });
+        } else {
+          stageElements = `<text x="${left + plotWidth/2}" y="105" text-anchor="middle" fill="#e2e8f0" font-size="15" font-weight="700">測定時間不足</text>` +
+            `<text x="${left + plotWidth/2}" y="129" text-anchor="middle" fill="#94a3b8" font-size="11">30分未満のため推定睡眠構造は表示しません</text>`;
+        }
+
+        const maxMotion = Math.max(.12, ...motion.map(item => item.value));
+        let motionElements = "";
+        motion.forEach(item => {
+          const x = left + Math.min(1, item.sec / total) * plotWidth;
+          const normalized = Math.min(1, item.value / maxMotion);
+          const y = motionBase - normalized * (motionBase - motionTop);
+          const strong = item.value >= Math.max(.04, maxMotion * .35);
+          const strokeWidth = strong ? 9 : 5;
+          motionElements += `<line x1="${x}" y1="${motionBase}" x2="${x}" y2="${y}" stroke="#ec4899" stroke-width="${strokeWidth}" stroke-linecap="round" opacity="${strong ? .95 : .62}"/>`;
+          if (strong) motionElements += `<circle cx="${x}" cy="${y}" r="6" fill="#f9a8d4" stroke="#ec4899" stroke-width="2"/>`;
+        });
+        if (!motion.length) {
+          motionElements = `<text x="${left + plotWidth/2}" y="282" text-anchor="middle" fill="#64748b" font-size="11">体動データなし</text>`;
+        }
+
+        wrap.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" height="100%" preserveAspectRatio="none" role="img" aria-label="推定睡眠構造と体動ピークのグラフ">
+          ${grid}${timeMarks}${stageElements}${motionElements}
         </svg>`;
       }
 
@@ -2199,7 +2272,7 @@
 
       const APP_BUILD = Object.freeze({
         version:"11.0",
-        build:"2026-09-20-peak-sync-session-delete",
+        build:"2026-09-20-min30-motion-profile",
         feature:"PEAK_DB_FRAME_SYNC_TIMESERIES_FULL_LOG"
       });
 
@@ -2208,16 +2281,14 @@
 
       function setFullExportProgress(done, total, message) {
         const button = document.getElementById("btnFullExport");
-        const shareButton = document.getElementById("btnFullShare");
         const safeTotal = Math.max(0, Number(total || 0));
         const safeDone = Math.max(0, Number(done || 0));
         if (button) {
           button.disabled = exportBusy;
           button.textContent = exportBusy
             ? (message || "完全ログ作成中") + " " + safeDone + "/" + safeTotal
-            : "完全ログZIP出力";
+            : "完全ログZIPを保存";
         }
-        if (shareButton) shareButton.disabled = exportBusy;
         updateDeleteSessionButtonState();
       }
 
@@ -3233,7 +3304,7 @@
 
       async function deleteSelectedSession() {
         if (isTracking) { toast("睡眠測定中はログを削除できません"); return; }
-        if (exportBusy) { toast("ログ出力・共有中は削除できません"); return; }
+        if (exportBusy) { toast("ログ保存中は削除できません"); return; }
         if (sessionDeleteBusy) return;
 
         const session = selectedReportSession();
