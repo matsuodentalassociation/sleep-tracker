@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#090d16">
-<title>SleepTracker AI Stable V7.0 NIGHT SCREEN</title>
+<title>SleepTracker AI Stable V11.0 NIGHT SCREEN</title>
 
 <style>
   :root {
@@ -355,7 +355,7 @@
   .score-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#6366f1,#22d3ee); }
   .quality-note { color:#94a3b8; font-size:10px; line-height:1.6; }
 
-  /* V6.9 NIGHT SCREEN: 表示のみ。測定・録音・再生経路には影響しません */
+  /* V11.0 NIGHT SCREEN: 表示のみ。測定・録音・再生経路には影響しません */
   #nightScreen {
     position:fixed;
     inset:0;
@@ -494,7 +494,7 @@
 
 <header class="top">
   <div class="top-inner">
-    <div class="brand">🌙 SleepTracker <span id="buildBadge">V6.9 NIGHT SCREEN</span></div>
+    <div class="brand">🌙 SleepTracker <span id="buildBadge">V11.0 NIGHT SCREEN</span></div>
     <div id="statusBadge" class="badge b-gray">待機中</div>
   </div>
 </header>
@@ -631,6 +631,7 @@
         <button class="btn btn-soft" onclick="App.shareSessionLog(false)">軽量ログ共有</button>
         <button id="btnFullExport" class="btn btn-primary" onclick="App.exportSessionLog(true)">完全ログZIP出力</button>
         <button id="btnFullShare" class="btn btn-soft" onclick="App.shareSessionLog(true)">完全ログZIP共有</button>
+        <button id="btnDeleteSession" class="btn btn-danger" style="grid-column:1/-1" onclick="App.deleteSelectedSession()">選択したログを削除</button>
       </div>
       <div id="reportEmpty" class="notice">保存済みレポートはありません。下のグラフは表示例です。測定終了後、実測データに自動更新されます。</div>
       <div id="reportContent" class="col">
@@ -882,7 +883,7 @@
         const commit = await latestCommit();
 
         if (currentDocumentSha() === commit.sha) {
-          updateStatus("V6.9 / GitHub最新版: " + commit.shortSha + formatCommitDate(commit.date), "live");
+          updateStatus("V11.0 / GitHub最新版: " + commit.shortSha + formatCommitDate(commit.date), "live");
           return {replaced:false, version:commit.sha};
         }
 
@@ -1007,11 +1008,13 @@
     let lastProfileFlushMs = 0;
     let timeSeriesLogs = [];
     let lastTimeSeriesSec = -1;
-    // ★追加: 1秒間の最大Peak dBおよび最大セントロイド周波数を保持するラッチバッファ
-    let secondPeakDbLatch = 20.0;
+    // 1秒区間内の最大dBと、その同一解析フレームの卓越周波数・観測時刻を保持する
+    let secondPeakDbLatch = Number.NEGATIVE_INFINITY;
     let secondPeakHzLatch = 0;
+    let secondPeakEpochMsLatch = 0;
+    let secondMotionGLatch = 0;
 
-    // V6.9 NIGHT SCREEN（表示制御のみ）
+    // V11.0 NIGHT SCREEN（表示制御のみ）
     const NIGHT_AUTO_DELAY_MS = 5000;
     const NIGHT_PEEK_MS = 5000;
     const NIGHT_HOLD_MS = 3000;
@@ -1275,6 +1278,25 @@
         try {
           const tx = db.transaction("clips", "readwrite");
           tx.objectStore("clips").clear();
+          tx.oncomplete = () => resolve(true);
+          tx.onerror = () => resolve(false);
+          tx.onabort = () => resolve(false);
+        } catch (error) {
+          resolve(false);
+        }
+      });
+    }
+
+    async function deleteClipKeysFromDB(keys) {
+      if (!keys.length) return true;
+      if (!db) await initDB();
+      if (!db) return false;
+
+      return new Promise(resolve => {
+        try {
+          const tx = db.transaction("clips", "readwrite");
+          const store = tx.objectStore("clips");
+          keys.forEach(key => store.delete(key));
           tx.oncomplete = () => resolve(true);
           tx.onerror = () => resolve(false);
           tx.onabort = () => resolve(false);
@@ -2011,6 +2033,7 @@
           document.getElementById("reportEmpty")?.classList.remove("hidden");
           document.getElementById("reportContent")?.classList.remove("hidden");
           resetEmptySleepReport();
+          updateDeleteSessionButtonState();
           return;
         }
         sessions.forEach(s => {
@@ -2019,6 +2042,7 @@
           select.appendChild(op);
         });
         renderSleepReport(select.value);
+        updateDeleteSessionButtonState();
       }
 
       function resetEmptySleepReport() {
@@ -2174,12 +2198,13 @@
       }
 
       const APP_BUILD = Object.freeze({
-        version:"6.9.1",
-        build:"2026-09-18-record-viewer-timeseries",
-        feature:"PEAK_HZ_ONE_SECOND_TIMESERIES_FULL_LOG"
+        version:"11.0",
+        build:"2026-09-20-peak-sync-session-delete",
+        feature:"PEAK_DB_FRAME_SYNC_TIMESERIES_FULL_LOG"
       });
 
       let exportBusy = false;
+      let sessionDeleteBusy = false;
 
       function setFullExportProgress(done, total, message) {
         const button = document.getElementById("btnFullExport");
@@ -2193,6 +2218,13 @@
             : "完全ログZIP出力";
         }
         if (shareButton) shareButton.disabled = exportBusy;
+        updateDeleteSessionButtonState();
+      }
+
+      function updateDeleteSessionButtonState() {
+        const button = document.getElementById("btnDeleteSession");
+        if (!button) return;
+        button.disabled = isTracking || exportBusy || sessionDeleteBusy || !selectedReportSession();
       }
 
       function yieldToBrowser() {
@@ -2345,24 +2377,56 @@
         return new Blob(parts, {type:"application/zip"});
       }
 
+      function clipAudioBlob(clip) {
+        const candidates = [clip?.blob, clip?.audioBlob, clip?.rawData];
+        return candidates.find(value => value instanceof Blob) || null;
+      }
+
+      function clipStartedAt(clip) {
+        const value = Number(clip?.startedAt ?? clip?.id);
+        return Number.isFinite(value) ? value : 0;
+      }
+
+      function sessionClipBounds(session) {
+        const start = Number(session.startedAt || session.id);
+        const end = Number(session.endedAt || start + Number(session.durationSec || 0) * 1000);
+        const laterStarts = loadSessionHistory()
+          .map(item => Number(item.startedAt || item.id))
+          .filter(value => Number.isFinite(value) && value > start);
+        const nextStart = laterStarts.length ? Math.min(...laterStarts) : Number.POSITIVE_INFINITY;
+        return {start, end:Math.min(end + 5000, nextStart - 1)};
+      }
+
       async function clipsForSession(session) {
         const all = await getClipsFromDB();
-        const start = Number(session.startedAt || session.id);
-        const end = Number(session.endedAt || start + session.durationSec * 1000);
+        const bounds = sessionClipBounds(session);
         return all
-          .filter(clip => Number(clip.id) >= start && Number(clip.id) <= end + 5000)
-          .sort((a, b) => Number(a.id) - Number(b.id));
+          .filter(clip => {
+            const startedAt = clipStartedAt(clip);
+            return startedAt >= bounds.start && startedAt <= bounds.end;
+          })
+          .sort((a, b) => clipStartedAt(a) - clipStartedAt(b));
       }
 
       function clipMetadata(clip, audioFile) {
+        const rawBlob = clipAudioBlob(clip);
         return {
-          id:clip.id, category:clip.category, label:clip.label,
-          timeStr:clip.timeStr, realClock:clip.realClock,
-          durationSec:clip.durationSec, peakDb:clip.peakDb,
-          motionG:clip.motionG, reason:clip.reason,
-          voteSummary:clip.voteSummary, waveform:clip.waveform || [],
-          mimeType:clip.blob?.type || "", audioFile:audioFile || null,
-          audioBytes:Number(clip.blob?.size || 0)
+          id:clip.id,
+          startedAt:clipStartedAt(clip),
+          startSec:Number(clip.startSec ?? 0),
+          category:clip.category,
+          label:clip.label,
+          timeStr:clip.timeStr,
+          realClock:clip.realClock,
+          durationSec:Number(clip.durationSec || 0),
+          peakDb:Number(clip.peakDb || 0),
+          motionG:Number(clip.motionG || 0),
+          reason:clip.reason || "",
+          voteSummary:clip.voteSummary || "",
+          waveform:clip.waveform || [],
+          audioFile:audioFile || null,
+          mimeType:rawBlob?.type || "",
+          audioBytes:Number(rawBlob?.size || 0)
         };
       }
 
@@ -2397,7 +2461,7 @@
           let audioFile = null;
           
           // Blob実体の確実な取得 (blob / audioBlob / rawData すべてを網羅)
-          const rawBlob = clip.blob || clip.audioBlob || clip.rawData;
+          const rawBlob = clipAudioBlob(clip);
 
           if (rawBlob instanceof Blob && rawBlob.size > 0) {
             const ext = audioExtension(rawBlob.type);
@@ -2421,10 +2485,14 @@
             // オシロスコープ用マニフェストに登録
             audioManifest.push({
               fileName: audioFile,
+              audioFile: audioFile,
+              startedAt: clipStartedAt(clip),
               startSec: startSec,
               durationSec: Number(clip.durationSec) || 10,
               category: clip.category,
-              peakDb: Number(clip.peakDb) || 0
+              peakDb: Number(clip.peakDb) || 0,
+              mimeType: rawBlob.type || "",
+              audioBytes: rawBlob.size
             });
           }
 
@@ -2507,9 +2575,9 @@
         if (!session) { toast("保存済みセッションがありません"); return; }
         if (exportBusy) { toast("完全ログを処理中です"); return; }
         try {
+          exportBusy = true;
+          setFullExportProgress(0, 0, withAudio ? "準備中" : "軽量ログ準備中");
           if (withAudio) {
-            exportBusy = true;
-            setFullExportProgress(0, 0, "準備中");
             toast("省メモリ方式で完全ログZIPを作成します");
             const zip = await buildFullSessionZip(session);
             downloadBlob(zip, safeSessionFilename(session, true));
@@ -2677,6 +2745,49 @@
         silenceStartTime = null;
       }
 
+      function resetTimeSeriesSecond(sec) {
+        lastTimeSeriesSec = sec;
+        secondPeakDbLatch = Number.NEGATIVE_INFINITY;
+        secondPeakHzLatch = 0;
+        secondPeakEpochMsLatch = 0;
+        secondMotionGLatch = 0;
+      }
+
+      function finalizeTimeSeriesSecond() {
+        if (lastTimeSeriesSec < 0 || !Number.isFinite(secondPeakDbLatch)) return;
+        const epochMs = sessionStartMs + lastTimeSeriesSec * 1000;
+        const peakEpochMs = secondPeakEpochMsLatch || epochMs;
+        timeSeriesLogs.push({
+          sec:lastTimeSeriesSec,
+          epochMs,
+          peakEpochMs,
+          peakOffsetMs:Math.max(0, peakEpochMs - sessionStartMs),
+          db:+Math.max(20, secondPeakDbLatch).toFixed(1),
+          peakHz:Math.round(secondPeakHzLatch || 0),
+          motionG:+secondMotionGLatch.toFixed(3)
+        });
+      }
+
+      function recordTimeSeriesFrame(now, dbValue, peakHz, motionG) {
+        const currentSec = Math.max(0, Math.floor((now - sessionStartMs) / 1000));
+
+        // 秒境界を先に処理し、新しい秒の解析値を前の秒へ混入させない
+        if (lastTimeSeriesSec < 0) {
+          resetTimeSeriesSecond(currentSec);
+        } else if (currentSec !== lastTimeSeriesSec) {
+          finalizeTimeSeriesSecond();
+          resetTimeSeriesSecond(currentSec);
+        }
+
+        secondMotionGLatch = Math.max(secondMotionGLatch, Number(motionG) || 0);
+        // 最大dBを更新した同じ解析フレームのpeakHzと時刻だけを組にして保存する
+        if (dbValue > secondPeakDbLatch) {
+          secondPeakDbLatch = dbValue;
+          secondPeakHzLatch = Number(peakHz) || 0;
+          secondPeakEpochMsLatch = now;
+        }
+      }
+
       function monitorTick() {
         if (!isTracking || stopRequested) return;
 
@@ -2706,36 +2817,8 @@
           updateMeters(motionSnapshot);
           updateBaseline();
 
-          // ★修正: 1秒間の中の最高音圧(Peak)と周波数を常にラッチ保持する
-          if (currentDb > secondPeakDbLatch) {
-            secondPeakDbLatch = currentDb;
-          }
-          if ((spectrum.peakHz || 0) > secondPeakHzLatch) {
-            secondPeakHzLatch = spectrum.peakHz || 0;
-          }
-
           const now = Date.now();
-          const currentSec = Math.max(0, Math.floor((now - sessionStartMs) / 1000));
-          
-          // 1秒が経過したタイミングでコミット
-          if (currentSec !== lastTimeSeriesSec) {
-            // 測定谷間の20dBではなく、ラッチされた最大音圧を出力する
-            const committedDb = Math.max(20.0, secondPeakDbLatch);
-            const committedHz = secondPeakHzLatch > 0 ? secondPeakHzLatch : (spectrum.centroid || 0);
-
-            timeSeriesLogs.push({
-              sec: currentSec,
-              epochMs: now,
-              db: +committedDb.toFixed(1),
-              peakHz: Math.round(committedHz),
-              motionG: +motionSnapshot.toFixed(3)
-            });
-
-            lastTimeSeriesSec = currentSec;
-            // 次の1秒のためにラッチを現在の瞬時値でリセット
-            secondPeakDbLatch = currentDb;
-            secondPeakHzLatch = spectrum.peakHz || 0;
-          }
+          recordTimeSeriesFrame(now, currentDb, spectrum.peakHz || 0, motionSnapshot);
 
           const delta = currentDb - baselineDb;
           const result =
@@ -2865,12 +2948,17 @@
         lastProfileFlushMs = sessionStartMs;
         timeSeriesLogs = [];
         lastTimeSeriesSec = -1;
+        secondPeakDbLatch = Number.NEGATIVE_INFINITY;
+        secondPeakHzLatch = 0;
+        secondPeakEpochMsLatch = 0;
+        secondMotionGLatch = 0;
 
         document.getElementById("statusBadge").textContent = "体動・音声監視中";
         document.getElementById("statusBadge").className = "badge b-green";
         document.getElementById("btnStart").disabled = true;
         document.getElementById("btnNight").disabled = false;
         document.getElementById("btnStop").disabled = false;
+        updateDeleteSessionButtonState();
         document.getElementById("recoveryNotice")?.classList.add("hidden");
 
         setEngineText("音声・体動エンジン正常稼働中", "var(--success)");
@@ -2937,6 +3025,9 @@
         timeBuf = null;
         freqBuf = null;
 
+        // セッション保存前に、まだ確定していない最後の1秒ログを保存する
+        finalizeTimeSeriesSecond();
+        lastTimeSeriesSec = -1;
         flushProfileBin(true);
         await saveCompletedSession();
         clearSessionHeartbeat();
@@ -2946,6 +3037,7 @@
         document.getElementById("btnStart").disabled = false;
         document.getElementById("btnNight").disabled = true;
         document.getElementById("btnStop").disabled = true;
+        updateDeleteSessionButtonState();
 
         setEngineText("測定終了", "var(--muted)");
         stopRequested = false;
@@ -3120,8 +3212,69 @@
         });
       }
 
+      function formatSessionDateTime(epochMs) {
+        const date = new Date(Number(epochMs));
+        if (!Number.isFinite(date.getTime())) return "日時不明";
+        return date.toLocaleString("ja-JP", {
+          year:"numeric", month:"numeric", day:"numeric",
+          hour:"2-digit", minute:"2-digit"
+        });
+      }
+
+      async function refreshClipCountsAndList() {
+        Object.keys(counts).forEach(key => { counts[key] = 0; });
+        const clips = await getClipsFromDB();
+        clips.forEach(clip => {
+          if (counts[clip.category] !== undefined) counts[clip.category]++;
+        });
+        updateCountUI();
+        await renderClipList();
+      }
+
+      async function deleteSelectedSession() {
+        if (isTracking) { toast("睡眠測定中はログを削除できません"); return; }
+        if (exportBusy) { toast("ログ出力・共有中は削除できません"); return; }
+        if (sessionDeleteBusy) return;
+
+        const session = selectedReportSession();
+        if (!session) { toast("削除する測定ログがありません"); return; }
+        const start = Number(session.startedAt || session.id);
+        const end = Number(session.endedAt || start + Number(session.durationSec || 0) * 1000);
+        const message = formatSessionDateTime(start) + "～" +
+          new Date(end).toLocaleTimeString("ja-JP", {hour:"2-digit", minute:"2-digit"}) +
+          " の測定ログと録音を削除します。\nこの操作は取り消せません。削除しますか？";
+        if (!confirm(message)) return;
+
+        sessionDeleteBusy = true;
+        updateDeleteSessionButtonState();
+        try {
+          const clips = await clipsForSession(session);
+          const deleted = await deleteClipKeysFromDB(clips.map(clip => clip.id));
+          if (!deleted) {
+            toast("録音データの削除に失敗したため、測定ログは削除していません");
+            return;
+          }
+
+          const history = loadSessionHistory().filter(item => String(item.id) !== String(session.id));
+          if (!saveSessionHistory(history)) {
+            toast("録音は削除されましたが、測定履歴の更新に失敗しました");
+            return;
+          }
+
+          loadReportSessions();
+          await refreshClipCountsAndList();
+          toast("測定ログと録音を削除しました");
+        } catch (error) {
+          console.error("[SessionDelete]", error);
+          toast("測定ログを削除できませんでした: " + (error?.message || error));
+        } finally {
+          sessionDeleteBusy = false;
+          updateDeleteSessionButtonState();
+        }
+      }
+
       async function clearClips() {
-        if (!confirm("すべての録音クリップを消去しますか？")) return;
+        if (!confirm("分類録音一覧のすべての録音クリップと音声Blobを消去します。睡眠レポートの測定履歴は削除されません。続行しますか？")) return;
 
         if (currentAudioPlayer) {
           currentAudioPlayer.pause();
@@ -3221,6 +3374,7 @@
         renderSleepReport,
         exportSessionLog,
         shareSessionLog,
+        deleteSelectedSession,
         enterNightScreen,
         exitNightScreen
       };
