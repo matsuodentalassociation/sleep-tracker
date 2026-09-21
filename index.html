@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#090d16">
-<title>SleepTracker AI Stable V11.5 SMOOTH CURVE</title>
+<title>SleepTracker AI V15 OVERNIGHT</title>
 
 <style>
   :root {
@@ -355,7 +355,7 @@
   .score-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#6366f1,#22d3ee); }
   .quality-note { color:#94a3b8; font-size:10px; line-height:1.6; }
 
-  /* V11.5 NIGHT SCREEN: 表示のみ。測定・録音・再生経路には影響しません */
+  /* V15 OVERNIGHT: 表示のみ。測定・録音・再生経路には影響しません */
   #nightScreen {
     position:fixed;
     inset:0;
@@ -468,6 +468,19 @@
     visibility:hidden !important;
   }
 
+
+  .week-nav { display:flex;align-items:center;gap:8px; }
+  .week-days { display:grid;grid-template-columns:repeat(7,1fr);gap:6px;flex:1; }
+  .day-btn { min-width:0;border:1px solid #263247;background:#0d1527;color:#94a3b8;border-radius:14px;padding:7px 2px;cursor:pointer;text-align:center;position:relative; }
+  .day-btn .dow { font-size:10px;font-weight:800; }
+  .day-btn .day-num { font-size:16px;font-weight:900;margin-top:2px; }
+  .day-btn.has-data::after { content:"";position:absolute;bottom:4px;left:50%;width:5px;height:5px;border-radius:50%;background:#38bdf8;transform:translateX(-50%); }
+  .day-btn.selected { color:white;border-color:#6366f1;background:#312e81;box-shadow:0 0 0 1px #6366f1 inset; }
+  .day-btn.today .day-num { color:#67e8f9; }
+  .week-arrow { width:34px;height:44px;padding:0;flex:0 0 auto; }
+  .session-status { margin-left:5px;font-size:9px;padding:2px 5px;border-radius:999px;background:#78350f;color:#fbbf24; }
+  #sessionDaySummary { font-size:11px;color:var(--muted); }
+
   @media (max-width:520px) {
     .stat-grid { grid-template-columns:repeat(2,1fr); }
     .clip-item { align-items:flex-start; }
@@ -482,6 +495,7 @@
     <div class="night-title">● NIGHT SCREEN・測定継続中</div>
     <div id="nightTimer">00:00:00</div>
     <div id="nightState">音声・体動エンジン正常稼働中</div>
+    <div id="nightSaved" class="night-guide">最終保存: --:--:--</div>
     <div class="night-guide">短くタップ：状態表示 ／ 3秒長押し：通常画面へ戻る</div>
   </div>
   <div class="night-hold" aria-hidden="true">
@@ -494,7 +508,7 @@
 
 <header class="top">
   <div class="top-inner">
-    <div class="brand">🌙 SleepTracker <span id="buildBadge">V11.5 NIGHT SCREEN</span></div>
+    <div class="brand">🌙 SleepTracker <span id="buildBadge">V15 OVERNIGHT</span></div>
     <div id="statusBadge" class="badge b-gray">待機中</div>
   </div>
 </header>
@@ -505,9 +519,6 @@
       <div id="ghDot" class="gh-dot"></div>
       <span id="ghStatusText">GitHubコード同期: 初期化中</span>
     </div>
-    <button class="btn btn-soft" style="padding:5px 8px;font-size:10px" onclick="GitHubLoader.forceReload()">
-      URL設定
-    </button>
   </div>
 
   <div id="recoveryNotice" class="notice hidden"></div>
@@ -622,9 +633,15 @@
 
   <section id="panel-report" class="hidden col">
     <div class="card col">
+      <div><strong>推定睡眠レポート</strong><div class="stat-k">音声・周波数・体動同期推定</div></div>
+      <div class="week-nav">
+        <button class="btn btn-soft week-arrow" onclick="App.shiftReportWeek(-7)" aria-label="前の週">‹</button>
+        <div id="reportWeekDays" class="week-days"></div>
+        <button class="btn btn-soft week-arrow" onclick="App.shiftReportWeek(7)" aria-label="次の週">›</button>
+      </div>
       <div class="row" style="justify-content:space-between;flex-wrap:wrap">
-        <div><strong>推定睡眠レポート</strong><div class="stat-k">音声・周波数・体動同期推定</div></div>
-        <select id="reportSessionSelect" class="btn btn-soft" style="max-width:300px" onchange="App.renderSleepReport(this.value)"></select>
+        <div id="sessionDaySummary">日付を選択してください</div>
+        <select id="reportSessionSelect" class="btn btn-soft" style="max-width:320px" onchange="App.renderSleepReport(this.value)"></select>
       </div>
       <div class="export-grid">
         <button id="btnFullExport" class="btn btn-primary" style="min-height:52px" onclick="App.exportSessionLog(true)">完全ログZIPを保存</button>
@@ -867,57 +884,12 @@
     }
 
     async function init() {
-      try {
-        updateStatus("GitHubの最新コミットを確認中...", "idle");
-        const commit = await latestCommit();
-
-        if (currentDocumentSha() === commit.sha) {
-          updateStatus("V11.5 / GitHub最新版: " + commit.shortSha + formatCommitDate(commit.date), "live");
-          return {replaced:false, version:commit.sha};
-        }
-
-        updateStatus("最新版 " + commit.shortSha + " を取得中...", "idle");
-        const html = validateHtml(await fetchText(rawUrl(commit.sha)));
-        saveCache(html, commit);
-        replaceDocument(html, commit.sha, commit.shortSha);
-        return {replaced:true, version:commit.sha};
-      } catch (apiError) {
-        console.warn("[DynamicFetch API]", apiError);
-        try {
-          return await directRawFallback();
-        } catch (rawError) {
-          console.warn("[DynamicFetch Raw]", rawError);
-          const cached = loadCache();
-          if (cached) {
-            if (currentDocumentSha() === cached.meta.sha) {
-              updateStatus("オフライン：保存済み版で起動", "cache");
-              return {replaced:false, cached:true};
-            }
-            replaceDocument(cached.html, cached.meta.sha, "保存済み版");
-            return {replaced:true, cached:true};
-          }
-          updateStatus("GitHub接続失敗：内蔵版で起動", "error");
-          return {replaced:false, offline:true};
-        }
-      }
+      updateStatus("V15 安定版（測定中の自動更新を停止）", "live");
+      return {replaced:false, local:true};
     }
 
     function forceReload() {
-      const message = [
-        "GitHubの最新版を再確認します。",
-        "",
-        "リポジトリ: " + OWNER + "/" + REPO,
-        "ブランチ: " + BRANCH,
-        "ファイル: " + PATH,
-        "",
-        "測定中は実行しないでください。続行しますか？"
-      ].join("\n");
-      if (!confirm(message)) return;
-      try { sessionStorage.removeItem(APPLIED_SHA_KEY); }
-      catch (error) {}
-      const url = new URL(location.href);
-      url.searchParams.set("st_update", Date.now().toString());
-      location.replace(url.toString());
+      alert("記録保護のため、この安定版では実行中のコード自動置換を停止しています。更新は測定終了後にHTMLファイルを更新してください。");
     }
 
     return {init, forceReload};
@@ -927,7 +899,7 @@
 <script>
   const App = (() => {
     const DB_NAME = "SleepTrackerClassifierV6DB";
-    const DB_VERSION = 1;
+    const DB_VERSION = 4;
     const SESSION_KEY = "ST_ACTIVE_SESSION_V6";
 
     const MONITOR_INTERVAL_MS = 500;
@@ -938,8 +910,13 @@
     const SNORE_MAX_MS = 90000;
     const TRIGGER_COOLDOWN_MS = 2500;
     const SESSION_HISTORY_KEY = "ST_SESSION_HISTORY_V63";
+    const LEGACY_MIGRATED_KEY = "ST_LEGACY_MIGRATED_V15";
     const PROFILE_BIN_MS = 30000;
     const MIN_REPORT_DURATION_SEC = 30 * 60; // 睡眠評価に必要な最低測定時間（30分）
+    const CALIBRATION_MS = 30000;
+    const CHECKPOINT_INTERVAL_MS = 60000;
+    const STALE_SESSION_MS = 15000;
+    const SCHEMA_VERSION = 4;
 
     let db = null;
     let initialized = false;
@@ -963,6 +940,15 @@
     let watchdogInterval = null;
     let timerInterval = null;
     let heartbeatInterval = null;
+    let checkpointInterval = null;
+    let activeSessionId = "";
+    let lastSavedAt = 0;
+    let savedLogCursor = 0;
+    let savedBinCursor = 0;
+    let saveChain = Promise.resolve();
+    let sessionCache = [];
+    let selectedReportDate = "";
+    let calendarEndDate = null;
     let lastMonitorTickMs = 0;
     let monitorGeneration = 0;
 
@@ -979,6 +965,8 @@
     let mediaRecorder = null;
     let currentRecordingChunks = [];
     let currentClipMeta = null;
+    let currentClipChunkIndex = 0;
+    let currentClipChunkWrites = [];
     let isClipRecording = false;
     let clipStopTimeout = null;
     let clipFinalizePromise = null;
@@ -989,6 +977,7 @@
     let silenceStartTime = null;
 
     let currentFilter = "all";
+    let clipListSessionId = "";
     let currentAudioPlayer = null;
     let currentAudioButton = null;
     let activeObjectUrls = [];
@@ -1004,7 +993,7 @@
     let secondPeakEpochMsLatch = 0;
     let secondMotionGLatch = 0;
 
-    // V11.5 NIGHT SCREEN（表示制御のみ）
+    // V15 OVERNIGHT（表示制御のみ）
     const NIGHT_AUTO_DELAY_MS = 5000;
     const NIGHT_PEEK_MS = 5000;
     const NIGHT_HOLD_MS = 3000;
@@ -1078,6 +1067,8 @@
         state.textContent = healthy
           ? "音声・体動エンジン正常稼働中"
           : "測定状態を確認中";
+        const saved=document.getElementById("nightSaved");
+        if(saved) saved.textContent="最終保存: "+(lastSavedAt?new Date(lastSavedAt).toLocaleTimeString("ja-JP"):"未保存");
       }
     }
 
@@ -1195,32 +1186,165 @@
 
     function initDB() {
       return new Promise(resolve => {
-        if (!("indexedDB" in window)) {
-          resolve(null);
-          return;
-        }
-
+        if (!("indexedDB" in window)) { resolve(null); return; }
         try {
           const request = indexedDB.open(DB_NAME, DB_VERSION);
           request.onerror = () => resolve(null);
           request.onsuccess = event => {
             db = event.target.result;
-            db.onversionchange = () => {
-              db.close();
-              db = null;
-            };
+            db.onversionchange = () => { db.close(); db = null; };
             resolve(db);
           };
           request.onupgradeneeded = event => {
             const database = event.target.result;
-            if (!database.objectStoreNames.contains("clips")) {
-              database.createObjectStore("clips", { keyPath:"id" });
+            if (!database.objectStoreNames.contains("clips")) database.createObjectStore("clips", {keyPath:"id"});
+            if (!database.objectStoreNames.contains("sessions")) {
+              const store=database.createObjectStore("sessions", {keyPath:"id"});
+              store.createIndex("dateKey","dateKey",{unique:false});
+              store.createIndex("status","status",{unique:false});
+              store.createIndex("startedAt","startedAt",{unique:false});
+            }
+            if (!database.objectStoreNames.contains("sessionLogs")) {
+              const store=database.createObjectStore("sessionLogs", {keyPath:"key"});
+              store.createIndex("sessionId","sessionId",{unique:false});
+            }
+            if (!database.objectStoreNames.contains("profileBins")) {
+              const store=database.createObjectStore("profileBins", {keyPath:"key"});
+              store.createIndex("sessionId","sessionId",{unique:false});
+            }
+            if (!database.objectStoreNames.contains("audioChunks")) {
+              const store=database.createObjectStore("audioChunks", {keyPath:"key"});
+              store.createIndex("clipId","clipId",{unique:false});
+              store.createIndex("sessionId","sessionId",{unique:false});
             }
           };
-        } catch (error) {
-          resolve(null);
-        }
+        } catch (error) { resolve(null); }
       });
+    }
+
+    function idbRequest(request) {
+      return new Promise((resolve,reject)=>{ request.onsuccess=()=>resolve(request.result); request.onerror=()=>reject(request.error); });
+    }
+
+    async function getAllStore(name) {
+      if (!db) await initDB();
+      if (!db || !db.objectStoreNames.contains(name)) return [];
+      try { return await idbRequest(db.transaction(name,"readonly").objectStore(name).getAll()); }
+      catch(error) { console.warn("[IDB getAll]",name,error); return []; }
+    }
+
+    function localDateKey(value) {
+      const d=new Date(value); if(!Number.isFinite(d.getTime())) return "";
+      return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+    }
+
+    function uniqueSessionId(startedAt=Date.now()) {
+      const random=crypto?.randomUUID?.() || Math.random().toString(36).slice(2)+Date.now().toString(36);
+      return "st-"+startedAt+"-"+random;
+    }
+
+    function queueSave(task) {
+      saveChain=saveChain.then(task,task).catch(error=>{ console.error("[Persistence]",error); setEngineText("保存エラー: 容量またはDBを確認してください","var(--danger)"); });
+      return saveChain;
+    }
+
+    async function persistCheckpoint(status="recording", force=false) {
+      if (!activeSessionId || !db) return false;
+      const now=Date.now();
+      const newLogs=timeSeriesLogs.slice(savedLogCursor);
+      const newBins=profileBins.slice(savedBinCursor);
+      const record={
+        id:activeSessionId, schemaVersion:SCHEMA_VERSION, status,
+        startedAt:sessionStartMs, endedAt:status==="completed"?now:null,
+        lastSavedAt:now, dateKey:localDateKey(sessionStartMs),
+        dateStr:new Date(sessionStartMs).toLocaleDateString("ja-JP"),
+        startTime:new Date(sessionStartMs).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
+        endTime:new Date(now).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
+        durationSec:Math.max(1,Math.round((now-sessionStartMs)/1000)), baselineDb:+baselineDb.toFixed(1),
+        counts:{...counts}, snoreDurationSec:0,
+        ownerId:window.name||(window.name="st-window-"+Math.random().toString(36).slice(2))
+      };
+      return queueSave(()=>new Promise(resolve=>{
+        try {
+          const names=["sessions","sessionLogs","profileBins"];
+          const tx=db.transaction(names,"readwrite");
+          tx.objectStore("sessions").put(record);
+          const logStore=tx.objectStore("sessionLogs");
+          newLogs.forEach(v=>logStore.put({...v,key:activeSessionId+":"+String(v.sec).padStart(8,"0"),sessionId:activeSessionId}));
+          const binStore=tx.objectStore("profileBins");
+          newBins.forEach((v,i)=>binStore.put({...v,key:activeSessionId+":"+String(savedBinCursor+i).padStart(8,"0"),sessionId:activeSessionId}));
+          tx.oncomplete=()=>{ savedLogCursor+=newLogs.length; savedBinCursor+=newBins.length; lastSavedAt=now; updateNightScreenStatus(); resolve(true); };
+          tx.onerror=tx.onabort=()=>resolve(false);
+        } catch(error){ console.warn("[Checkpoint]",error); resolve(false); }
+      }));
+    }
+
+    async function loadPersistentSessions() {
+      const [sessions,logs,bins]=await Promise.all([getAllStore("sessions"),getAllStore("sessionLogs"),getAllStore("profileBins")]);
+      const logMap=new Map(),binMap=new Map();
+      logs.forEach(v=>{if(!logMap.has(v.sessionId))logMap.set(v.sessionId,[]);logMap.get(v.sessionId).push(v);});
+      bins.forEach(v=>{if(!binMap.has(v.sessionId))binMap.set(v.sessionId,[]);binMap.get(v.sessionId).push(v);});
+      const now=Date.now();
+      for(const item of sessions){
+        if(item.status==="recording" && now-Number(item.lastSavedAt||0)>STALE_SESSION_MS){ item.status="interrupted"; item.endedAt=item.lastSavedAt; await putSessionRecord(item); }
+        item.timeSeriesLogs=(logMap.get(item.id)||[]).sort((a,b)=>a.sec-b.sec).map(({key,sessionId,...v})=>v);
+        item.profileBins=(binMap.get(item.id)||[]).sort((a,b)=>a.startSec-b.startSec).map(({key,sessionId,...v})=>v);
+        item.quality=qualityFromSession(item);
+      }
+      sessionCache=sessions.sort((a,b)=>Number(b.startedAt)-Number(a.startedAt));
+      return sessionCache;
+    }
+
+    async function putSessionRecord(record){
+      if(!db)return false;
+      return new Promise(resolve=>{try{const tx=db.transaction("sessions","readwrite");tx.objectStore("sessions").put(record);tx.oncomplete=()=>resolve(true);tx.onerror=tx.onabort=()=>resolve(false);}catch(e){resolve(false);}});
+    }
+
+    async function migrateLegacySessions(){
+      if (!db) return;
+      try { if (localStorage.getItem(LEGACY_MIGRATED_KEY) === "1") return; } catch(e) {}
+      const legacy=(()=>{try{return JSON.parse(localStorage.getItem(SESSION_HISTORY_KEY)||"[]");}catch(e){return[];}})();
+      if(legacy.length){
+        const existing=new Set((await getAllStore("sessions")).map(x=>String(x.id)));
+        for(const old of legacy){
+          const id=String(old.id); if(existing.has(id))continue;
+          const dateKey=localDateKey(old.startedAt||Number(old.id));
+          await new Promise(resolve=>{try{const tx=db.transaction(["sessions","sessionLogs","profileBins"],"readwrite");
+            const {timeSeriesLogs=[],profileBins=[],...meta}=old;
+            tx.objectStore("sessions").put({...meta,id,dateKey,status:"completed",lastSavedAt:old.endedAt||old.startedAt,schemaVersion:SCHEMA_VERSION});
+            timeSeriesLogs.forEach(v=>tx.objectStore("sessionLogs").put({...v,key:id+":"+String(v.sec).padStart(8,"0"),sessionId:id}));
+            profileBins.forEach((v,i)=>tx.objectStore("profileBins").put({...v,key:id+":"+String(i).padStart(8,"0"),sessionId:id}));
+            tx.oncomplete=()=>resolve();tx.onerror=tx.onabort=()=>resolve();}catch(e){resolve();}});
+        }
+      }
+      try {
+        localStorage.removeItem(SESSION_HISTORY_KEY);
+        localStorage.setItem(LEGACY_MIGRATED_KEY,"1");
+      } catch(e) {}
+    }
+
+    async function saveAudioChunk(meta,blob,index,mimeType){
+      if(!db||!blob?.size)return;
+      const row={key:meta.id+":"+String(index).padStart(6,"0"),clipId:meta.id,sessionId:activeSessionId,index,mimeType,blob,createdAt:Date.now(),meta:{...meta,waveformDb:undefined}};
+      return new Promise(resolve=>{try{const tx=db.transaction("audioChunks","readwrite");tx.objectStore("audioChunks").put(row);tx.oncomplete=()=>resolve(true);tx.onerror=tx.onabort=()=>resolve(false);}catch(e){resolve(false);}});
+    }
+
+    async function deleteAudioChunks(clipId){
+      const rows=(await getAllStore("audioChunks")).filter(x=>x.clipId===clipId);
+      if(!rows.length)return;
+      return new Promise(resolve=>{const tx=db.transaction("audioChunks","readwrite"),store=tx.objectStore("audioChunks");rows.forEach(x=>store.delete(x.key));tx.oncomplete=()=>resolve();tx.onerror=tx.onabort=()=>resolve();});
+    }
+
+    async function recoverAudioChunks(){
+      const rows=await getAllStore("audioChunks");
+      const groups=new Map();rows.forEach(x=>{if(!groups.has(x.clipId))groups.set(x.clipId,[]);groups.get(x.clipId).push(x);});
+      for(const [clipId,parts] of groups){
+        parts.sort((a,b)=>a.index-b.index); const first=parts[0];
+        if(!first||parts.reduce((n,x)=>n+x.blob.size,0)===0)continue;
+        const meta={...(first.meta||{}),id:clipId,sessionId:first.sessionId,recovered:true,label:(first.meta?.label||"録音")+"（中断復元）"};
+        await saveClipToDB({...meta,blob:new Blob(parts.map(x=>x.blob),{type:first.mimeType||"audio/webm"})});
+        await deleteAudioChunks(clipId);
+      }
     }
 
     async function saveClipToDB(clip) {
@@ -1266,8 +1390,10 @@
 
       return new Promise(resolve => {
         try {
-          const tx = db.transaction("clips", "readwrite");
+          const names = db.objectStoreNames.contains("audioChunks") ? ["clips","audioChunks"] : ["clips"];
+          const tx = db.transaction(names, "readwrite");
           tx.objectStore("clips").clear();
+          if (names.includes("audioChunks")) tx.objectStore("audioChunks").clear();
           tx.oncomplete = () => resolve(true);
           tx.onerror = () => resolve(false);
           tx.onabort = () => resolve(false);
@@ -1296,11 +1422,50 @@
       });
     }
 
+    function deleteIndexMatches(store, indexName, value) {
+      return new Promise((resolve,reject) => {
+        const request = store.index(indexName).openKeyCursor(IDBKeyRange.only(value));
+        request.onerror = () => reject(request.error || new Error("IndexedDB cursor error"));
+        request.onsuccess = () => {
+          const cursor = request.result;
+          if (!cursor) { resolve(); return; }
+          store.delete(cursor.primaryKey);
+          cursor.continue();
+        };
+      });
+    }
+
+    async function deleteSessionFromDB(session) {
+      if (!db) await initDB();
+      if (!db || !session?.id) return false;
+      const sessionId = String(session.id);
+      const exactClips = (await getClipsFromDB()).filter(c => String(c.sessionId || "") === sessionId);
+      // sessionIdのない旧録音だけは、そのセッションの時間範囲で限定する。
+      const bounds = sessionClipBounds(session);
+      const legacyClips = (await getClipsFromDB()).filter(c => !c.sessionId && clipStartedAt(c) >= bounds.start && clipStartedAt(c) <= bounds.end);
+      const clipIds = [...new Set([...exactClips,...legacyClips].map(c => String(c.id)))];
+      return new Promise(resolve => {
+        try {
+          const names=["sessions","sessionLogs","profileBins","clips","audioChunks"];
+          const tx=db.transaction(names,"readwrite");
+          tx.objectStore("sessions").delete(sessionId);
+          deleteIndexMatches(tx.objectStore("sessionLogs"),"sessionId",sessionId).catch(()=>tx.abort());
+          deleteIndexMatches(tx.objectStore("profileBins"),"sessionId",sessionId).catch(()=>tx.abort());
+          deleteIndexMatches(tx.objectStore("audioChunks"),"sessionId",sessionId).catch(()=>tx.abort());
+          const clipStore=tx.objectStore("clips");
+          clipIds.forEach(id=>clipStore.delete(id));
+          tx.oncomplete=()=>resolve(true);
+          tx.onerror=tx.onabort=()=>resolve(false);
+        } catch(error) { console.error("[DeleteSessionDB]",error); resolve(false); }
+      });
+    }
+
     function saveSessionHeartbeat() {
       if (!isTracking) return;
       try {
         localStorage.setItem(SESSION_KEY, JSON.stringify({
           active:true,
+          sessionId:activeSessionId,
           startedAt:sessionStartMs,
           heartbeatAt:Date.now()
         }));
@@ -1736,12 +1901,15 @@
       lastTriggerTime = now;
       isClipRecording = true;
       currentRecordingChunks = [];
+      currentClipChunkIndex = 0;
+      currentClipChunkWrites = [];
 
       // ★修正: トリガー判定成立時の厳密なセッション相対秒を固定算出
       const exactStartSec = Math.max(0, Math.floor((now - sessionStartMs) / 1000));
 
       currentClipMeta = {
         id: String(now),
+        sessionId: activeSessionId,
         startSec: exactStartSec, // ★追加: グラフX軸/Y軸と1ミリ秒の狂いもなく完全同期する基準秒
         category: result.category,
         label: result.label,
@@ -1778,6 +1946,9 @@
         mediaRecorder.ondataavailable = event => {
           if (event.data && event.data.size > 0) {
             currentRecordingChunks.push(event.data);
+            const snapshot=currentClipMeta ? {...currentClipMeta} : null;
+            const index=currentClipChunkIndex++;
+            if(snapshot) currentClipChunkWrites.push(saveAudioChunk(snapshot,event.data,index,mediaRecorder?.mimeType||mimeType||"audio/webm"));
           }
         };
 
@@ -1796,6 +1967,8 @@
           isClipRecording = false;
 
           if (meta && blob.size > 0) {
+            await Promise.allSettled(currentClipChunkWrites);
+            currentClipChunkWrites = [];
             meta.durationSec = Math.max(1, Math.round((Date.now() - meta.startedAt) / 1000));
             meta.waveform = normalizeWaveform(meta.waveformDb || [], 56);
             delete meta.waveformDb;
@@ -1803,6 +1976,7 @@
             const saved = await saveClipToDB({ ...meta, blob });
 
             if (saved) {
+              await deleteAudioChunks(meta.id);
               counts[meta.category] = (counts[meta.category] || 0) + 1;
               updateCountUI();
             } else {
@@ -1954,14 +2128,11 @@
         lastProfileFlushMs = Date.now();
       }
 
-      function loadSessionHistory() {
-        try { return JSON.parse(localStorage.getItem(SESSION_HISTORY_KEY) || "[]"); }
-        catch (error) { return []; }
-      }
+      function loadSessionHistory() { return sessionCache; }
 
       function saveSessionHistory(items) {
-        try { localStorage.setItem(SESSION_HISTORY_KEY, JSON.stringify(items.slice(0, 60))); return true; }
-        catch (error) { toast("レポート保存容量が不足しています"); return false; }
+        sessionCache=items.slice().sort((a,b)=>Number(b.startedAt)-Number(a.startedAt));
+        return true;
       }
 
       function qualityFromSession(session) {
@@ -2029,26 +2200,15 @@
       }
 
       async function saveCompletedSession() {
-        const clips = await getClipsFromDB();
-        const start = sessionStartMs;
-        const end = Date.now();
-        const own = clips.filter(c => Number(c.id) >= start && Number(c.id) <= end + 5000);
-        const c = {snore:0,roll:0,bruxism:0,talk:0,fart:0,env:0,apnea:0};
-        own.forEach(x => { if (c[x.category] !== undefined) c[x.category]++; });
-        const snoreDurationSec = own.filter(x => x.category === "snore").reduce((n,x) => n + Number(x.durationSec || 0), 0);
-        const session = {
-          id:String(start), startedAt:start, endedAt:end,
-          dateStr:new Date(start).toLocaleDateString("ja-JP"),
-          startTime:new Date(start).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
-          endTime:new Date(end).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
-          durationSec:Math.max(1,Math.round((end-start)/1000)), baselineDb:+baselineDb.toFixed(1),
-          counts:c, snoreDurationSec, profileBins:[...profileBins],
-          timeSeriesLogs:[...timeSeriesLogs]
-        };
-        session.quality = qualityFromSession(session);
-        const history = loadSessionHistory().filter(x => x.id !== session.id);
-        history.unshift(session);
-        saveSessionHistory(history);
+        await persistCheckpoint("completed",true);
+        const clips=await getClipsFromDB();
+        const own=clips.filter(c=>c.sessionId===activeSessionId || (Number(c.id)>=sessionStartMs&&Number(c.id)<=Date.now()+5000));
+        const c={snore:0,roll:0,bruxism:0,talk:0,fart:0,env:0,apnea:0};
+        own.forEach(x=>{if(c[x.category]!==undefined)c[x.category]++;});
+        const records=await getAllStore("sessions");
+        const session=records.find(x=>x.id===activeSessionId);
+        if(session){session.counts=c;session.snoreDurationSec=own.filter(x=>x.category==="snore").reduce((n,x)=>n+Number(x.durationSec||0),0);await putSessionRecord(session);}
+        await loadPersistentSessions();
       }
 
       function formatDurationJP(sec) {
@@ -2057,26 +2217,43 @@
         return h ? h + "時間" + m + "分" : m + "分";
       }
 
-      function loadReportSessions() {
-        const select = document.getElementById("reportSessionSelect");
-        if (!select) return;
-        const sessions = loadSessionHistory();
-        select.textContent = "";
-        if (!sessions.length) {
-          const op = document.createElement("option"); op.textContent = "保存済みレポートなし"; op.value = ""; select.appendChild(op);
-          document.getElementById("reportEmpty")?.classList.remove("hidden");
-          document.getElementById("reportContent")?.classList.remove("hidden");
-          resetEmptySleepReport();
-          updateDeleteSessionButtonState();
-          return;
+      async function loadReportSessions(preferredId="") {
+        await loadPersistentSessions();
+        if(!calendarEndDate) calendarEndDate=new Date();
+        if(!selectedReportDate){
+          const preferred=sessionCache.find(x=>String(x.id)===String(preferredId));
+          selectedReportDate=preferred?.dateKey || sessionCache[0]?.dateKey || localDateKey(Date.now());
         }
-        sessions.forEach(s => {
-          const op = document.createElement("option"); op.value = s.id;
-          op.textContent = s.dateStr + " " + s.startTime + "〜" + s.endTime;
-          select.appendChild(op);
-        });
-        renderSleepReport(select.value);
-        updateDeleteSessionButtonState();
+        renderWeekBar();
+        renderSessionsForDate(selectedReportDate,preferredId);
+      }
+
+      function renderWeekBar(){
+        const wrap=document.getElementById("reportWeekDays");if(!wrap)return;wrap.textContent="";
+        const end=new Date(calendarEndDate||Date.now());end.setHours(12,0,0,0);
+        const names=["日","月","火","水","木","金","土"];
+        for(let offset=6;offset>=0;offset--){
+          const d=new Date(end);d.setDate(end.getDate()-offset);const key=localDateKey(d);
+          const button=document.createElement("button");button.className="day-btn";
+          if(sessionCache.some(x=>x.dateKey===key))button.classList.add("has-data");
+          if(key===selectedReportDate)button.classList.add("selected");
+          if(key===localDateKey(Date.now()))button.classList.add("today");
+          button.innerHTML='<div class="dow">'+names[d.getDay()]+'</div><div class="day-num">'+d.getDate()+'</div>';
+          button.onclick=()=>selectReportDate(key);wrap.appendChild(button);
+        }
+      }
+
+      function selectReportDate(key){selectedReportDate=key;renderWeekBar();renderSessionsForDate(key);}
+      function shiftReportWeek(days){calendarEndDate=new Date(calendarEndDate||Date.now());calendarEndDate.setDate(calendarEndDate.getDate()+days);renderWeekBar();}
+
+      function renderSessionsForDate(key,preferredId=""){
+        const select=document.getElementById("reportSessionSelect");if(!select)return;
+        const sessions=sessionCache.filter(x=>x.dateKey===key).sort((a,b)=>a.startedAt-b.startedAt);select.textContent="";
+        const summary=document.getElementById("sessionDaySummary");if(summary)summary.textContent=key+" ・ "+sessions.length+"件の記録";
+        if(!sessions.length){const op=document.createElement("option");op.textContent="この日の睡眠記録はありません";op.value="";select.appendChild(op);document.getElementById("reportEmpty")?.classList.remove("hidden");resetEmptySleepReport();updateDeleteSessionButtonState();return;}
+        sessions.forEach(s=>{const op=document.createElement("option");op.value=s.id;const status=s.status==="recording"?"［測定中］":"";op.textContent=s.startTime+"〜"+s.endTime+" "+formatDurationJP(s.durationSec)+status;select.appendChild(op);});
+        if(preferredId&&sessions.some(x=>String(x.id)===String(preferredId)))select.value=preferredId;
+        renderSleepReport(select.value);updateDeleteSessionButtonState();
       }
 
       function resetEmptySleepReport() {
@@ -2108,6 +2285,7 @@
       }
 
       function renderSleepReport(id) {
+        if (id) clipListSessionId = String(id);
         const sessions = loadSessionHistory();
         const s = sessions.find(x => String(x.id) === String(id)) || sessions[0];
         if (!s) return;
@@ -2155,7 +2333,7 @@
         drawSleepChart(s, q.eligible);
       }
 
-      // V11.5: 端末操作ピークを分離し、1秒ログから睡眠構造を再推定する。
+      // V15: 端末操作ピークを分離し、1秒ログから睡眠構造を再推定する。
       // 医学的睡眠段階ではなく、音・体動の相対変化に基づく参考推定。
       function percentile(values, ratio, fallback = 0) {
         const sorted = values.filter(Number.isFinite).sort((a,b) => a-b);
@@ -2169,7 +2347,7 @@
         return Math.max(0, Math.min(1, Number(value) || 0));
       }
 
-      // V11.5: 1秒体動ログから、常時ノイズではなく確定体動イベントだけを抽出する。
+      // V15: 1秒体動ログから、常時ノイズではなく確定体動イベントだけを抽出する。
       // 開始・終了付近の突出値は端末操作候補として睡眠深度補正から除外する。
       function detectMotionEvents(session, total) {
         let source=(Array.isArray(session.timeSeriesLogs)?session.timeSeriesLogs:[])
@@ -2522,14 +2700,14 @@
 
       function selectedReportSession() {
         const id = document.getElementById("reportSessionSelect")?.value;
-        const sessions = loadSessionHistory();
-        return sessions.find(x => String(x.id) === String(id)) || sessions[0] || null;
+        if (!id) return null;
+        return loadSessionHistory().find(x => String(x.id) === String(id)) || null;
       }
 
       const APP_BUILD = Object.freeze({
-        version:"11.5",
-        build:"2026-09-20-motion-linked-sleep-curve-v11.5",
-        feature:"NOISE_GATED_MOTION_EVENTS_LINKED_TO_SLEEP_DEPTH"
+        version:"15",
+        build:"V15",
+        feature:"OVERNIGHT_INDEXEDDB_APPEND"
       });
 
       let exportBusy = false;
@@ -2551,7 +2729,10 @@
       function updateDeleteSessionButtonState() {
         const button = document.getElementById("btnDeleteSession");
         if (!button) return;
-        button.disabled = isTracking || exportBusy || sessionDeleteBusy || !selectedReportSession();
+        const selected = selectedReportSession();
+        const isActiveSelection = !!selected && isTracking && String(selected.id) === String(activeSessionId);
+        button.disabled = exportBusy || sessionDeleteBusy || !selected || isActiveSelection;
+        button.title = isActiveSelection ? "現在測定中のログは終了後に削除できます" : "";
       }
 
       function yieldToBrowser() {
@@ -2729,6 +2910,7 @@
         const bounds = sessionClipBounds(session);
         return all
           .filter(clip => {
+            if (clip.sessionId) return String(clip.sessionId)===String(session.id);
             const startedAt = clipStartedAt(clip);
             return startedAt >= bounds.start && startedAt <= bounds.end;
           })
@@ -3145,9 +3327,17 @@
           updateBaseline();
 
           const now = Date.now();
-          recordTimeSeriesFrame(now, currentDb, spectrum.peakHz || 0, motionSnapshot);
-
           const delta = currentDb - baselineDb;
+          recordTimeSeriesFrame(now, currentDb, spectrum.peakHz || 0, motionSnapshot);
+          if (now - sessionStartMs < CALIBRATION_MS) {
+            const remain=Math.max(0,Math.ceil((CALIBRATION_MS-(now-sessionStartMs))/1000));
+            const liveClass=document.getElementById("liveClassText");
+            if(liveClass) liveClass.textContent="環境音校正中（録音判定は残り"+remain+"秒後）";
+            collectProfileSample(now, currentDb, delta, motionSnapshot, null, spectrum);
+            return;
+          }
+
+          
           const result =
             classifySoundAndMotion(delta, spectrum, motionSnapshot);
           collectProfileSample(now, currentDb, delta, motionSnapshot, result, spectrum);
@@ -3261,6 +3451,12 @@
 
         isTracking = true;
         sessionStartMs = Date.now();
+        activeSessionId = uniqueSessionId(sessionStartMs);
+        savedLogCursor = 0;
+        savedBinCursor = 0;
+        lastSavedAt = 0;
+        Object.keys(counts).forEach(key => { counts[key] = 0; });
+        updateCountUI();
         lastMonitorTickMs = Date.now();
         baselineSamples = [];
         baselineDb = 24;
@@ -3303,7 +3499,11 @@
         heartbeatInterval = setInterval(saveSessionHeartbeat, 5000);
         saveSessionHeartbeat();
 
-        toast("睡眠測定を開始しました");
+        await persistCheckpoint("recording", true);
+        clearInterval(checkpointInterval);
+        checkpointInterval = setInterval(() => persistCheckpoint("recording"), CHECKPOINT_INTERVAL_MS);
+
+        toast("睡眠測定を開始しました（自動保存中）");
         scheduleNightScreen();
       }
 
@@ -3319,6 +3519,7 @@
         clearInterval(watchdogInterval);
         clearInterval(timerInterval);
         clearInterval(heartbeatInterval);
+        clearInterval(checkpointInterval);
 
         await waitForRecorderFinalize();
         await releaseWakeLock();
@@ -3358,6 +3559,8 @@
         flushProfileBin(true);
         await saveCompletedSession();
         clearSessionHeartbeat();
+        const completedSessionId = activeSessionId;
+        activeSessionId = "";
 
         document.getElementById("statusBadge").textContent = "完了";
         document.getElementById("statusBadge").className = "badge b-gray";
@@ -3369,8 +3572,10 @@
         setEngineText("測定終了", "var(--muted)");
         stopRequested = false;
 
-        toast("測定を終了しました");
+        toast("測定を終了し、記録を保存しました");
+        selectedReportDate = localDateKey(sessionStartMs);
         switchTab("report");
+        await loadReportSessions(completedSessionId);
       }
 
       function filterCategory(category, button) {
@@ -3389,6 +3594,13 @@
         activeObjectUrls = [];
       }
 
+      function resolveClipListSessionId() {
+        if (isTracking && activeSessionId) return activeSessionId;
+        const selected = document.getElementById("reportSessionSelect")?.value;
+        if (selected) return selected;
+        return sessionCache[0]?.id || "";
+      }
+
       async function renderClipList() {
         const list = document.getElementById("clipList");
         if (!list) return;
@@ -3403,10 +3615,13 @@
         list.textContent = "";
 
         const all = await getClipsFromDB();
-        const clips =
-          currentFilter === "all"
-            ? all
-            : all.filter(clip => clip.category === currentFilter);
+        clipListSessionId = resolveClipListSessionId();
+        const scoped = clipListSessionId
+          ? all.filter(clip => String(clip.sessionId || "") === String(clipListSessionId))
+          : [];
+        const clips = currentFilter === "all"
+          ? scoped
+          : scoped.filter(clip => clip.category === currentFilter);
 
         if (!clips.length) {
           list.innerHTML =
@@ -3550,21 +3765,23 @@
 
       async function refreshClipCountsAndList() {
         Object.keys(counts).forEach(key => { counts[key] = 0; });
-        const clips = await getClipsFromDB();
-        clips.forEach(clip => {
-          if (counts[clip.category] !== undefined) counts[clip.category]++;
-        });
+        const sessionId = resolveClipListSessionId();
+        const clips = (await getClipsFromDB()).filter(clip => String(clip.sessionId || "") === String(sessionId || ""));
+        clips.forEach(clip => { if (counts[clip.category] !== undefined) counts[clip.category]++; });
         updateCountUI();
         await renderClipList();
       }
 
       async function deleteSelectedSession() {
-        if (isTracking) { toast("睡眠測定中はログを削除できません"); return; }
         if (exportBusy) { toast("ログ保存中は削除できません"); return; }
         if (sessionDeleteBusy) return;
 
         const session = selectedReportSession();
         if (!session) { toast("削除する測定ログがありません"); return; }
+        if (isTracking && String(session.id) === String(activeSessionId)) {
+          toast("現在測定中のログは、測定終了後に削除できます");
+          return;
+        }
         const start = Number(session.startedAt || session.id);
         const end = Number(session.endedAt || start + Number(session.durationSec || 0) * 1000);
         const message = formatSessionDateTime(start) + "～" +
@@ -3575,22 +3792,19 @@
         sessionDeleteBusy = true;
         updateDeleteSessionButtonState();
         try {
-          const clips = await clipsForSession(session);
-          const deleted = await deleteClipKeysFromDB(clips.map(clip => clip.id));
+          const deleted = await deleteSessionFromDB(session);
           if (!deleted) {
-            toast("録音データの削除に失敗したため、測定ログは削除していません");
+            toast("IndexedDBから測定ログを削除できませんでした");
             return;
           }
-
-          const history = loadSessionHistory().filter(item => String(item.id) !== String(session.id));
-          if (!saveSessionHistory(history)) {
-            toast("録音は削除されましたが、測定履歴の更新に失敗しました");
-            return;
-          }
-
-          loadReportSessions();
+          await loadPersistentSessions();
+          const stillExists = sessionCache.some(item => String(item.id) === String(session.id));
+          if (stillExists) throw new Error("削除後の確認で測定ログが残っています");
+          selectedReportDate = sessionCache[0]?.dateKey || localDateKey(Date.now());
+          clipListSessionId = sessionCache[0]?.id || "";
+          await loadReportSessions();
           await refreshClipCountsAndList();
-          toast("測定ログと録音を削除しました");
+          toast("測定ログ・録音・時系列データを完全に削除しました");
         } catch (error) {
           console.error("[SessionDelete]", error);
           toast("測定ログを削除できませんでした: " + (error?.message || error));
@@ -3628,66 +3842,59 @@
       }
 
       async function handleVisibilityChange() {
-        if (!isTracking || document.visibilityState !== "visible") return;
-
-        setEngineText("画面復帰後の監視状態を確認中...", "var(--warn)");
-
-        try {
-          if (audioCtx?.state === "suspended") {
-            await audioCtx.resume();
-          }
-        } catch (error) {}
-
-        await requestWakeLock();
-
-        const staleFor = Date.now() - lastMonitorTickMs;
-        if (staleFor > MONITOR_STALE_MS) scheduleMonitor();
-
-        const track = stream?.getAudioTracks()?.[0];
-        if (!track || track.readyState !== "live") {
-          await recoverAudioPipeline("画面復帰");
+        if (!isTracking) return;
+        if (document.visibilityState !== "visible") {
+          await persistCheckpoint("recording", true);
+          return;
         }
-
+        setEngineText("画面復帰後の監視状態を確認中...", "var(--warn)");
+        try { if (audioCtx?.state === "suspended") await audioCtx.resume(); } catch (error) {}
+        await requestWakeLock();
+        if (Date.now() - lastMonitorTickMs > MONITOR_STALE_MS) scheduleMonitor();
+        const track = stream?.getAudioTracks()?.[0];
+        if (!track || track.readyState !== "live") await recoverAudioPipeline("画面復帰");
+        await persistCheckpoint("recording", true);
         setEngineText("音声・体動エンジン正常稼働中", "var(--success)");
+      }
+
+      function flushOnPageHide() {
+        if (isTracking) {
+          saveSessionHeartbeat();
+          persistCheckpoint("recording", true);
+        }
+        revokeObjectUrls();
       }
 
       async function init() {
         if (initialized) return;
         initialized = true;
-
         const buildBadge = document.getElementById("buildBadge");
-        if (buildBadge) buildBadge.textContent = "V" + APP_BUILD.version + " NIGHT SCREEN";
+        if (buildBadge) buildBadge.textContent = "V" + APP_BUILD.version + " OVERNIGHT";
+        document.title = "SleepTracker AI V15 OVERNIGHT";
         document.documentElement.dataset.sleepTrackerBuild = APP_BUILD.build;
         bindNightScreenControls();
         exitNightScreen();
-
-        showInterruptedSessionNotice();
         checkIosMotionBanner();
 
         await initDB();
+        if (!db) {
+          const notice=document.getElementById("recoveryNotice");
+          if(notice){notice.textContent="IndexedDBを使用できません。このブラウザでは耐障害保存ができません。";notice.classList.remove("hidden");}
+        } else {
+          try { await navigator.storage?.persist?.(); } catch(error) {}
+          await migrateLegacySessions();
+          await recoverAudioChunks();
+          const sessions=await loadPersistentSessions();
 
-        const clips = await getClipsFromDB();
+        }
 
-        clips.forEach(clip => {
-          if (counts[clip.category] !== undefined) {
-            counts[clip.category]++;
-          }
-        });
+        await loadReportSessions();
+        await refreshClipCountsAndList();
 
-        updateCountUI();
-        loadReportSessions();
-
-        document.addEventListener(
-          "visibilitychange",
-          handleVisibilityChange
-        );
-
+        document.addEventListener("visibilitychange", handleVisibilityChange);
         window.addEventListener("pageshow", handleVisibilityChange);
-
-        window.addEventListener("beforeunload", () => {
-          if (isTracking) saveSessionHeartbeat();
-          revokeObjectUrls();
-        });
+        window.addEventListener("pagehide", flushOnPageHide);
+        window.addEventListener("beforeunload", flushOnPageHide);
       }
 
       return {
@@ -3702,6 +3909,8 @@
         exportSessionLog,
         shareSessionLog,
         deleteSelectedSession,
+        shiftReportWeek,
+        selectReportDate,
         enterNightScreen,
         exitNightScreen
       };
