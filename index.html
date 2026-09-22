@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#090d16">
-<title>SleepTracker AI V16 OVERNIGHT</title>
+<title>SleepTracker AI V17 OVERNIGHT</title>
 
 <style>
   :root {
@@ -355,7 +355,7 @@
   .score-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#6366f1,#22d3ee); }
   .quality-note { color:#94a3b8; font-size:10px; line-height:1.6; }
 
-  /* V16 OVERNIGHT: 表示のみ。測定・録音・再生経路には影響しません */
+  /* V17 OVERNIGHT: 表示のみ。測定・録音・再生経路には影響しません */
   #nightScreen {
     position:fixed;
     inset:0;
@@ -508,7 +508,7 @@
 
 <header class="top">
   <div class="top-inner">
-    <div class="brand">🌙 SleepTracker <span id="buildBadge">V16 OVERNIGHT</span></div>
+    <div class="brand">🌙 SleepTracker <span id="buildBadge">V17 OVERNIGHT</span></div>
     <div id="statusBadge" class="badge b-gray">待機中</div>
   </div>
 </header>
@@ -884,12 +884,43 @@
     }
 
     async function init() {
-      updateStatus("V16 安定版（測定中の自動更新を停止）", "live");
-      return {replaced:false, local:true};
+      updateStatus("GitHub最新コミットを確認中...", "idle");
+      try {
+        const commit = await latestCommit();
+        if (currentDocumentSha() === commit.sha) {
+          markApplied(commit.sha);
+          updateStatus("GitHub最新版で起動中: " + commit.shortSha + formatCommitDate(commit.date), "live");
+          return {replaced:false, version:commit.sha, commit};
+        }
+        updateStatus("GitHub最新版を取得中: " + commit.shortSha, "idle");
+        const html = validateHtml(await fetchText(rawUrl(commit.sha)));
+        saveCache(html, commit);
+        replaceDocument(html, commit.sha, commit.shortSha + formatCommitDate(commit.date));
+        return {replaced:true, version:commit.sha, commit};
+      } catch (error) {
+        console.warn("[DynamicFetch]", error);
+        try {
+          return await directRawFallback();
+        } catch (rawError) {
+          console.warn("[DynamicFetch Raw]", rawError);
+          const cached = loadCache();
+          if (cached) {
+            if (currentDocumentSha() === cached.meta.sha) {
+              updateStatus("GitHubキャッシュ版で起動中: " + (cached.meta.shortSha || cached.meta.sha), "cache");
+              return {replaced:false, version:cached.meta.sha, cache:true};
+            }
+            replaceDocument(cached.html, cached.meta.sha, (cached.meta.shortSha || cached.meta.sha) + "（キャッシュ）");
+            return {replaced:true, version:cached.meta.sha, cache:true};
+          }
+          updateStatus("GitHub同期失敗・内蔵版で起動", "error");
+          return {replaced:false, local:true, error:rawError};
+        }
+      }
     }
 
     function forceReload() {
-      alert("記録保護のため、この安定版では実行中のコード自動置換を停止しています。更新は測定終了後にHTMLファイルを更新してください。");
+      try { sessionStorage.removeItem(APPLIED_SHA_KEY); } catch (error) {}
+      location.reload();
     }
 
     return {init, forceReload};
@@ -993,7 +1024,7 @@
     let secondPeakEpochMsLatch = 0;
     let secondMotionGLatch = 0;
 
-    // V16 OVERNIGHT（表示制御のみ）
+    // V17 OVERNIGHT（表示制御のみ）
     const NIGHT_AUTO_DELAY_MS = 5000;
     const NIGHT_PEEK_MS = 5000;
     const NIGHT_HOLD_MS = 3000;
@@ -1720,8 +1751,8 @@
       let sum = 0;
       for (let i = 0; i < timeBuf.length; i++) sum += timeBuf[i] * timeBuf[i];
       const rms = Math.sqrt(sum / timeBuf.length);
-      if (!Number.isFinite(rms) || rms <= 1e-7) return 20;
-      return Math.min(95, Math.max(20, 20 * Math.log10(rms) + 72));
+      if (!Number.isFinite(rms) || rms <= 1e-7) return 0;
+      return Math.min(95, Math.max(0, 20 * Math.log10(rms) + 72));
     }
 
     function analyzeFrequencySpectrum() {
@@ -2705,8 +2736,8 @@
       }
 
       const APP_BUILD = Object.freeze({
-        version:"16",
-        build:"V16",
+        version:"17",
+        build:"V17",
         feature:"OVERNIGHT_INDEXEDDB_APPEND"
       });
 
@@ -3312,7 +3343,8 @@
             return;
           }
 
-          currentDb = measuredDb;
+          const logDb = measuredDb;
+          currentDb = Math.max(20, measuredDb);
           if (isClipRecording && currentClipMeta && currentClipMeta.waveformDb.length < 240) {
             currentClipMeta.waveformDb.push(currentDb);
           }
@@ -3328,7 +3360,7 @@
 
           const now = Date.now();
           const delta = currentDb - baselineDb;
-          recordTimeSeriesFrame(now, currentDb, spectrum.peakHz || 0, motionSnapshot);
+          recordTimeSeriesFrame(now, logDb, spectrum.peakHz || 0, motionSnapshot);
           if (now - sessionStartMs < CALIBRATION_MS) {
             const remain=Math.max(0,Math.ceil((CALIBRATION_MS-(now-sessionStartMs))/1000));
             const liveClass=document.getElementById("liveClassText");
@@ -3870,7 +3902,7 @@
         initialized = true;
         const buildBadge = document.getElementById("buildBadge");
         if (buildBadge) buildBadge.textContent = "V" + APP_BUILD.version + " OVERNIGHT";
-        document.title = "SleepTracker AI V16 OVERNIGHT";
+        document.title = "SleepTracker AI V17 OVERNIGHT";
         document.documentElement.dataset.sleepTrackerBuild = APP_BUILD.build;
         bindNightScreenControls();
         exitNightScreen();
