@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#090d16">
-<title>SleepTracker AI V15 OVERNIGHT</title>
+<title>SleepTracker AI V16 OVERNIGHT</title>
 
 <style>
   :root {
@@ -355,7 +355,7 @@
   .score-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#6366f1,#22d3ee); }
   .quality-note { color:#94a3b8; font-size:10px; line-height:1.6; }
 
-  /* V15 OVERNIGHT: 表示のみ。測定・録音・再生経路には影響しません */
+  /* V16 OVERNIGHT: 表示のみ。測定・録音・再生経路には影響しません */
   #nightScreen {
     position:fixed;
     inset:0;
@@ -508,7 +508,7 @@
 
 <header class="top">
   <div class="top-inner">
-    <div class="brand">🌙 SleepTracker <span id="buildBadge">V15 OVERNIGHT</span></div>
+    <div class="brand">🌙 SleepTracker <span id="buildBadge">V16 OVERNIGHT</span></div>
     <div id="statusBadge" class="badge b-gray">待機中</div>
   </div>
 </header>
@@ -884,7 +884,7 @@
     }
 
     async function init() {
-      updateStatus("V15 安定版（測定中の自動更新を停止）", "live");
+      updateStatus("V16 安定版（測定中の自動更新を停止）", "live");
       return {replaced:false, local:true};
     }
 
@@ -993,7 +993,7 @@
     let secondPeakEpochMsLatch = 0;
     let secondMotionGLatch = 0;
 
-    // V15 OVERNIGHT（表示制御のみ）
+    // V16 OVERNIGHT（表示制御のみ）
     const NIGHT_AUTO_DELAY_MS = 5000;
     const NIGHT_PEEK_MS = 5000;
     const NIGHT_HOLD_MS = 3000;
@@ -2705,8 +2705,8 @@
       }
 
       const APP_BUILD = Object.freeze({
-        version:"15",
-        build:"V15",
+        version:"16",
+        build:"V16",
         feature:"OVERNIGHT_INDEXEDDB_APPEND"
       });
 
@@ -3271,7 +3271,7 @@
           epochMs,
           peakEpochMs,
           peakOffsetMs:Math.max(0, peakEpochMs - sessionStartMs),
-          db:+Math.max(20, secondPeakDbLatch).toFixed(1),
+          db:+secondPeakDbLatch.toFixed(1),
           peakHz:Math.round(secondPeakHzLatch || 0),
           motionG:+secondMotionGLatch.toFixed(3)
         });
@@ -3870,7 +3870,7 @@
         initialized = true;
         const buildBadge = document.getElementById("buildBadge");
         if (buildBadge) buildBadge.textContent = "V" + APP_BUILD.version + " OVERNIGHT";
-        document.title = "SleepTracker AI V15 OVERNIGHT";
+        document.title = "SleepTracker AI V16 OVERNIGHT";
         document.documentElement.dataset.sleepTrackerBuild = APP_BUILD.build;
         bindNightScreenControls();
         exitNightScreen();
